@@ -372,7 +372,11 @@ flowchart LR
 
 - 画像は作成後に変更しない。既存画像の再利用もしない。自動削除もしない。
 - 削除は、画像管理ページから手動で行う。
-  - **ゴミ箱への移動**: Contributor 以上(`ctx.content.delete`)。ただし権限は [[#17. 実装時に再確認する事項]] で再確認する。
+  - **ゴミ箱への移動**: Contributor 以上(2026-09-24 に利用者が決定。[[T06-decision-trash-permission#結果|T06]])。プラグインのルートに `permission: "content:create"` を宣言し、ハンドラーで `ctx.content.delete("b64_images", id)` を呼ぶ。
+    - `ctx.content.delete` は、呼び出した利用者の権限を確かめない(公式ドキュメントのみ。`packages/core/src/plugins/context.ts:897`)。権限の確認はルートの `permission` だけになる(省略すると `plugins:manage` で、管理者のみ。実測+公式ドキュメント。`skills/creating-plugins/references/api-routes.md:81`)。
+    - EmDash の標準より緩い。標準 API では、Contributor は自分のコンテンツもゴミ箱に移せない(`content:delete_own` は Author 以上。`packages/auth/src/rbac.ts:22`。実測+公式ドキュメント)。そのため Contributor が、他人の投稿で使われている画像もゴミ箱に移せる。ゴミ箱に入った画像は、サイトに表示されなくなる(サイト側の取得は `deleted_at IS NULL` のものだけ。`packages/core/src/loader.ts:1341`。公式ドキュメントのみ)。
+    - ゴミ箱から戻せるのは Editor 以上(標準 API の restore)。プラグインが作った画像は作成者(`authorId`)が空なので、`content:edit_any` で判定される(`packages/core/src/astro/routes/api/content/[collection]/[id]/restore.ts:44`)。根拠: 実測+公式ドキュメント
+    - 画像管理ページでは、ゴミ箱に移す前に確認し、使用中の画像ならそのことを示す([[#11.5 画像管理ページ]])。
   - **完全削除**: 管理者のみ。標準の API `DELETE /_emdash/api/content/b64_images/{id}/permanent` を、ログイン中の管理者の権限で呼ぶ(`packages/core/src/astro/routes/api/content/[collection]/[id]/permanent.ts:14`。権限は `content:delete_permanent`)。
 - プラグインは完全削除ができない(`skills/creating-plugins/references/sandbox-boundaries.md`)。ゴミ箱を自動で空にする処理も見当たらない。容量が戻るのは完全削除したときだけ。
 - EmDash 標準の `b64_images` 一覧画面とゴミ箱画面は、1ページ100件分の base64 を読み込むので使わない(1件約 100KB)。
@@ -600,7 +604,7 @@ export default defineConfig({
 ## 17. 実装時に再確認する事項
 
 > [!question] 合意内容のうち、実装時に確認・調整するもの
-> - **ゴミ箱に移動できる権限**: 合意したのは Contributor 以上。ただし EmDash の RBAC では、自分のコンテンツを削除する `content:delete_own` でも Author 以上(`packages/auth/src/rbac.ts:22`)。画像は複数の投稿から参照されうるので、Editor 以上(`content:delete_any`)に揃えるかを確認する。
+> - **ゴミ箱に移動できる権限**(決定済み): Contributor 以上のまま(2026-09-24、利用者の判断)。Editor 以上(`content:delete_any`)に揃える案は採らなかった。ルートの permission は `content:create`。→ [[T06-decision-trash-permission#結果|T06 の結果]]、[[#10. 画像のライフサイクル|10 章]]
 > - **一覧の列を出すコレクションの判定方法**: `contentListColumns` の `collections` は同期関数。マニフェストをどう参照するかを確認する。
 > - **`content:afterSave` に渡される内容**: 下書きを保存したときに、下書きのデータが渡るのか公開版のデータが渡るのかを確認する(`packages/core/src/emdash-runtime.ts:3670`)。
 > - **`b64_images` の seed**: タイトル用のフィールドなど、最低限必要な構成を確認する。
