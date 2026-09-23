@@ -20,3 +20,6 @@ plans/
 tasks/
 docs/
 *.md
+
+# Obsidian の設定(利用者の手元にだけある。.git/info/exclude で除外していて、prettier はそれを読まない)
+.obsidian/

@@ -11,7 +11,7 @@ tags:
   - oxlint
 source_task: "[[T01-scaffold]]"
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-24
 ---
 
 # テスト・lint・E2E の設定
@@ -97,6 +97,7 @@ afterEach(() => {
   - EmDash のコードには 80 文字を超える行が多い(`packages/core/src/plugins/define-plugin.ts` で 19 行。根拠: **実測のみ**)。oxfmt の既定の行幅 100 に合わせた(根拠: **推測のみ**)。
 - 対象はコードと設定ファイルだけ。`.prettierignore` で `references/`、`.claude/`、playground のビルド出力、`spikes/`、`plans/` / `tasks/` / `docs/`、`*.md`、`package-lock.json` を除外した。Markdown は Obsidian 形式なので整形しない。
 - prettier 3 は `.gitignore` も読む。`.gitignore` にだけ書いた場所のファイルは、コマンドラインで明示しても対象外になった。根拠: **実測のみ**
+- prettier 3 は `.git/info/exclude` を読まない。メインの作業ディレクトリにだけある `.obsidian/`(利用者の Obsidian の設定。`.git/info/exclude` で除外)が `prettier --check .` の対象になり、失敗した。`.prettierignore` に `.obsidian/` を追加した([[T01-1-workflow-docs-index|T01-1]])。根拠: **実測のみ**
 - `.astro` を整形するプラグイン(`prettier-plugin-astro`)は入れていない。`prettier --check .` は、整形できない拡張子のファイルを飛ばす。
 
 ## E2E(Playwright 1.63.0)

@@ -574,7 +574,7 @@ export default defineConfig({
 
 **ツール**
 - mise で固定した npm 12 を使い、ルートと `playground/` を npm workspaces でまとめる。
-- TypeScript は strict。lint と format は EmDash と同じ oxlint + prettier。
+- TypeScript は strict。lint は oxlint、format は prettier。EmDash 0.38.0 は、lint に oxlint を、整形に oxfmt と prettier(`.astro` 用)を使っている(`package.json:24-27`、公式ドキュメントのみ)。このリポジトリは合意どおり prettier に統一する([[T01-1-workflow-docs-index|T01-1]])。
 
 **テスト**
 
