@@ -1,0 +1,77 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["typescript", "unicorn", "oxc", "import", "promise", "react", "jsx-a11y", "vitest"],
+	"categories": {
+		"correctness": "error",
+		"suspicious": "warn",
+		"perf": "warn"
+	},
+	"rules": {
+		"no-unused-vars": [
+			"warn",
+			{
+				"argsIgnorePattern": "^_",
+				"varsIgnorePattern": "^_"
+			}
+		],
+		"react/rules-of-hooks": "error",
+		"react/react-in-jsx-scope": "off",
+		"import/no-unassigned-import": [
+			"warn",
+			{
+				"allow": ["@testing-library/jest-dom/vitest"]
+			}
+		]
+	},
+	"overrides": [
+		{
+			"files": ["src/**"],
+			"rules": {
+				"no-restricted-globals": [
+					"error",
+					{
+						"name": "Buffer",
+						"message": "src はブラウザと Workers で動く。Uint8Array / atob / Uint8Array.fromBase64 を使う。"
+					},
+					{
+						"name": "process",
+						"message": "src はブラウザと Workers で動く。Node.js の process は使わない。"
+					},
+					{
+						"name": "__dirname",
+						"message": "src は ES module で、ブラウザと Workers で動く。"
+					},
+					{
+						"name": "__filename",
+						"message": "src は ES module で、ブラウザと Workers で動く。"
+					},
+					{
+						"name": "require",
+						"message": "src は ES module で、ブラウザと Workers で動く。"
+					}
+				],
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": ["node:*"],
+								"message": "src はブラウザと Workers で動く。Node.js の組み込みモジュールは使わない。"
+							}
+						]
+					}
+				]
+			}
+		}
+	],
+	"ignorePatterns": [
+		"references/**",
+		".claude/**",
+		"playground/dist/**",
+		"playground/.astro/**",
+		"spikes/**",
+		"plans/**",
+		"tasks/**",
+		"docs/**"
+	]
+}
