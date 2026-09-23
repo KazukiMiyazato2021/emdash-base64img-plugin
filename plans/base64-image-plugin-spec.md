@@ -281,9 +281,14 @@ flowchart LR
 
 1. EXIF の向きを反映してデコードする(`createImageBitmap(file, { imageOrientation: "from-image" })`)。
 2. 長辺を `maxEdge`(既定 1600px)以下に縮小する。拡大はしない。
-3. 画質 `minQuality`(既定 0.60)〜 0.92 の範囲で二分探索し、予算内に収まる最高の画質を採用する。
+   - 縮小は `createImageBitmap(bitmap, { resizeWidth, resizeHeight, resizeQuality: "high" })` で行い、同じ大きさの canvas に 1:1 で描いてからエンコードする。Firefox 155 は `imageSmoothingQuality` を持たず、`drawImage` で 2 倍以上縮小するとエイリアシングが出て、同じ画質で 10〜25% 大きくなるため。この方法なら、Firefox は ImageMagick の Lanczos とほぼ同じ画素になる(PSNR 55〜59 dB)。根拠: 実測のみ([[T05-spike-canvas-webp#結果|T05]])
+3. 画質 `minQuality`(既定 0.60)〜 0.92 の範囲で探索し、予算内に収まる最高の画質を採用する。
+   - 順番は、`minQuality` を最初に試し、次に 0.92、そのあと 0.01 刻みの二分探索にする。収まらない長辺ではエンコードが 1 回で済み、5 枚で 1 枚あたり 2〜10 回、0.13〜0.51 秒だった(Apple M5 Pro)。根拠: 実測のみ([[T05-spike-canvas-webp#結果|T05]])
+   - 画質は必ず範囲内の値を明示して渡す。省略や範囲外はブラウザの既定値(Chromium 0.80、Firefox 0.92)になり、Firefox は 0.995 以上で可逆になる。根拠: 実測+公式ドキュメント(同上)
 4. `minQuality` でも収まらなければ、0.8 倍に縮小して手順 3 に戻る。
 5. 長辺が `minEdge`(既定 480px)を下回ったら、エラーにする。
+
+既定値は、ブラウザでの測定(T05)のあとも変えない。この縮小方法なら、Chromium 153・Firefox 155 のどちらでも、5 枚すべてが 1024px 以上・画質 0.60 以上に収まった。ブラウザと cwebp の差は数ポイントで、Q7 の判断を変えるほどではない(実測のみ。[[#A.5 ブラウザの canvas での確認|付録 A.5]])。
 
 写真5枚での結果(cwebp での見積もり。[[#付録 A. 実測データ|付録 A.2]]):
 
@@ -622,7 +627,7 @@ export default defineConfig({
 - [ ] git 依存 + TS ソースのプラグインを、Vite(Node と workerd)が読み込めるか(現状は推測のみ)
 - [ ] プラグインのルートの body 上限(既定 1MiB。`skills/creating-plugins/references/sandbox-boundaries.md`)で、100KB の data URL を問題なくやり取りできるか
 - [ ] `resolveBase64Images` で画像を解決するのに、実際に何クエリかかるか(画像エントリの authorId によってバイライン取得のクエリが増えるかも含めて)
-- [ ] canvas の WebP のファイルサイズが、ブラウザ間と cwebp とでどれだけずれるか
+- [x] canvas の WebP のファイルサイズが、ブラウザ間と cwebp とでどれだけずれるか → 同じ画素ならエンコーダーの差は小さい(Firefox は cwebp と同じ、Chromium は +0.2〜1.2%)。ずれの主な原因は縮小の方法で、上の 6.3 の方法に決めた([[T05-spike-canvas-webp#結果|T05]]、[[#A.5 ブラウザの canvas での確認|付録 A.5]])
 
 ## 17. 実装時に再確認する事項
 
@@ -721,6 +726,25 @@ export default defineConfig({
 - base64 のデコード + WebP ヘッダーの解析(20回の中央値):
   - `Uint8Array.fromBase64`: 0.011ms
   - `atob` + ループ: 0.149ms
+- 実装([[T04-webp-utils|T04]] の `parseWebpDataUrl`)では、Node 26 で 0.009ms(`fromBase64`)/ 0.062ms(`atob`)、Chromium 153・Firefox 155 でも 0.15ms 以下だった(実測のみ。[[webp-data-url-validation]])。
+
+### A.5 ブラウザの canvas での確認
+
+[[T05-spike-canvas-webp|T05]] で、Chromium 153 と Firefox 155(Playwright 1.63.0、macOS、Apple M5 Pro)の `toBlob("image/webp")` を、A.2 の cwebp と比べた。全データと再現のコードは [[canvas-webp-encoding]]。根拠: 実測のみ
+
+保存 100,000 バイトに収まる最高画質。各セルは「cwebp / Chromium / Firefox」。Firefox は 6.3 の方法(`createImageBitmap` の `resizeQuality: "high"`)で、Chromium は `drawImage`(`imageSmoothingQuality = "high"`、ソフトウェア描画)で縮小した。
+
+| 写真 | 1600px | 1280px | 1024px | 800px |
+|---|---|---|---|---|
+| p1 | 55 / 57 / 55 | 77 / 78 / 77 | 84 / 85 / 84 | 90 / 91 / 90 |
+| p2 | 80 / 81 / 80 | 86 / 87 / 86 | 91 / 91 / 91 | 94 / 94 / 94 |
+| p3 | 22 / 26 / 22 | 37 / 45 / 36 | 60 / 70 / 60 | 80 / 83 / 80 |
+| p4 | 40 / 43 / 39 | 59 / 66 / 58 | 77 / 79 / 77 | 84 / 86 / 84 |
+| p5 | 92 / 92 / 91 | 95 / 95 / 95 | 97 / 97 / 97 | 100 / 99 / 99 |
+
+- Chromium では、6.3 の方法(`createImageBitmap` の `resizeQuality: "high"`)で縮小しても、ほぼ同じ結果だった(5 枚中 4 枚はすべての条件で同じサイズ)。
+- Chromium の出力は `VP8X` + `ICCP`(sRGB)+ `VP8 ` で、Firefox より 482 B 大きい。サイズの判定は Blob のサイズのままでよい。
+- 採用される長辺と画質は、ブラウザと GPU の有無で変わる。E2E では値を固定しない。
 
 ## 付録 B. 参考資料
 
