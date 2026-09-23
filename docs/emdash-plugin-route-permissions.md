@@ -26,6 +26,8 @@ updated: 2026-09-24
 
 > [!info] 対象の版
 > npm からインストールした `emdash@0.38.0` / `@emdash-cms/auth@0.38.0` / `@emdash-cms/admin@0.38.0`(`node_modules/`)で確かめた。`references/emdash` は 0.38.0 より新しい開発版で、ファイルの分け方が違う([[emdash-reference-vs-npm-0-38]])。このノートの判定の中身は、両方で同じ。
+> - 2026-09-24 に対象を 0.39.1 に上げた([[T01-2-emdash-0-39|T01-2]])。`node_modules/` のパスと行番号は 0.38.0 のときのもので、今の `node_modules`(0.39.1)とはずれることがある。`references/emdash/` の行番号は 0.39.1 でも同じ(プラグイン関係のソースに差が無い)。
+> - 0.39.1 での実測のやり直しは、[[T08-spike-route-body|T08]](ルートの権限チェックの挙動を確かめる)で行う。
 
 ## 判定の流れ
 

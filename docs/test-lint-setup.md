@@ -93,7 +93,7 @@ afterEach(() => {
 ## prettier(3.9.8)
 
 - `.prettierrc`: `useTabs: true`、`printWidth: 100`。
-  - EmDash 0.38.0 は、`.astro` 以外の整形に prettier ではなく oxfmt を使っている(`references/emdash/.prettierignore:1-3`、`references/emdash/package.json:24-25`)。根拠: **公式ドキュメントのみ**。仕様書 15 章の「EmDash と同じ oxlint + prettier」とは少し違う。
+  - EmDash(0.39.1 でも同じ)は、`.astro` 以外の整形に prettier ではなく oxfmt を使っている(`references/emdash/.prettierignore:1-3`、`references/emdash/package.json:24-25`)。根拠: **公式ドキュメントのみ**。仕様書 15 章の「EmDash と同じ oxlint + prettier」とは少し違う。
   - EmDash のコードには 80 文字を超える行が多い(`packages/core/src/plugins/define-plugin.ts` で 19 行。根拠: **実測のみ**)。oxfmt の既定の行幅 100 に合わせた(根拠: **推測のみ**)。
 - 対象はコードと設定ファイルだけ。`.prettierignore` で `references/`、`.claude/`、playground のビルド出力、`spikes/`、`plans/` / `tasks/` / `docs/`、`*.md`、`package-lock.json` を除外した。Markdown は Obsidian 形式なので整形しない。
 - prettier 3 は `.gitignore` も読む。`.gitignore` にだけ書いた場所のファイルは、コマンドラインで明示しても対象外になった。根拠: **実測のみ**
