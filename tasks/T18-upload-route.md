@@ -40,6 +40,7 @@ created: 2026-09-23
 - [ ] 検証([[T11-server-validation|T11]])→ `ctx.content.create("b64_images", …)` → `getVersioned` → `publish` → `imageRefs.put` → 参照を返す
 - [ ] `target.entryId` があれば、最初の参照元として記録する
 - [ ] 途中で失敗したときの後始末(作成済みのエントリの扱い)を決めて実装する
+- [ ] 公開するとデータを丸ごと複製したリビジョンが 1 件でき、容量を約 2 倍使う(仕様書 5.4、[[T02-1-prettier-storage-capacity|T02-1]])。これを避ける方法があるかを確かめる(例: `supports: []` のコレクションで `ctx.content.create` の直後の状態、`publish` 以外で公開状態にする方法)。無ければ仕様書 5.4 の見積もりのままにする
 
 ## 完了条件
 

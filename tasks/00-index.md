@@ -16,7 +16,7 @@ spec: "[[base64-image-plugin-spec]]"
 > - 依存関係から決まる「ウェーブ」は 0〜7 の 8 段。ウェーブ N を「フェーズ N」として、ブランチ `phase/N` で進める。同じウェーブのタスクは同時に進められる。
 > - 各タスクは、変更してよいファイルを分けてある。そのため、同じウェーブのタスクを別々のブランチで進めても衝突しにくい。
 > - 各タスクのノートの frontmatter に、依存(`depends_on`)・後続(`blocks`)・変更してよいファイル(`files`)・状態(`status`)を書いてある。
-> - 予定外の作業は、サブタスク `TNN-M` として追加する(現在 2 件: [[T01-1-workflow-docs-index|T01-1]]、[[T01-2-emdash-0-39|T01-2]])。
+> - 予定外の作業は、サブタスク `TNN-M` として追加する(現在 4 件: [[T01-1-workflow-docs-index|T01-1]]、[[T01-2-emdash-0-39|T01-2]]、[[T02-1-prettier-storage-capacity|T02-1]]、[[T05-1-spec-browser-results|T05-1]])。
 > - 対象の EmDash は 0.39.1(peer は `^0.39.0`)。2026-09-24 に 0.38.0 から変更した([[T01-2-emdash-0-39|T01-2]])。
 > - 作業中に得た知見は [[docs/00-index|知見の索引]] から辿れる。
 
@@ -68,7 +68,7 @@ spec: "[[base64-image-plugin-spec]]"
 | ウェーブ(フェーズ) | 並列数 | タスク |
 |---|---|---|
 | 0 | 2 | [[T01-scaffold\|T01]] リポジトリ雛形<br>[[T01-1-workflow-docs-index\|T01-1]] 運用ルールと知見の索引(サブタスク)<br>[[T01-2-emdash-0-39\|T01-2]] EmDash を 0.39.1 に(サブタスク)<br>[[T06-decision-trash-permission\|T06]] 決定: ゴミ箱の権限 |
-| 1 | 4 | [[T02-playground\|T02]] playground 構築<br>[[T03-shared-contracts\|T03]] 共有の型・スキーマ<br>[[T04-webp-utils\|T04]] WebP・data URL 処理<br>[[T05-spike-canvas-webp\|T05]] スパイク: canvas の WebP |
+| 1 | 4 | [[T02-playground\|T02]] playground 構築<br>[[T02-1-prettier-storage-capacity\|T02-1]] 生成物の prettier 除外と storage・容量の記述(サブタスク)<br>[[T03-shared-contracts\|T03]] 共有の型・スキーマ<br>[[T04-webp-utils\|T04]] WebP・data URL 処理<br>[[T05-spike-canvas-webp\|T05]] スパイク: canvas の WebP<br>[[T05-1-spec-browser-results\|T05-1]] T05 の結果を仕様書と T13 に反映(サブタスク) |
 | 2 | 11 | [[T07-spike-git-dependency\|T07]] スパイク: git 依存<br>[[T08-spike-route-body\|T08]] スパイク: body 上限<br>[[T09-spike-query-count\|T09]] スパイク: クエリ数<br>[[T10-spike-after-save\|T10]] 調査: afterSave<br>[[T11-server-validation\|T11]] サーバー検証ロジック<br>[[T12-input-decode\|T12]] 入力判定とデコード<br>[[T13-encode-search\|T13]] 画質探索・リサイズ<br>[[T14-admin-i18n-api\|T14]] 管理画面の文言と通信<br>[[T15-site-resolve\|T15]] resolveBase64Images<br>[[T16-reference-hook\|T16]] 参照側の保存 hook<br>[[T17-admin-data-routes\|T17]] プレビュー・サムネイル取得ルート |
 | 3 | 9 | [[T18-upload-route\|T18]] アップロードルート<br>[[T19-image-entry-hook\|T19]] b64_images の保存 hook<br>[[T20-owner-tracking\|T20]] 参照元の記録<br>[[T21-orphan-routes\|T21]] 未使用判定・画像管理ルート<br>[[T22-widget-parts\|T22]] widget 共通部品<br>[[T23-upload-hook\|T23]] アップロード処理フック<br>[[T24-list-column\|T24]] 一覧サムネイル列<br>[[T25-images-page\|T25]] 画像管理ページ<br>[[T26-playground-pages\|T26]] playground のページ |
 | 4 | 3 | [[T27-image-widget\|T27]] 単一画像 widget<br>[[T28-gallery-widget\|T28]] ギャラリー widget<br>[[T29-plugin-definition\|T29]] プラグイン定義の組み立て |
@@ -95,9 +95,11 @@ flowchart LR
     subgraph W1["ウェーブ 1"]
         direction TB
         T02["T02 playground 構築"]
+        T02_1["T02-1 prettier 除外と storage・容量"]
         T03["T03 共有の型・スキーマ"]
         T04["T04 WebP・data URL 処理"]
         T05["T05 スパイク: canvas の WebP"]
+        T05_1["T05-1 T05 の結果を反映"]
     end
     subgraph W2["ウェーブ 2"]
         direction TB
@@ -149,9 +151,11 @@ flowchart LR
     T01 --> T01_2
     T06 -.-> T01_2
     T01 --> T02
+    T02 --> T02_1
     T01 --> T03
     T01 --> T04
     T01 --> T05
+    T05 --> T05_1
     T02 --> T07
     T02 --> T08
     T02 --> T09
@@ -215,7 +219,7 @@ flowchart LR
     class T05,T07,T08,T09,T10 spike
     class T06 decision
     classDef subtask stroke-dasharray: 2 4
-    class T01_1,T01_2 subtask
+    class T01_1,T01_2,T02_1,T05_1 subtask
 ```
 
 - 実線の矢印: 完了を待ってから着手する依存
@@ -231,9 +235,11 @@ flowchart LR
 | [[T01-2-emdash-0-39\|T01-2]] | EmDash を 0.39.1 に上げる(サブタスク) | 実装 | 0 | [[T01-scaffold\|T01]] | `package.json`<br>`package-lock.json`<br>`playground/package.json`<br>`plans/base64-image-plugin-spec.md`(版)<br>ほか |
 | [[T06-decision-trash-permission\|T06]] | 決定: 画像をゴミ箱に移動できる権限 | 決定 | 0 | — | `plans/base64-image-plugin-spec.md`(10・17 章)<br>このノートの「結果」 |
 | [[T02-playground\|T02]] | playground(動作確認用サイト)を作る | 実装 | 1 | [[T01-scaffold\|T01]] | `playground/**` |
+| [[T02-1-prettier-storage-capacity\|T02-1]] | playground の生成物を prettier から外し、storage と容量の記述を直す(サブタスク) | ドキュメント | 1 | [[T02-playground\|T02]] | `.prettierignore`<br>`plans/base64-image-plugin-spec.md`(2.3・5.4・18 章)<br>`tasks/T18-upload-route.md` |
 | [[T03-shared-contracts\|T03]] | 共有の型・スキーマ・定数を定める | 実装 | 1 | [[T01-scaffold\|T01]] | `src/shared/constants.ts`<br>`src/shared/types.ts`<br>`src/shared/schema.ts`<br>ほか |
 | [[T04-webp-utils\|T04]] | WebP と data URL の低レベル処理を作る | 実装 | 1 | [[T01-scaffold\|T01]] | `src/shared/webp.ts`<br>`src/shared/data-url.ts`<br>`tests/shared/webp.test.ts`<br>ほか |
 | [[T05-spike-canvas-webp\|T05]] | スパイク: canvas の WebP サイズを比較する | スパイク | 1 | [[T01-scaffold\|T01]] | `spikes/canvas-webp/**`(使い捨て)<br>このノートの「結果」 |
+| [[T05-1-spec-browser-results\|T05-1]] | T05 の結果を仕様書と T13 に反映する(サブタスク) | ドキュメント | 1 | [[T05-spike-canvas-webp\|T05]] | `plans/base64-image-plugin-spec.md`(6.3・16 章、付録 A)<br>`tasks/T13-encode-search.md` |
 | [[T07-spike-git-dependency\|T07]] | スパイク: git 依存 + TS ソースで読み込めるか確かめる | スパイク | 2 | [[T02-playground\|T02]] | `spikes/git-dependency/**`(使い捨て)<br>このノートの「結果」 |
 | [[T08-spike-route-body\|T08]] | スパイク: プラグインのルートの body 上限を確かめる | スパイク | 2 | [[T02-playground\|T02]] | `spikes/route-body/**`(使い捨て)<br>このノートの「結果」 |
 | [[T09-spike-query-count\|T09]] | スパイク: 画像の解決にかかるクエリ数を測る | スパイク | 2 | [[T02-playground\|T02]] | `spikes/query-count/**`(使い捨て)<br>このノートの「結果」 |
