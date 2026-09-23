@@ -37,6 +37,8 @@ updated: 2026-09-24
 | [[emdash-playground-site-config\|storage を指定しない EmDash サイト(Node + SQLite)の設定とビルド]] | `docs/emdash-playground-site-config.md` | storage を省略すると local storage が既定になる。`fonts: false` の不具合と回避策。`astro build` の挙動(約 2 秒、DB・ネットワーク不要)。生成されるファイル | [[T02-playground\|T02]] |
 | [[emdash-seed-and-b64-images\|EmDash の seed の適用と b64_images の最小構成]] | `docs/emdash-seed-and-b64-images.md` | seed が適用される時期と条件。`b64_images` はタイトル不要、`routable: false` は必須。公開でリビジョンが 1 件できる。dev-bypass。widget が無いフィールドは JSON の入力欄になる | [[T02-playground\|T02]] |
 | [[emdash-query-count-b64-images\|b64_images を ID の IN 句で取得するときのクエリ数]] | `docs/emdash-query-count-b64-images.md` | `getEmDashCollection` は 50 件まで 1 クエリ。バインド変数は ID 数 + 7(1 回 93 件まで)。上限を超えると `{ entries: [], error }` で黙って空になる。locale を省いたときの絞り込み。バイラインでの増え方 | [[T09-spike-query-count\|T09]] |
+| [[emdash-after-save-payload\|EmDash 0.39.1 の content:afterSave に渡る内容と、操作ごとに呼ばれる hook]] | `docs/emdash-after-save-payload.md` | `content.data` は下書き、`liveData` は列の値。呼ばれるのは作成と更新だけ(公開・複製・ゴミ箱・復元では呼ばれない)。`errorPolicy`。`afterDelete` の形。プラグインの書き込みと hook | [[T10-spike-after-save\|T10]] |
+| [[emdash-plugin-content-query-counts\|EmDash 0.39.1 のプラグイン content API のクエリ数]] | `docs/emdash-plugin-content-query-counts.md` | 参照元 1 件 1 / 3 / 6、画像の状態 2 / 5 / 3、アップロード 72(SQLite)。T21 の件数の決め方 | [[T10-spike-after-save\|T10]] |
 | [[emdash-reference-vs-npm-0-38\|references/emdash と npm の emdash@0.38.0 のずれ]] | `docs/emdash-reference-vs-npm-0-38.md` | 参照ソースは 0.38.0 のあとの開発版だった。npm の 0.38.0 には `schema:read` などの capability が無い(0.39.1 に上げて解消) | [[T06-decision-trash-permission\|T06]] |
 | [[emdash-plugin-route-permissions\|EmDash のプラグインルートの権限]] | `docs/emdash-plugin-route-permissions.md` | ルートの `permission` とロールごとの結果(0.38.0 で実測)。省略すると Admin のみ。`ctx.content` は利用者の権限を確かめない。画面側のロールの取り方 | [[T06-decision-trash-permission\|T06]] |
 | [[emdash-plugin-route-errors\|EmDash 0.39.1 のプラグインルートのエラーの返り方]] | `docs/emdash-plugin-route-errors.md` | `PluginRouteError` は `{ success: false, error: { code, message } }` と HTTP ステータスになる。`details` は応答に入らない。想定外の例外は `INTERNAL_ERROR` | [[T03-shared-contracts\|T03]] |
@@ -57,4 +59,6 @@ updated: 2026-09-24
 
 ## Cloudflare
 
-まだ無い。
+| ノート | パス | 内容 | 元のタスク |
+|---|---|---|---|
+| [[cloudflare-workers-free-d1-limits\|Workers Free で D1 に送れるクエリ数と、1 日の上限]] | `docs/cloudflare-workers-free-d1-limits.md` | Free はサブリクエストが外部 50・Cloudflare のサービス 1,000 / 呼び出し(D1 は後者)。D1 のページの「50」と食い違う。D1 Free の 1 日の上限(読み 500 万・書き 10 万行)は 2026-09-01 から厳密に適用 | [[T10-1-spec-d1-limits\|T10-1]] |

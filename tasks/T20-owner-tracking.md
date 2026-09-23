@@ -40,6 +40,11 @@ created: 2026-09-23
 - [ ] `imageRefs.getMany` → `owners` に追記 → `putMany`(1〜2クエリ)
 - [ ] 追記だけを行い、削除はしない。同じ参照元は重複させない
 - [ ] afterSave は遅れて実行されるので、例外は外に出さずにログに出す
+- [ ] [[T10-spike-after-save#結果|T10]] の結果に合わせる(仕様書 9 章):
+  - 参照は `event.content.data`(下書き)と `event.content.liveData`(列の値)の両方から集める
+  - `content:afterPublish` でも同じ処理をする(一覧の一括公開では afterSave が呼ばれない)
+  - hook に `errorPolicy: "continue"` を指定する
+  - `b64_images` と、このプラグインの widget を持たないコレクションは読み飛ばす
 
 ## 完了条件
 
