@@ -37,7 +37,9 @@ updated: 2026-09-24
 
 ## ブラウザ・画像処理
 
-まだ無い。
+| ノート | パス | 内容 | 元のタスク |
+|---|---|---|---|
+| [[webp-data-url-validation\|WebP の data URL の検証]] | `docs/webp-data-url-validation.md` | `atob` / `fromBase64` は空白を読み飛ばす。O(1) の検査で不正な base64 を拒否する方法。WebP ヘッダーの検査(libwebp との比較)。Chromium の canvas は `VP8X` + `ICCP` で 482 バイト増える。約 100KB で 0.009〜0.15ms。テスト用の WebP は `tests/fixtures/webp/README.md` | [[T04-webp-utils\|T04]] |
 
 ## Cloudflare
 
