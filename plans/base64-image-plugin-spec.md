@@ -456,8 +456,8 @@ flowchart LR
 
 - プラグインは `resolveBase64Images(refs)` を提供する。ページで使う参照をまとめて渡すと、画像 ID をキーにした `MediaValue` 互換の値(`src` は data URL、`alt` は参照のもの)を返す。
   - 中では `getEmDashCollection("b64_images", { where: { id: [...] }, locale })` を使う。IN 句は `packages/core/src/loader.ts:772`。
-  - ID は 50 件ずつに分けて取得する(D1 のバインド変数は1クエリ100個まで)。
-  - バイラインとタクソノミーは、本体のクエリにまとめて取得される仕組みがある(`packages/core/src/query.ts:1085`)。そのため1ページあたり1〜3クエリの見込み(推測のみ。スパイクで実測する)。
+  - ID は 50 件ずつに分けて取得する(D1 のバインド変数は1クエリ100個まで)。1 回の呼び出しのバインド変数は「ID の数 + 7」(locale を指定したとき)なので、1 回に入る ID は 93 件まで。50 件なら余裕があり、EmDash 自身の IN 句の分割単位(`packages/core/src/utils/chunks.ts:17` の `SQL_BATCH_SIZE`)とも揃う。根拠: 実測+公式ドキュメント(D1 の上限は node:sqlite で模擬した。[[T09-spike-query-count#結果|T09]])
+  - バイラインとタクソノミーは、本体のクエリに畳み込まれる(`packages/core/src/loader.ts:124`)。そのため、50 件までの 1 回の呼び出しは 1 クエリ。サイトにバイラインが 1 件でもあると、バイラインの補完のクエリが加わる。このプラグインで作った画像(authorId なし)では、リクエストあたり +1、バイラインのカスタムフィールドもあれば呼び出しごとにさらに +1 で、1 ページ(1 ロケール・50 件まで)は 1〜3 クエリ。標準の REST API や管理画面で作った画像(authorId あり)では、最悪で呼び出しごとに 4 クエリとリクエストあたり +2 になる。根拠: 実測+公式ドキュメント([[T09-spike-query-count#結果|T09]]、[[emdash-query-count-b64-images]])
 - 描画は `emdash/ui` の `Image` を使う。data URL は responsive 変換の対象外なので、`<img src="data:…" width height loading="lazy" decoding="async">` がそのまま出力される(`packages/core/src/components/EmDashImage.astro`、`packages/core/src/media/responsive.ts:127`)。
 - LCP の対象になる画像には `priority` を付ける。
 - 画像が見つからないときは何も描画せず、警告ログを出す。
