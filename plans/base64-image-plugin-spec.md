@@ -229,7 +229,7 @@ flowchart LR
 
 - `id`: 画像エントリの ID。英数字で始まり、英数字・`_`・`-` だけからなる 128 文字まで(EmDash が作る ULID は満たす)。seed で slug を省いたエントリは seed の `id` がそのまま ID になるので(`packages/core/src/seed/apply.ts:676`)、`b64_images` を seed で作るときはこの規則に合わせる([[T03-shared-contracts#結果|T03]])。
 - `locale`: 画像エントリのロケール。
-  - 多言語サイトでは、取得がリクエストのロケールに絞り込まれるため、取得時にこの値を明示的に指定する(`packages/core/src/query.ts:769`)。
+  - 多言語サイトで取得時に locale を省くと、匿名の閲覧者には既定のロケールが、編集モードとプレビューの編集者にはページのロケールが使われる。見る人によって結果が変わるので、取得時にこの値を明示的に指定する(`packages/core/src/query.ts:769`)。根拠: 実測+公式ドキュメント([[T09-spike-query-count#結果|T09]])
 - `alt`: 使う場所やロケールごとに設定できる。1,000 文字以内(Unicode のコードポイントで数える)。空欄は装飾画像として扱う。
 - 型: `json` フィールドは、サイト側の型生成で `unknown` になる(`packages/core/src/schema/zod-generator.ts:499`)。プラグインから型定義と type guard を export する。
 
@@ -626,7 +626,7 @@ export default defineConfig({
 
 - [ ] git 依存 + TS ソースのプラグインを、Vite(Node と workerd)が読み込めるか(現状は推測のみ)
 - [ ] プラグインのルートの body 上限(既定 1MiB。`skills/creating-plugins/references/sandbox-boundaries.md`)で、100KB の data URL を問題なくやり取りできるか
-- [ ] `resolveBase64Images` で画像を解決するのに、実際に何クエリかかるか(画像エントリの authorId によってバイライン取得のクエリが増えるかも含めて)
+- [x] `resolveBase64Images` で画像を解決するのに、実際に何クエリかかるか(画像エントリの authorId によってバイライン取得のクエリが増えるかも含めて) → 50 件までの 1 回の呼び出しは 1 クエリ。このプラグインの画像(authorId なし)では、1 ページ 1〜3 クエリ。authorId のある画像はバイラインの補完で増える([[T09-spike-query-count#結果|T09]]、[[#12. サイト側の描画|12 章]])
 - [x] canvas の WebP のファイルサイズが、ブラウザ間と cwebp とでどれだけずれるか → 同じ画素ならエンコーダーの差は小さい(Firefox は cwebp と同じ、Chromium は +0.2〜1.2%)。ずれの主な原因は縮小の方法で、上の 6.3 の方法に決めた([[T05-spike-canvas-webp#結果|T05]]、[[#A.5 ブラウザの canvas での確認|付録 A.5]])
 
 ## 17. 実装時に再確認する事項

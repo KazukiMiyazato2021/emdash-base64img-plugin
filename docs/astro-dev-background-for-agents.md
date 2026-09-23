@@ -54,6 +54,7 @@ const wantsBackground = !!flags.background || agentDetected && !ignoreLock;
 - `-- stop` の出力は `Stopped dev server (pid …).`。止めると `dev.json` は消え、`dev.log` は残る。根拠: **実測のみ**
 - `--ignore-lock` を付けると、前面で動き、`dev.json` を作らない。そのため `stop` / `status` / `logs` の対象にならない。止めるには起動したシェルを止める(Bash の `run_in_background` で起動したなら TaskStop)。止めたあとポートが空くことを確かめた。根拠: **実測+公式ドキュメント**(`index.js:108-142`)
 - 止め忘れの確認: `lsof -nP -iTCP:4402 -sTCP:LISTEN`。根拠: **実測のみ**
+- サイトの外から相対パスの `--root` を渡すと、起動に失敗する。バックグラウンドのプロセスがそのパスをもう一度解決するため。サイトのディレクトリの中から起動する(`npm run dev -w playground` や、`cd <サイト> && npx astro dev`)。根拠: **実測のみ**([[T09-spike-query-count|T09]] の使い捨てのサイトで確認)
 
 ## ロックファイル
 
