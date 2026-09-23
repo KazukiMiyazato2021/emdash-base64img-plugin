@@ -30,8 +30,10 @@ updated: 2026-09-24
 
 | ノート | パス | 内容 | 元のタスク |
 |---|---|---|---|
-| [[emdash-0-38-dependency-versions\|EmDash 0.38.0 に合わせた依存パッケージの版]] | `docs/emdash-0-38-dependency-versions.md` | `emdash` / `@emdash-cms/admin` は 0.38.0 に固定し、peer は `^0.38.0`(0.39.x を含まない)。kumo は 2.6.0。`~/.npmrc` の `min-release-age=3` の影響 | [[T01-scaffold\|T01]] |
-| [[emdash-native-plugin-entrypoints\|EmDash 0.38.0 の native プラグインの入口]] | `docs/emdash-native-plugin-entrypoints.md` | descriptor の必須項目、名前付き export の `createPlugin`、`adminEntry` と `admin.entry` の違い | [[T01-scaffold\|T01]] |
+| [[emdash-dependency-versions\|EmDash に合わせた依存パッケージの版]] | `docs/emdash-dependency-versions.md` | `emdash` / `@emdash-cms/admin` は 0.39.1、peer は `^0.39.0`。kumo は 2.6.0。0.38.0 から上げた経緯と、`min-release-age` の例外の手順・監査結果 | [[T01-scaffold\|T01]]、[[T01-2-emdash-0-39\|T01-2]] |
+| [[emdash-native-plugin-entrypoints\|EmDash の native プラグインの入口]] | `docs/emdash-native-plugin-entrypoints.md` | descriptor の必須項目、名前付き export の `createPlugin`、`adminEntry` と `admin.entry` の違い(0.38.0 と 0.39.1 で同じ) | [[T01-scaffold\|T01]] |
+| [[emdash-reference-vs-npm-0-38\|references/emdash と npm の emdash@0.38.0 のずれ]] | `docs/emdash-reference-vs-npm-0-38.md` | 参照ソースは 0.38.0 のあとの開発版だった。npm の 0.38.0 には `schema:read` などの capability が無い(0.39.1 に上げて解消) | [[T06-decision-trash-permission\|T06]] |
+| [[emdash-plugin-route-permissions\|EmDash のプラグインルートの権限]] | `docs/emdash-plugin-route-permissions.md` | ルートの `permission` とロールごとの結果(0.38.0 で実測)。省略すると Admin のみ。`ctx.content` は利用者の権限を確かめない。画面側のロールの取り方 | [[T06-decision-trash-permission\|T06]] |
 
 ## ブラウザ・画像処理
 

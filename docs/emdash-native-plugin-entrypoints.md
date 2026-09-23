@@ -1,5 +1,5 @@
 ---
-title: EmDash 0.38.0 の native プラグインの入口
+title: EmDash の native プラグインの入口
 aliases:
   - native プラグインの入口
   - createPlugin と descriptor
@@ -9,16 +9,17 @@ tags:
   - plugin
 source_task: "[[T01-scaffold]]"
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-24
 ---
 
-# EmDash 0.38.0 の native プラグインの入口
+# EmDash の native プラグインの入口
 
 > [!summary] 要点
 > - サイトの設定に渡す descriptor(`base64ImagePlugin()` が返す `PluginDescriptor`)は、`id` / `version` / `entrypoint` が必須。
 > - EmDash は `entrypoint` のモジュールから **名前付き export の `createPlugin`** を import し、`createPlugin(descriptor.options)` を呼ぶ。default export は native 形式では使われない。
 > - 管理画面の React は 2 か所で指定する: descriptor の `adminEntry`(ビルド時にバンドルへ入れる)と、`definePlugin({ admin: { entry } })`(実行時にマニフェストで `adminMode: "react"` にする)。
 > - 関連: [[T01-scaffold]]、[[T29-plugin-definition]]、[[T30-admin-entry]]、[[base64-image-plugin-spec#14. 配布とバージョン|仕様書 14 章]]
+> - 0.38.0 で確かめた内容。0.39.1 でも同じだった(`references/emdash/packages/core/src/astro/integration/virtual-modules.ts:303` の `createPlugin` の import、`runtime.ts:84` の `PluginDescriptor`。2026-09-24、[[T01-2-emdash-0-39|T01-2]]。公式ドキュメントのみ)。仮実装の `src/index.ts` は、0.39.1 でも型チェックとテストが通った(実測のみ)。
 
 ## descriptor(`PluginDescriptor`)
 

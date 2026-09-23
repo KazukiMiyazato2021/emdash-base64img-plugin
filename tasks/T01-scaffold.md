@@ -106,10 +106,13 @@ created: 2026-09-23
 
 ## 結果
 
+> [!note] 2026-09-24 追記
+> このあと [[T01-2-emdash-0-39|T01-2]] で、`emdash` / `@emdash-cms/admin` を 0.39.1(peer は `^0.39.0`)に上げた。以下は T01 の時点(0.38.0)の記録。
+
 > [!summary] まとめ
 > - `npm run verify` が通る雛形を作った(build・lint・test とも成功、テスト 7 件)。
 > - `exports` の 3 つの入口は、Node(自己参照と playground からのリンク経由)・TypeScript・vitest のいずれでも解決できた。
-> - 知見ノート: [[emdash-0-38-dependency-versions]]、[[npm-workspaces-nested-worktree]]、[[emdash-native-plugin-entrypoints]]、[[test-lint-setup]]
+> - 知見ノート: [[emdash-dependency-versions]]、[[npm-workspaces-nested-worktree]]、[[emdash-native-plugin-entrypoints]]、[[test-lint-setup]]
 
 ### 入口の形(EmDash 0.38.0)
 
@@ -130,7 +133,7 @@ created: 2026-09-23
 
 ### 依存パッケージの版
 
-詳細は [[emdash-0-38-dependency-versions]]。
+詳細は [[emdash-dependency-versions]]。
 
 - `emdash` / `@emdash-cms/admin` は devDependencies で `0.38.0` に固定し、peer は `^0.38.0`。`^0.38.0` は 0.39.x(latest の 0.39.1 を含む)も、npm にある deprecated の 1.0.0 も含まない。根拠: **実測のみ**(`semver.satisfies`、`npm view`)
 - `@cloudflare/kumo` は `2.6.0` に固定(peer も)。`@emdash-cms/admin` 0.38.0 が `2.6.0` に完全一致で依存しており、EmDash は Kumo の版に合わせて管理画面の CSS を作っているため。根拠: **公式ドキュメントのみ**(`references/emdash/pnpm-workspace.yaml:97-102`)+ `npm view` の **実測**

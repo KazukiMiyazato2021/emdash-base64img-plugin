@@ -18,7 +18,12 @@ updated: 2026-09-24
 > - `references/emdash` は `package.json` の版が 0.38.0 だが、0.38.0 のリリース後の開発版で、未リリースの changeset が 80 件ある。npm からインストールされる `emdash@0.38.0`(このリポジトリが使う版)とは中身が違う。
 > - 仕様書が使っている capability `schema:read` / `content:publish` / `content:revisions:read` / `content:restore` は、npm の 0.38.0 には無い。`definePlugin` に渡すと `Invalid capability` の例外になる(実測)。
 > - 仕様書やノートの行番号(`references/emdash/...`)は、npm の 0.38.0 の行番号と一致しないことがある。実際に動くのは `node_modules/emdash` のほう。
-> - 関連: [[T06-decision-trash-permission]]、[[emdash-plugin-route-permissions]]、[[emdash-0-38-dependency-versions]]、[[base64-image-plugin-spec|仕様書]]
+> - 関連: [[T06-decision-trash-permission]]、[[emdash-plugin-route-permissions]]、[[emdash-dependency-versions]]、[[base64-image-plugin-spec|仕様書]]
+
+> [!success] 対応(2026-09-24)
+> - 利用者の判断で、対象を npm の 0.39.1 に上げた(peer は `^0.39.0`)。0.39.0 / 0.39.1 には、上の capability と `ctx.content` のメソッドがある(tarball を読んで確認。公式ドキュメントのみ)。→ [[T01-2-emdash-0-39|T01-2]]、[[emdash-dependency-versions#0.38.0 から 0.39.1 に上げた経緯]]
+> - `references/emdash` は、タグ `emdash@0.39.1` に切り替えた。これで、参照ソースとインストールされる版が一致する。
+> - 下の表は、2026-09-24 に 0.38.0 と開発版(`ea275faf`)を比べたときの記録として残す。
 
 ## 確かめたこと
 
@@ -40,7 +45,7 @@ updated: 2026-09-24
 
 - 追加の capability は、changeset `plugin-publication-actions.md`(`content:publish` / `content:restore`)と `bright-plugins-discover.md`(`schema:read` / `content:revisions:read`)に、`emdash` の minor の変更として書かれている。根拠: 公式ドキュメントのみ
 - これらが npm の 0.39.x に入っているかは確かめていない。changeset の運用から、次のマイナーで出ると見込まれる。根拠: 推測のみ
-- T01 の時点(2026-09-23)では、0.39.x は公開から 3 日たっておらず、利用者の `~/.npmrc` の `min-release-age=3` でインストールできなかった([[emdash-0-38-dependency-versions|依存パッケージの版]])。根拠: 実測のみ(T01)
+- T01 の時点(2026-09-23)では、0.39.x は公開から 3 日たっておらず、利用者の `~/.npmrc` の `min-release-age=3` でインストールできなかった([[emdash-dependency-versions|依存パッケージの版]])。根拠: 実測のみ(T01)
 
 ## 仕様書への影響(T06 では直していない)
 
