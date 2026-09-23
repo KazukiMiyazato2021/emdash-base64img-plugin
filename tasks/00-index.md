@@ -1,0 +1,237 @@
+---
+title: タスク一覧
+aliases:
+  - base64-image プラグイン タスク一覧
+tags:
+  - task
+  - index
+created: 2026-09-23
+spec: "[[base64-image-plugin-spec]]"
+---
+
+# タスク一覧
+
+> [!summary] 概要
+> [[base64-image-plugin-spec|仕様書]] の合意内容を、並列に進められるように 34 個のタスクに分けたもの。
+> - 依存関係から決まる「ウェーブ」は 0〜7 の 8 段。同じウェーブのタスクは同時に進められる。
+> - 各タスクは、変更してよいファイルを分けてある。そのため、同じウェーブのタスクを別々のブランチで進めても衝突しにくい。
+> - 各タスクのノートの frontmatter に、依存(`depends_on`)・後続(`blocks`)・変更してよいファイル(`files`)・状態(`status`)を書いてある。
+
+## 進め方のルール
+
+- 着手する前に、ローカルの変更を `git stash` などで退避する。
+- main には直接コミットしない。タスクごとにブランチ `task/<ID>-<slug>`(例: `task/T11-server-validation`)を作り、PR でマージする。
+- 依存するタスクが main にマージされてから、最新の main からブランチを作る。
+- 並列に進めるときは、`git worktree add ../wt-T11 -b task/T11-server-validation` のように、タスクごとに作業ディレクトリを分ける。
+- `git add` はパスを指定する(`-A` などで全体を追加しない)。
+- タスクノートの `status` を `todo` → `doing` → `done` と更新する。
+- スパイクのコードは使い捨てで、マージしない。結果はタスクノートの「結果」に根拠レベル付きで書く。設計が変わる場合は、仕様書と関係するタスクも更新する。
+- 管理画面の文言は、各部品のファイル内に ja / en の辞書として持つ。共有の辞書ファイルには追記しない(同時に編集して衝突するのを防ぐため)。
+- 依存パッケージの追加が必要になったら、単独の小さな PR にする(`package-lock.json` の衝突を防ぐため)。
+
+## 共通の完了条件
+
+- `npm run typecheck` / `npm run lint` / `npm test` が通る。
+- 新しいコードには、実際の不具合で失敗しうる単体テストがある。
+- 管理画面の文言は日本語と英語の両方があり、キーボードで操作できる。
+- 仕様と違う実装にした場合は、仕様書を更新した。
+
+## ウェーブ(同時に進められるタスクのまとまり)
+
+| ウェーブ | 並列数 | タスク |
+|---|---|---|
+| 0 | 2 | [[T01-scaffold\|T01]] リポジトリ雛形<br>[[T06-decision-trash-permission\|T06]] 決定: ゴミ箱の権限 |
+| 1 | 4 | [[T02-playground\|T02]] playground 構築<br>[[T03-shared-contracts\|T03]] 共有の型・スキーマ<br>[[T04-webp-utils\|T04]] WebP・data URL 処理<br>[[T05-spike-canvas-webp\|T05]] スパイク: canvas の WebP |
+| 2 | 11 | [[T07-spike-git-dependency\|T07]] スパイク: git 依存<br>[[T08-spike-route-body\|T08]] スパイク: body 上限<br>[[T09-spike-query-count\|T09]] スパイク: クエリ数<br>[[T10-spike-after-save\|T10]] 調査: afterSave<br>[[T11-server-validation\|T11]] サーバー検証ロジック<br>[[T12-input-decode\|T12]] 入力判定とデコード<br>[[T13-encode-search\|T13]] 画質探索・リサイズ<br>[[T14-admin-i18n-api\|T14]] 管理画面の文言と通信<br>[[T15-site-resolve\|T15]] resolveBase64Images<br>[[T16-reference-hook\|T16]] 参照側の保存 hook<br>[[T17-admin-data-routes\|T17]] プレビュー・サムネイル取得ルート |
+| 3 | 9 | [[T18-upload-route\|T18]] アップロードルート<br>[[T19-image-entry-hook\|T19]] b64_images の保存 hook<br>[[T20-owner-tracking\|T20]] 参照元の記録<br>[[T21-orphan-routes\|T21]] 未使用判定・画像管理ルート<br>[[T22-widget-parts\|T22]] widget 共通部品<br>[[T23-upload-hook\|T23]] アップロード処理フック<br>[[T24-list-column\|T24]] 一覧サムネイル列<br>[[T25-images-page\|T25]] 画像管理ページ<br>[[T26-playground-pages\|T26]] playground のページ |
+| 4 | 3 | [[T27-image-widget\|T27]] 単一画像 widget<br>[[T28-gallery-widget\|T28]] ギャラリー widget<br>[[T29-plugin-definition\|T29]] プラグイン定義の組み立て |
+| 5 | 1 | [[T30-admin-entry\|T30]] 管理画面エントリの組み立て |
+| 6 | 3 | [[T31-e2e\|T31]] E2E テスト<br>[[T32-cloudflare-check\|T32]] Cloudflare での確認<br>[[T33-readme\|T33]] README |
+| 7 | 1 | [[T34-release\|T34]] v0.1.0 リリース |
+
+**クリティカルパス**(最も長い依存の連なり、8 段): [[T01-scaffold|T01]] → [[T03-shared-contracts|T03]] → [[T12-input-decode|T12]] → [[T23-upload-hook|T23]] → [[T27-image-widget|T27]] → [[T30-admin-entry|T30]] → [[T31-e2e|T31]] → [[T34-release|T34]]
+
+> [!tip] 最優先は [[T03-shared-contracts|T03]](共有の型・スキーマ)
+> 9 個のタスクが T03 の完了を直接待っている。小さく作って早く main にマージすると、全体の並列度が上がる。
+
+## 依存グラフ
+
+```mermaid
+flowchart LR
+    subgraph W0["ウェーブ 0"]
+        direction TB
+        T01["T01 リポジトリ雛形"]
+        T06["T06 決定: ゴミ箱の権限"]
+    end
+    subgraph W1["ウェーブ 1"]
+        direction TB
+        T02["T02 playground 構築"]
+        T03["T03 共有の型・スキーマ"]
+        T04["T04 WebP・data URL 処理"]
+        T05["T05 スパイク: canvas の WebP"]
+    end
+    subgraph W2["ウェーブ 2"]
+        direction TB
+        T07["T07 スパイク: git 依存"]
+        T08["T08 スパイク: body 上限"]
+        T09["T09 スパイク: クエリ数"]
+        T10["T10 調査: afterSave"]
+        T11["T11 サーバー検証ロジック"]
+        T12["T12 入力判定とデコード"]
+        T13["T13 画質探索・リサイズ"]
+        T14["T14 管理画面の文言と通信"]
+        T15["T15 resolveBase64Images"]
+        T16["T16 参照側の保存 hook"]
+        T17["T17 プレビュー・サムネイル取得ルート"]
+    end
+    subgraph W3["ウェーブ 3"]
+        direction TB
+        T18["T18 アップロードルート"]
+        T19["T19 b64_images の保存 hook"]
+        T20["T20 参照元の記録"]
+        T21["T21 未使用判定・画像管理ルート"]
+        T22["T22 widget 共通部品"]
+        T23["T23 アップロード処理フック"]
+        T24["T24 一覧サムネイル列"]
+        T25["T25 画像管理ページ"]
+        T26["T26 playground のページ"]
+    end
+    subgraph W4["ウェーブ 4"]
+        direction TB
+        T27["T27 単一画像 widget"]
+        T28["T28 ギャラリー widget"]
+        T29["T29 プラグイン定義の組み立て"]
+    end
+    subgraph W5["ウェーブ 5"]
+        direction TB
+        T30["T30 管理画面エントリの組み立て"]
+    end
+    subgraph W6["ウェーブ 6"]
+        direction TB
+        T31["T31 E2E テスト"]
+        T32["T32 Cloudflare での確認"]
+        T33["T33 README"]
+    end
+    subgraph W7["ウェーブ 7"]
+        direction TB
+        T34["T34 v0.1.0 リリース"]
+    end
+    T01 --> T02
+    T01 --> T03
+    T01 --> T04
+    T01 --> T05
+    T02 --> T07
+    T02 --> T08
+    T02 --> T09
+    T02 --> T10
+    T03 --> T11
+    T04 --> T11
+    T03 --> T12
+    T03 --> T13
+    T04 --> T13
+    T05 -.-> T13
+    T03 --> T14
+    T03 --> T15
+    T09 -.-> T15
+    T03 --> T16
+    T03 --> T17
+    T11 --> T18
+    T08 --> T18
+    T11 --> T19
+    T03 --> T20
+    T10 --> T20
+    T03 --> T21
+    T06 --> T21
+    T10 --> T21
+    T14 --> T22
+    T12 --> T23
+    T13 --> T23
+    T14 --> T23
+    T14 --> T24
+    T14 --> T25
+    T06 --> T25
+    T02 --> T26
+    T15 --> T26
+    T22 --> T27
+    T23 --> T27
+    T22 --> T28
+    T23 --> T28
+    T07 --> T29
+    T16 --> T29
+    T17 --> T29
+    T18 --> T29
+    T19 --> T29
+    T20 --> T29
+    T21 --> T29
+    T24 --> T30
+    T25 --> T30
+    T27 --> T30
+    T28 --> T30
+    T26 --> T31
+    T29 --> T31
+    T30 --> T31
+    T26 --> T32
+    T29 --> T32
+    T30 --> T32
+    T29 --> T33
+    T30 --> T33
+    T31 --> T34
+    T32 --> T34
+    T33 --> T34
+    classDef spike stroke-dasharray: 5 5
+    classDef decision stroke-width:3px
+    class T05,T07,T08,T09,T10 spike
+    class T06 decision
+```
+
+- 実線の矢印: 完了を待ってから着手する依存
+- 点線の矢印: 結果を後で反映するだけで、着手はブロックしない依存
+- 点線の枠: スパイク / 太い枠: 利用者が決めること
+
+## 全タスク
+
+| ID | タスク | 種別 | ウェーブ | 依存 | 主な変更ファイル |
+|---|---|---|---|---|---|
+| [[T01-scaffold\|T01]] | リポジトリの雛形を作る | 実装 | 0 | — | `package.json`<br>`package-lock.json`<br>`playground/package.json`(仮)<br>ほか |
+| [[T06-decision-trash-permission\|T06]] | 決定: 画像をゴミ箱に移動できる権限 | 決定 | 0 | — | `plans/base64-image-plugin-spec.md`(10・17 章)<br>このノートの「結果」 |
+| [[T02-playground\|T02]] | playground(動作確認用サイト)を作る | 実装 | 1 | [[T01-scaffold\|T01]] | `playground/**` |
+| [[T03-shared-contracts\|T03]] | 共有の型・スキーマ・定数を定める | 実装 | 1 | [[T01-scaffold\|T01]] | `src/shared/constants.ts`<br>`src/shared/types.ts`<br>`src/shared/schema.ts`<br>ほか |
+| [[T04-webp-utils\|T04]] | WebP と data URL の低レベル処理を作る | 実装 | 1 | [[T01-scaffold\|T01]] | `src/shared/webp.ts`<br>`src/shared/data-url.ts`<br>`tests/shared/webp.test.ts`<br>ほか |
+| [[T05-spike-canvas-webp\|T05]] | スパイク: canvas の WebP サイズを比較する | スパイク | 1 | [[T01-scaffold\|T01]] | `spikes/canvas-webp/**`(使い捨て)<br>このノートの「結果」 |
+| [[T07-spike-git-dependency\|T07]] | スパイク: git 依存 + TS ソースで読み込めるか確かめる | スパイク | 2 | [[T02-playground\|T02]] | `spikes/git-dependency/**`(使い捨て)<br>このノートの「結果」 |
+| [[T08-spike-route-body\|T08]] | スパイク: プラグインのルートの body 上限を確かめる | スパイク | 2 | [[T02-playground\|T02]] | `spikes/route-body/**`(使い捨て)<br>このノートの「結果」 |
+| [[T09-spike-query-count\|T09]] | スパイク: 画像の解決にかかるクエリ数を測る | スパイク | 2 | [[T02-playground\|T02]] | `spikes/query-count/**`(使い捨て)<br>このノートの「結果」 |
+| [[T10-spike-after-save\|T10]] | 調査: afterSave に渡される内容を確かめる | スパイク | 2 | [[T02-playground\|T02]] | `spikes/after-save/**`(使い捨て)<br>このノートの「結果」 |
+| [[T11-server-validation\|T11]] | サーバー側の検証ロジックを作る | 実装 | 2 | [[T03-shared-contracts\|T03]]、[[T04-webp-utils\|T04]] | `src/server/validate.ts`<br>`tests/server/validate.test.ts` |
+| [[T12-input-decode\|T12]] | 入力画像の判定とデコードを作る | 実装 | 2 | [[T03-shared-contracts\|T03]] | `src/client/input.ts`<br>`tests/client/input.test.ts` |
+| [[T13-encode-search\|T13]] | リサイズ・画質探索・サムネイル生成を作る | 実装 | 2 | [[T03-shared-contracts\|T03]]、[[T04-webp-utils\|T04]] | `src/client/encode.ts`<br>`src/client/thumbnail.ts`<br>`tests/client/encode.test.ts` |
+| [[T14-admin-i18n-api\|T14]] | 管理画面の文言(i18n)と API クライアントを作る | 実装 | 2 | [[T03-shared-contracts\|T03]] | `src/client/i18n.ts`<br>`src/client/error-messages.ts`<br>`src/client/api.ts`<br>ほか |
+| [[T15-site-resolve\|T15]] | サイト側の resolveBase64Images を作る | 実装 | 2 | [[T03-shared-contracts\|T03]] | `src/site/resolve.ts`<br>`src/astro.ts`<br>`tests/site/resolve.test.ts` |
+| [[T16-reference-hook\|T16]] | 参照を持つコレクションの保存 hook(検証)を作る | 実装 | 2 | [[T03-shared-contracts\|T03]] | `src/server/hooks/references.ts`<br>`tests/server/references.test.ts` |
+| [[T17-admin-data-routes\|T17]] | 管理画面用のデータ取得ルートを作る | 実装 | 2 | [[T03-shared-contracts\|T03]] | `src/server/routes/admin-data.ts`<br>`tests/server/admin-data.test.ts` |
+| [[T18-upload-route\|T18]] | アップロード用ルートを作る | 実装 | 3 | [[T11-server-validation\|T11]]、[[T08-spike-route-body\|T08]] | `src/server/routes/upload.ts`<br>`tests/server/upload.test.ts` |
+| [[T19-image-entry-hook\|T19]] | b64_images の保存 hook(検証)を作る | 実装 | 3 | [[T11-server-validation\|T11]] | `src/server/hooks/image-entry.ts`<br>`tests/server/image-entry.test.ts` |
+| [[T20-owner-tracking\|T20]] | 参照元の記録(afterSave)を作る | 実装 | 3 | [[T03-shared-contracts\|T03]]、[[T10-spike-after-save\|T10]] | `src/server/hooks/owners.ts`<br>`tests/server/owners.test.ts` |
+| [[T21-orphan-routes\|T21]] | 未使用画像の判定と画像管理ルートを作る | 実装 | 3 | [[T03-shared-contracts\|T03]]、[[T06-decision-trash-permission\|T06]]、[[T10-spike-after-save\|T10]] | `src/server/orphans.ts`<br>`src/server/routes/images-admin.ts`<br>`src/server/hooks/image-deleted.ts`<br>ほか |
+| [[T22-widget-parts\|T22]] | widget 共通の UI 部品を作る | 実装 | 3 | [[T14-admin-i18n-api\|T14]] | `src/admin/parts/**`<br>`tests/admin/parts.test.tsx` |
+| [[T23-upload-hook\|T23]] | アップロード処理の React フックを作る | 実装 | 3 | [[T12-input-decode\|T12]]、[[T13-encode-search\|T13]]、[[T14-admin-i18n-api\|T14]] | `src/admin/hooks/**`<br>`tests/admin/hooks.test.ts` |
+| [[T24-list-column\|T24]] | コンテンツ一覧のサムネイル列を作る | 実装 | 3 | [[T14-admin-i18n-api\|T14]] | `src/admin/ThumbnailColumn.tsx`<br>`tests/admin/ThumbnailColumn.test.tsx` |
+| [[T25-images-page\|T25]] | 画像管理ページを作る | 実装 | 3 | [[T14-admin-i18n-api\|T14]]、[[T06-decision-trash-permission\|T06]] | `src/admin/ImagesPage.tsx`<br>`tests/admin/ImagesPage.test.tsx` |
+| [[T26-playground-pages\|T26]] | playground に E2E 用のページとデータを用意する | 実装 | 3 | [[T02-playground\|T02]]、[[T15-site-resolve\|T15]] | `playground/src/pages/**`<br>`playground/seed/**`<br>`e2e/fixtures/**` |
+| [[T27-image-widget\|T27]] | 単一画像の widget を作る | 実装 | 4 | [[T22-widget-parts\|T22]]、[[T23-upload-hook\|T23]] | `src/admin/ImageField.tsx`<br>`tests/admin/ImageField.test.tsx` |
+| [[T28-gallery-widget\|T28]] | ギャラリーの widget を作る | 実装 | 4 | [[T22-widget-parts\|T22]]、[[T23-upload-hook\|T23]] | `src/admin/GalleryField.tsx`<br>`tests/admin/GalleryField.test.tsx` |
+| [[T29-plugin-definition\|T29]] | プラグイン定義(src/index.ts)を組み立てる | 実装 | 4 | [[T07-spike-git-dependency\|T07]]、[[T16-reference-hook\|T16]]、[[T17-admin-data-routes\|T17]]、[[T18-upload-route\|T18]]、[[T19-image-entry-hook\|T19]]、[[T20-owner-tracking\|T20]]、[[T21-orphan-routes\|T21]] | `src/index.ts`<br>`src/server/plugin.ts` |
+| [[T30-admin-entry\|T30]] | 管理画面のエントリ(src/admin.tsx)を組み立てる | 実装 | 5 | [[T24-list-column\|T24]]、[[T25-images-page\|T25]]、[[T27-image-widget\|T27]]、[[T28-gallery-widget\|T28]] | `src/admin.tsx` |
+| [[T31-e2e\|T31]] | E2E テストを作る | テスト | 6 | [[T26-playground-pages\|T26]]、[[T29-plugin-definition\|T29]]、[[T30-admin-entry\|T30]] | `e2e/**`<br>`playwright.config.ts` |
+| [[T32-cloudflare-check\|T32]] | Cloudflare(wrangler dev + D1)で動作を確認する | テスト | 6 | [[T26-playground-pages\|T26]]、[[T29-plugin-definition\|T29]]、[[T30-admin-entry\|T30]] | `playground/wrangler.jsonc`<br>`playground/astro.config.cloudflare.mjs`<br>このノートの「結果」 |
+| [[T33-readme\|T33]] | README と導入手順を書く | ドキュメント | 6 | [[T29-plugin-definition\|T29]]、[[T30-admin-entry\|T30]] | `README.md` |
+| [[T34-release\|T34]] | v0.1.0 をリリースする | リリース | 7 | [[T31-e2e\|T31]]、[[T32-cloudflare-check\|T32]]、[[T33-readme\|T33]] | `package.json`(version)<br>`plans/base64-image-plugin-spec.md`(status) |
+
+## 状態の一覧(Dataview プラグインがある場合)
+
+```dataview
+TABLE WITHOUT ID file.link AS タスク, title AS 内容, type AS 種別, wave AS ウェーブ, status AS 状態
+FROM "tasks"
+WHERE id
+SORT wave ASC, id ASC
+```
