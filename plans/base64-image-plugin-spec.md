@@ -110,6 +110,11 @@ package: emdash-plugin-base64-image
 - 結果として、**このプラグインがサイトで唯一の画像の手段**になる。
 - 根拠: 公式ドキュメントのみ
 
+> [!note] 「storage を指定しない」と「storage が無い」は違う(2026-09-24 に確認)
+> - EmDash 0.39.1 は、`storage` を省略すると `./.emdash/uploads` の local storage を既定にする(`packages/core/src/astro/integration/index.ts:71-75`、`:335` の `config.storage ?? DEFAULT_STORAGE`)。根拠: 公式ドキュメントのみ
+> - Node(playground)では、省略したままでも標準のメディアのアップロードが成功した。`NO_STORAGE` になったのは、型定義に無い `storage: false` を渡したときだけ。根拠: 実測+公式ドキュメント([[T02-playground#結果|T02]])
+> - Cloudflare Workers ではファイルシステムに書けないので、省略したときの local storage は動かない見込み(推測のみ)。上の機能が使えなくなることに変わりはない。実際のエラーの形は [[T32-cloudflare-check|T32]] で確かめる([[T02-1-prettier-storage-capacity|T02-1]])。
+
 ### 2.4 バックアップ
 
 > [!warning] 復旧手段は D1 Time Travel(直近7日)のみ
@@ -249,7 +254,8 @@ flowchart LR
 
 ### 5.4 容量の目安
 
-- 画像1枚は最大 100,000 バイトなので、D1 の 500MB で約 5,000 枚(未使用画像を含む)。
+- 画像1枚は最大 100,000 バイト。ただし、公開するとデータを丸ごと複製したリビジョンが 1 件できる(`packages/core/src/database/repositories/content.ts:2309-2318`。`supports: []` でも同じ。実測+公式ドキュメント、[[T02-playground#結果|T02]])。そのため 1 枚で DB を約 2 倍使い、D1 の 500MB で約 2,500 枚(未使用画像を含む。推測のみ)。
+  - プラグインが公開するときに、この複製を避けられるかは [[T18-upload-route|T18]] で確かめる([[T02-1-prettier-storage-capacity|T02-1]])。
 - 投稿側の行とリビジョンには参照しか入らないため、小さいまま保たれる。
 
 ## 6. 圧縮仕様(ブラウザ)
@@ -633,7 +639,7 @@ export default defineConfig({
 | ブラウザ | 管理画面は Safari 非対応(canvas で WebP を作れない) |
 | 入力形式 | HEIC / HEIF は非対応 |
 | 編集ロック | 編集ロック中でも widget を操作できる(EmDash 側の制約) |
-| 容量 | D1 の 500MB で約 5,000 枚。使われなくなった画像は自動では消えず、プラグインからは完全削除もできない。使用量は Cloudflare のダッシュボードで監視する |
+| 容量 | D1 の 500MB で約 2,500 枚(公開時にできるリビジョンを含む。[[#5.4 容量の目安\|5.4]])。使われなくなった画像は自動では消えず、プラグインからは完全削除もできない。使用量は Cloudflare のダッシュボードで監視する |
 | バックアップ | D1 Time Travel(直近7日)だけ |
 | ページの重さ | 画像は HTML にインラインで埋め込まれる。一覧ページ10件で最大約 1MB、カバー1枚+ギャラリー10枚のページで約 1.1MB。圧縮すれば転送量はほぼ WebP 本体の合計まで下がる見込み(推測のみ) |
 | 標準画面 | `b64_images` の標準の一覧画面・ゴミ箱画面は重い(1ページ100件 × 約 100KB) |

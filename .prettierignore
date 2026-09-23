@@ -23,3 +23,8 @@ docs/
 
 # Obsidian の設定(利用者の手元にだけある。.git/info/exclude で除外していて、prettier はそれを読まない)
 .obsidian/
+
+# playground で EmDash と Astro が生成するもの(playground/.gitignore で git から外している。prettier はそれを読まない)
+# emdash-env.d.ts は開発サーバーの起動時に生成され、末尾に改行が無い
+playground/emdash-env.d.ts
+playground/.emdash/
