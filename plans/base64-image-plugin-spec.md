@@ -513,6 +513,12 @@ const images = await resolveBase64Images(refs);
 ```
 
 - プラグインは起動時に `b64_images` があるかを確認し、なければエラーを出す。プラグインからはコレクションを作れない(`ctx.schema` は読み取り専用)。
+- `b64_images` は上の構成で足りる。タイトル用のフィールドは要らない(作成・公開・取得・一覧ができ、管理画面の一覧とダッシュボードには ID が表示される)。根拠: 実測+公式ドキュメント([[T02-playground#結果|T02]])
+  - `routable: false` は必須。プラグインが作るエントリには slug が無く、routable のままでは公開できない(`Cannot publish routable content without a slug`。`packages/core/src/database/repositories/content.ts:2305`)。
+  - `hidden: true` で外れるのは、サイドバーとダッシュボードのクイックアクションだけ。ダッシュボードの件数と最近の更新には出る(画像本体は読まない)。
+  - `supports: []` でも、公開すると内容をまるごと複製したリビジョンが 1 件できる(`content.ts:2308`)。
+  - `image` の `required: true` は、省略を 400 で拒否する(標準の REST API で確認)。`null` は DB の NOT NULL 制約で 500 になるので、中身は [[#8. サーバー側の検証|8 章]] の②で拒否する。
+- seed が適用されるのは、コレクションが 0 件のデータベースへの最初のリクエストと、セットアップ(開発では dev-bypass)のときだけ。既存のコレクションは変更されない(`packages/core/src/seed/apply.ts:217`)。
 
 ### 13.2 フィールドの `options`
 
@@ -618,7 +624,7 @@ export default defineConfig({
 > - **ゴミ箱に移動できる権限**(決定済み): Contributor 以上のまま(2026-09-24、利用者の判断)。Editor 以上(`content:delete_any`)に揃える案は採らなかった。ルートの permission は `content:create`。→ [[T06-decision-trash-permission#結果|T06 の結果]]、[[#10. 画像のライフサイクル|10 章]]
 > - **一覧の列を出すコレクションの判定方法**: `contentListColumns` の `collections` は同期関数。マニフェストをどう参照するかを確認する。
 > - **`content:afterSave` に渡される内容**: 下書きを保存したときに、下書きのデータが渡るのか公開版のデータが渡るのかを確認する(`packages/core/src/emdash-runtime.ts:3670`)。
-> - **`b64_images` の seed**: タイトル用のフィールドなど、最低限必要な構成を確認する。
+> - **`b64_images` の seed**(確認済み、2026-09-24): [[#13.1 seed|13.1]] の構成(`hidden: true` / `routable: false` / `supports: []` / `image` は json・必須)で足りる。タイトル用のフィールドは要らない。`routable: false` は必須(slug の無いエントリを公開するため)。公開すると、内容を複製したリビジョンが 1 件できる。→ [[T02-playground#結果|T02 の結果]]
 
 ## 18. 既知の制約とリスク
 
