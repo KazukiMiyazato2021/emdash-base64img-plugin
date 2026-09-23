@@ -1,0 +1,15 @@
+{
+	"name": "playground",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@astrojs/node": "^11.1.5",
+		"@astrojs/react": "^6.0.5",
+		"astro": "^7.3.2",
+		"emdash": "0.38.0",
+		"emdash-plugin-base64-image": "file:..",
+		"react": "19.2.4",
+		"react-dom": "19.2.4"
+	}
+}

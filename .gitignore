@@ -1,0 +1,25 @@
+# 依存パッケージ
+node_modules/
+
+# ビルド出力
+dist/
+.astro/
+
+# playground のデータベース(SQLite)
+*.db
+*.db-*
+*.sqlite*
+
+# wrangler のローカル状態(D1 など)
+.wrangler/
+
+# Playwright の出力
+test-results/
+playwright-report/
+
+# worktree の置き場
+.claude/worktrees/
+
+# スパイクのコードはコミットしない(使い捨て)。説明の README だけを残す。
+spikes/*
+!spikes/README.md

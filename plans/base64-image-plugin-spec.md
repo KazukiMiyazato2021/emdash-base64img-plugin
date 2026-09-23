@@ -549,6 +549,8 @@ export default defineConfig({
   - ビルドがないので、git 依存でインストールするたびに `prepare` でビルドが走ることもない。
 - peer dependency: `emdash: "^0.38.0"`(`>=0.38.0 <0.39.0`)、`react`、`@cloudflare/kumo`、`@emdash-cms/admin`
   - EmDash のマイナーバージョンが上がるたびに動作を確認し、範囲を広げる。
+  - 範囲([[T01-scaffold]] で決定): `@emdash-cms/admin: "^0.38.0"`、`@cloudflare/kumo: "2.6.0"`(`@emdash-cms/admin` 0.38.0 の依存と同じ版に固定)、`react: "^18.0.0 || ^19.0.0"`(`@emdash-cms/admin` 0.38.0 の peer と同じ)。
+- dependency: `zod: "^4.5.4"`(`emdash` 0.38.0 が依存する 4.5.4 と同じ版を使う)。
 - GitHub リポジトリを非公開にする場合、サイトのビルド環境(Cloudflare Workers Builds など)に、そのリポジトリを読むためのトークンが必要になる。
 
 ## 15. リポジトリ構成・ツール・テスト
