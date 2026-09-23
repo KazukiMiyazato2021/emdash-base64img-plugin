@@ -1,0 +1,40 @@
+{
+	"$schema": "https://emdashcms.com/seed.schema.json",
+	"version": "1",
+	"meta": {
+		"name": "base64-image playground",
+		"description": "Posts with base64-image fields and the hidden b64_images collection"
+	},
+	"collections": [
+		{
+			"slug": "b64_images",
+			"label": "Base64 Images",
+			"hidden": true,
+			"routable": false,
+			"supports": [],
+			"fields": [{ "slug": "image", "label": "Image", "type": "json", "required": true }]
+		},
+		{
+			"slug": "posts",
+			"label": "Posts",
+			"supports": ["drafts", "revisions", "search", "seo"],
+			"fields": [
+				{ "slug": "title", "label": "Title", "type": "string", "required": true },
+				{
+					"slug": "cover",
+					"label": "Cover",
+					"type": "json",
+					"widget": "base64-image:image",
+					"options": { "maxStoredBytes": 100000 }
+				},
+				{
+					"slug": "gallery",
+					"label": "Gallery",
+					"type": "json",
+					"widget": "base64-image:gallery",
+					"options": { "maxStoredBytes": 100000, "maxItems": 10 }
+				}
+			]
+		}
+	]
+}
