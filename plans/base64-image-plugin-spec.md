@@ -197,17 +197,18 @@ flowchart LR
 
 ```jsonc
 {
-  "id": "01J…",                            // エントリ ID と同じ値
   "src": "data:image/webp;base64,UklGR…",  // 既定で 100,000 バイト以下
   "mimeType": "image/webp",
   "width": 1280,
   "height": 853,
   "filename": "IMG_0001.jpg",              // 元のファイル名(任意)
-  "meta": { "v": 1, "bytes": 74668 }       // スキーマのバージョン・WebP 本体のバイト数
+  "meta": { "v": 1, "bytes": 74668, "quality": 0.77 }  // スキーマのバージョン・WebP 本体のバイト数・圧縮時の画質(任意)
 }
 ```
 
-- `MediaValue` 互換の形。`alt` は使う場所ごとに変えられるよう参照側で持つので、画像エントリには持たせない(Q3 + Q9)。
+- `MediaValue` 互換の形。読み出すときにエントリ ID を `id` に入れ、参照の `alt` を加えると `MediaValue` に代入できる。`alt` は使う場所ごとに変えられるよう参照側で持つので、画像エントリには持たせない(Q3 + Q9)。
+- `id` は値に持たせない。プラグインの `ctx.content.create` は ID を指定できず(`packages/core/src/emdash-runtime.ts:2135`)、新規作成時の `content:beforeSave` にも ID が渡らない(`:3339`)ため、作成が終わるまで ID が決まらない。根拠: 公式ドキュメントのみ([[T03-shared-contracts#結果|T03]])
+- `meta.quality` は、ブラウザが申告した圧縮時の画質。保存済みの画像を開いたときに widget で画質を表示するために持つ([[#11. 管理画面 UI|11.2]])。サーバーは確かめない。
 - 作成時のロケールは、サイトの既定ロケールにする(`ctx.content.create` の既定値。`packages/core/src/plugins/types.ts:476`)。
 - 画像エントリは、作成したあと変更しない。
 
@@ -221,9 +222,10 @@ flowchart LR
 [ { "v": 1, "id": "01J…", … }, { "v": 1, "id": "01J…", … } ]
 ```
 
+- `id`: 画像エントリの ID。英数字で始まり、英数字・`_`・`-` だけからなる 128 文字まで(EmDash が作る ULID は満たす)。seed で slug を省いたエントリは seed の `id` がそのまま ID になるので(`packages/core/src/seed/apply.ts:676`)、`b64_images` を seed で作るときはこの規則に合わせる([[T03-shared-contracts#結果|T03]])。
 - `locale`: 画像エントリのロケール。
   - 多言語サイトでは、取得がリクエストのロケールに絞り込まれるため、取得時にこの値を明示的に指定する(`packages/core/src/query.ts:769`)。
-- `alt`: 使う場所やロケールごとに設定できる。1,000 文字以内。空欄は装飾画像として扱う。
+- `alt`: 使う場所やロケールごとに設定できる。1,000 文字以内(Unicode のコードポイントで数える)。空欄は装飾画像として扱う。
 - 型: `json` フィールドは、サイト側の型生成で `unknown` になる(`packages/core/src/schema/zod-generator.ts:499`)。プラグインから型定義と type guard を export する。
 
 ### 5.3 参照元メタデータ(プラグインストレージ `imageRefs`、キーは画像 ID)
@@ -236,7 +238,7 @@ flowchart LR
   "bytes": 74668,
   "width": 1280,
   "height": 853,
-  "thumb": "data:image/webp;base64,…",  // 長辺 96px 程度、8,000 バイト以下
+  "thumb": "data:image/webp;base64,…",  // 長辺 96px 程度、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下)
   "createdAt": "2026-09-23T12:00:00.000Z",
   "createdBy": "<userId>"
 }
@@ -289,7 +291,7 @@ flowchart LR
 
 ### 6.4 サムネイル
 
-- 本体と同時に、長辺 96px 程度の WebP(8,000 バイト以下)を作る。アップロード時に一緒に送り、`imageRefs.thumb` に保存する。
+- 本体と同時に、長辺 96px 程度の WebP を、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下)で作る。アップロード時に一緒に送り、`imageRefs.thumb` に保存する。
 - 用途: コンテンツ一覧の列と、画像管理ページ。
 
 ### 6.5 入力形式と上限(Q8)
@@ -319,11 +321,14 @@ flowchart LR
   "thumb": "data:image/webp;base64,…",
   "width": 1280,
   "height": 853,
+  "quality": 0.77,   // 圧縮時の画質。画像エントリの meta.quality に保存する
   "filename": "IMG_0001.jpg",
-  "target": { "collection": "posts", "field": "cover", "entryId": "01J…", "locale": "ja" }  // entryId は新規エントリなら省略
+  "target": { "collection": "posts", "field": "cover", "entryId": "01J…", "locale": "ja" }  // entryId・locale は分かるときだけ送る(新規エントリには entryId が無い)
 }
 ```
 
+- 応答: `{ "ref": { "v": 1, "id": "01J…", "locale": "ja", "width": 1280, "height": 853, "alt": "" } }`。widget はこの参照をそのままフィールドの値にできる。
+- エラー: ハンドラーは `PluginRouteError(code, message, status)` を投げる。EmDash はこれを HTTP ステータスと `{ "success": false, "error": { "code", "message" } }` に変換する。`details` は応答に含まれないので、画面の文言はコードだけで決める。根拠: 実測+公式ドキュメント(`packages/core/src/plugins/http-route-dispatch.ts:134`。[[emdash-plugin-route-errors]])。コードの一覧は `src/shared/errors.ts`。
 - 処理の順番:
   1. 検証する([[#8. サーバー側の検証]] の①)。
   2. `ctx.content.create("b64_images", …)` で作成する。
@@ -337,7 +342,7 @@ flowchart LR
 
 | 場所 | 検証内容 | 不正なとき |
 |---|---|---|
-| ① アップロード用ルート | ・保存先のフィールドが存在し、このプラグインの widget であること(`ctx.schema.getCollection` で `widget` / `options` を読む。`packages/core/src/plugins/types.ts:407`)<br>・`dataUrl` が `data:image/webp;base64,` で始まり、長さが `maxStoredBytes` 以下(固定上限 500,000)<br>・デコードした中身が WebP(RIFF / WEBP、`VP8 ` / `VP8L` / `VP8X`)で、ヘッダーから読んだ寸法が width / height と一致し、長辺が `maxEdge` 以下<br>・`thumb` が WebP で 8,000 バイト以下 | 拒否 |
+| ① アップロード用ルート | ・保存先のフィールドが存在し、このプラグインの widget であること(`ctx.schema.getCollection` で `widget` / `options` を読む。`packages/core/src/plugins/types.ts:407`)<br>・`dataUrl` が `data:image/webp;base64,` で始まり、長さが `maxStoredBytes` 以下(固定上限 500,000)<br>・デコードした中身が WebP(RIFF / WEBP、`VP8 ` / `VP8L` / `VP8X`)で、ヘッダーから読んだ寸法が width / height と一致し、長辺が `maxEdge` 以下<br>・`thumb` が WebP で、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下) | 拒否 |
 | ② `b64_images` の `content:beforeSave` | ①と同じ中身の検証。API / MCP / 管理画面など、どこからの書き込みでも実行する | 拒否 |
 | ③ 参照を持つコレクションの `content:beforeSave` | ・参照の形(`{ v, id, locale, width, height, alt }` の型、alt は 1,000 文字以内)<br>・ギャラリーの枚数が `maxItems` 以下で、同じ画像が重複していないこと<br>・参照している画像 ID が、すべて `imageRefs` に存在すること(`getMany` でまとめて1クエリ) | 拒否し、どのフィールドの何が問題かをメッセージで返す |
 
@@ -364,6 +369,8 @@ flowchart LR
   - **参照元が削除された**(ゴミ箱に入った場合を含む)
   - **参照元から外された**
   - **参照元なし**(アップロードしたが保存されなかった)
+- 判定結果とは別に、画像エントリ自身の状態(ゴミ箱に入っていない / ゴミ箱に入っている / エントリが無い)も返す。完全削除のボタンは、ゴミ箱に入った画像にだけ出すため([[T06-decision-trash-permission#結果|T06]])。値の名前は `src/shared/schema.ts` の `imageUsageSchema` / `imageEntryStatusSchema`([[T03-shared-contracts#結果|T03]])。
+  - 0.39.1 では、capability `content:restore` の `ctx.content.getTrashedVersioned` が、ゴミ箱に入っているエントリだけを返す(`packages/core/src/emdash-runtime.ts:3877`)。`ctx.content.get` はゴミ箱に入ったものと無いものの両方で `null` なので、組み合わせると区別できる。根拠: 公式ドキュメントのみ
 - 判定は 10 件程度ずつのページ送りで行う。D1 のクエリ数上限(1リクエスト50本)があり、プラグインの `ctx.content.list` では ID の IN 検索ができないため(`packages/core/src/plugins/types.ts:443`)。
 
 > [!warning] 「参照されていない」は「消しても安全」ではない
@@ -509,13 +516,16 @@ const images = await resolveBase64Images(refs);
 
 ### 13.2 フィールドの `options`
 
-| option | 対象 | 既定値 | 説明 |
-|---|---|---|---|
-| `maxStoredBytes` | image / gallery | 100000 | data URL の最大長(バイト)。サーバー側の固定上限は 500000 |
-| `maxEdge` | image / gallery | 1600 | 長辺の上限(px) |
-| `minQuality` | image / gallery | 0.6 | 画質の下限 |
-| `minEdge` | image / gallery | 480 | 縮小していく下限(px)。これを下回るとエラー |
-| `maxItems` | gallery | 10 | 最大枚数 |
+| option | 対象 | 既定値 | 範囲 | 説明 |
+|---|---|---|---|---|
+| `maxStoredBytes` | image / gallery | 100000 | 10,000〜500,000 | data URL の最大長(バイト)。サーバー側の固定上限は 500000 |
+| `maxEdge` | image / gallery | 1600 | 96〜4,096 | 長辺の上限(px) |
+| `minQuality` | image / gallery | 0.6 | 0〜0.92 | 画質の下限 |
+| `minEdge` | image / gallery | 480 | 96〜`maxEdge` | 縮小していく下限(px)。これを下回るとエラー |
+| `maxItems` | gallery | 10 | 1〜20 | 最大枚数 |
+
+- 範囲外の数値は範囲内に丸め、整数の項目は小数点以下を切り捨てる。数値でない値は既定値にする。サーバー(検証)とブラウザ(圧縮)は同じ関数 `normalizeFieldOptions`(`src/shared/options.ts`)で解釈する([[T03-shared-contracts#結果|T03]])。
+- 範囲の理由: `maxStoredBytes` の上限は固定上限、下限は本体の予算をサムネイルの上限(8,000)より小さくしないため。長辺の下限はサムネイルの長辺(96px)。`minQuality` の上限は画質の上限(0.92、[[#6.3 リサイズと画質の方針(Q7)|6.3]])。`maxEdge` の上限 4,096 は 4K の幅(3,840px)を含み、これより大きい画像を固定上限(500,000)に収まる画質で作るのは難しいため(推測のみ)。`maxItems` の上限 20 は、ページの重さ(100KB × 20 枚で約 2MB)を抑えるため。後から広げても既存のデータは壊れないが、狭めると既存のギャラリーの保存が拒否されるので、小さく始めた。
 
 ### 13.3 `astro.config.mjs`
 
