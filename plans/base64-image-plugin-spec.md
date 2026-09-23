@@ -364,28 +364,32 @@ flowchart LR
 ## 9. 参照元の記録と未使用画像の検出
 
 **記録(追記のみ)**
-- アップロード時: `target.entryId` があれば、最初の参照元として記録する。
-- 保存時: 参照を持つコレクションの `content:afterSave` で、保存されたエントリの中の参照を読み取り、`imageRefs.owners` に追記する。
-  - `getMany` / `putMany` でまとめて処理するので、1〜2クエリで済む。
-  - afterSave は `after()`(waitUntil)で遅れて実行される(`packages/core/src/emdash-runtime.ts:5560`)。
+- アップロード時: `target.entryId` があれば、最初の参照元として記録する。アップロード用ルートの `ctx.content.create` では、このプラグイン自身の `content:afterSave` は呼ばれない(呼んだプラグインは除外される。`packages/core/src/emdash-runtime.ts:2147`)。根拠: 実測+公式ドキュメント([[T10-spike-after-save#結果|T10]])
+- 保存時: 参照を持つコレクションの `content:afterSave` で、エントリの中の参照を読み取り、`imageRefs.owners` に追記する。
+  - 読むのは `event.content.data`(保存した下書き。公開版ではない)と、更新のときにある `event.content.liveData`(content テーブルの列の値。公開済みなら公開版)。下の判定で見る範囲と揃える。根拠: 実測+公式ドキュメント([[T10-spike-after-save#結果|T10]])
+  - afterSave が呼ばれるのは、作成(`isNew: true`)と更新(保存・自動保存・メタデータだけの更新。`isNew: false`)だけ。管理画面の「公開」は保存してから公開するので、保存の側で呼ばれる。`b64_images` の保存でも呼ばれるので、参照を持たないコレクションは読み飛ばす。根拠: 実測+公式ドキュメント
+  - 公開(`content:afterPublish`)でも同じ処理をする。API だけで公開したとき(一覧の一括公開など)は afterSave が呼ばれないため。afterPublish の `event.content.data` は公開したデータ。根拠: 実測+公式ドキュメント
+  - クエリ数は `getMany` の 1 と、参照元が増えた画像の数(`putMany` は 1 件 1 クエリ)。どちらも保存のリクエストと同じ呼び出しのクエリ数に入る。根拠: 実測+公式ドキュメント([[emdash-plugin-content-query-counts]])
+  - afterSave は `after()` で実行され、保存の応答を待たせない(Workers では waitUntil。`packages/core/src/emdash-runtime.ts:5560`)。例外を投げると、後に続くプラグインの afterSave が呼ばれなくなる(既定の `errorPolicy` は `"abort"`)。例外は hook の中で受け止めてログに出し、`errorPolicy: "continue"` を指定する。根拠: 実測+公式ドキュメント([[emdash-after-save-payload]])
 - 保存時に参照元を削除しない理由: 下書きと公開版の二重管理や、hook が失敗したときのずれを扱わずに済むため。
-- エントリの複製などで、1枚の画像に参照元が複数つくこともある。その場合は `owners` に複数並ぶ。
+- 複製はどの hook も呼ばない。複製先は元の公開版の値を持つ下書きになり、保存か公開をするまで参照元として記録されない。記録されると、1枚の画像の `owners` に複数並ぶ。根拠: 実測+公式ドキュメント
 
 **判定(画像管理ページを開いたときに行う)**
-- 参照元ごとに `ctx.content.get` でエントリを取得する。
-- 公開版のデータと下書きリビジョン(`getRevision`)の両方に、画像 ID が残っているかを確認する。
-  - 下書きは、公開版の行とは別にリビジョンのテーブルに保存されている(`packages/core/src/emdash-runtime.ts:3516`)。
+- 参照元ごとに `ctx.content.get` でエントリを取得する。`null` なら「参照元が削除された」(ゴミ箱と完全削除のどちらも)。
+- 列の値(`get` の `data`)と、`draftRevisionId` があればその下書きリビジョン(`getRevision`)の両方で、参照元の `field` に画像 ID が残っているかを確認する。
+  - 下書きは、公開版の行とは別にリビジョンのテーブルに保存されている(`packages/core/src/emdash-runtime.ts:3516`)。一度も公開していないエントリの列の値は、作成したときの値。根拠: 実測+公式ドキュメント
 - 判定結果は4種類:
   - **使用中**
   - **参照元が削除された**(ゴミ箱に入った場合を含む)
   - **参照元から外された**
   - **参照元なし**(アップロードしたが保存されなかった)
 - 判定結果とは別に、画像エントリ自身の状態(ゴミ箱に入っていない / ゴミ箱に入っている / エントリが無い)も返す。完全削除のボタンは、ゴミ箱に入った画像にだけ出すため([[T06-decision-trash-permission#結果|T06]])。値の名前は `src/shared/schema.ts` の `imageUsageSchema` / `imageEntryStatusSchema`([[T03-shared-contracts#結果|T03]])。
-  - 0.39.1 では、capability `content:restore` の `ctx.content.getTrashedVersioned` が、ゴミ箱に入っているエントリだけを返す(`packages/core/src/emdash-runtime.ts:3877`)。`ctx.content.get` はゴミ箱に入ったものと無いものの両方で `null` なので、組み合わせると区別できる。根拠: 公式ドキュメントのみ
-- 判定は 10 件程度ずつのページ送りで行う。D1 のクエリ数上限(1リクエスト50本)があり、プラグインの `ctx.content.list` では ID の IN 検索ができないため(`packages/core/src/plugins/types.ts:443`)。
+  - 0.39.1 では、capability `content:restore` の `ctx.content.getTrashedVersioned` が、ゴミ箱に入っているエントリだけを返す(`packages/core/src/emdash-runtime.ts:3877`)。`ctx.content.get` はゴミ箱に入ったものと無いものの両方で `null` なので、組み合わせると区別できる。`getTrashedVersioned` は、`get` が `null` のときだけ呼ぶ(ゴミ箱に入っていないエントリに呼ぶとクエリが多い)。根拠: 実測+公式ドキュメント([[T10-spike-after-save#結果|T10]])
+- 判定はページ送りで行う。D1 のクエリ数上限(1リクエスト50本)があり、プラグインの `ctx.content.list` では ID の IN 検索ができないため(`packages/core/src/plugins/types.ts:443`)。
+  - 1 回に扱う件数は固定にせず、クエリ数の見積もりで決める。1 件のクエリ数は、参照元が 1 / 3 / 6(削除済み / 下書きなし / 下書きあり)、画像の状態が 2 / 5 / 3(ゴミ箱に入っていない / ゴミ箱 / 無い)。同じ参照元は、リクエストの中で 1 回だけ調べる。参照元がそれぞれ別の投稿だと、10 件で 50 を超える。根拠: 実測のみ([[emdash-plugin-content-query-counts]])
 
 > [!warning] 「参照されていない」は「消しても安全」ではない
-> 判定の対象は、現在のコンテンツ(公開版と下書き)だけ。古いリビジョンからは、まだ参照されている可能性がある。警告文にもそう明記する。
+> 判定の対象は、現在のコンテンツ(公開版と下書き)だけ。古いリビジョンや、複製したまま保存も公開もしていないエントリからは、まだ参照されている可能性がある。警告文にもそう明記する。
 
 ## 10. 画像のライフサイクル
 
@@ -634,7 +638,7 @@ export default defineConfig({
 > [!question] 合意内容のうち、実装時に確認・調整するもの
 > - **ゴミ箱に移動できる権限**(決定済み): Contributor 以上のまま(2026-09-24、利用者の判断)。Editor 以上(`content:delete_any`)に揃える案は採らなかった。ルートの permission は `content:create`。→ [[T06-decision-trash-permission#結果|T06 の結果]]、[[#10. 画像のライフサイクル|10 章]]
 > - **一覧の列を出すコレクションの判定方法**: `contentListColumns` の `collections` は同期関数。マニフェストをどう参照するかを確認する。
-> - **`content:afterSave` に渡される内容**: 下書きを保存したときに、下書きのデータが渡るのか公開版のデータが渡るのかを確認する(`packages/core/src/emdash-runtime.ts:3670`)。
+> - **`content:afterSave` に渡される内容**(確認済み、2026-09-24): `content.data` は保存した下書きで、公開版ではない。更新のときは、content テーブルの列の値(公開済みなら公開版)が `content.liveData` に入る。`isNew` は作成で `true`、更新で `false`。公開・複製・ゴミ箱・復元では呼ばれない。`after()` で実行され、応答を待たせない(`packages/core/src/emdash-runtime.ts:3670`)。→ [[T10-spike-after-save#結果|T10 の結果]]、[[#9. 参照元の記録と未使用画像の検出|9 章]]
 > - **`b64_images` の seed**(確認済み、2026-09-24): [[#13.1 seed|13.1]] の構成(`hidden: true` / `routable: false` / `supports: []` / `image` は json・必須)で足りる。タイトル用のフィールドは要らない。`routable: false` は必須(slug の無いエントリを公開するため)。公開すると、内容を複製したリビジョンが 1 件できる。→ [[T02-playground#結果|T02 の結果]]
 
 ## 18. 既知の制約とリスク
