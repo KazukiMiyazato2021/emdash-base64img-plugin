@@ -13,34 +13,61 @@ spec: "[[base64-image-plugin-spec]]"
 
 > [!summary] 概要
 > [[base64-image-plugin-spec|仕様書]] の合意内容を、並列に進められるように 34 個のタスクに分けたもの。
-> - 依存関係から決まる「ウェーブ」は 0〜7 の 8 段。同じウェーブのタスクは同時に進められる。
+> - 依存関係から決まる「ウェーブ」は 0〜7 の 8 段。ウェーブ N を「フェーズ N」として、ブランチ `phase/N` で進める。同じウェーブのタスクは同時に進められる。
 > - 各タスクは、変更してよいファイルを分けてある。そのため、同じウェーブのタスクを別々のブランチで進めても衝突しにくい。
 > - 各タスクのノートの frontmatter に、依存(`depends_on`)・後続(`blocks`)・変更してよいファイル(`files`)・状態(`status`)を書いてある。
+> - 予定外の作業は、サブタスク `TNN-M` として追加する(現在 2 件: [[T01-1-workflow-docs-index|T01-1]]、[[T01-2-emdash-0-39|T01-2]])。
+> - 対象の EmDash は 0.39.1(peer は `^0.39.0`)。2026-09-24 に 0.38.0 から変更した([[T01-2-emdash-0-39|T01-2]])。
+> - 作業中に得た知見は [[docs/00-index|知見の索引]] から辿れる。
 
 ## 進め方のルール
 
-- 着手する前に、ローカルの変更を `git stash` などで退避する。
-- main には直接コミットしない。タスクごとにブランチ `task/<ID>-<slug>`(例: `task/T11-server-validation`)を作り、PR でマージする。
-- 依存するタスクが main にマージされてから、最新の main からブランチを作る。
-- 並列に進めるときは、`git worktree add ../wt-T11 -b task/T11-server-validation` のように、タスクごとに作業ディレクトリを分ける。
+### ブランチ
+
+| ブランチ | 作り方 | 例 |
+|---|---|---|
+| フェーズブランチ | 前のフェーズを `develop` にマージしてから、`develop` から作る | `phase/2` |
+| タスクブランチ | フェーズブランチから作る | `phase-2/t-11` |
+| サブタスクブランチ | 予定外の作業が出たら、フェーズブランチから作る | `phase-0/t-01-1` |
+
+- ブランチを作る前に、分岐元のコミットを確かめる。
+- タスクの最終確認は `npm run verify`(build・lint・test)。通ったら、タスクブランチをフェーズブランチに `--no-ff` でマージする。
+- フェーズのタスクがすべて終わったら、フェーズブランチでもう一度 `npm run verify` を実行する。通ったら `develop` に `--no-ff` でマージする。
+- サブタスクが出たら、そのたびにノート `tasks/TNN-M-<slug>.md` を作り、この一覧(ウェーブの表・依存グラフ・全タスクの表)に追加する。
+- main には直接コミットしない。`develop` には、フェーズブランチのマージだけで変更を入れる。
+
+### 並列作業(worktree)
+
+- チームメイトは、タスクごとに isolation: worktree で作られた worktree(`.claude/worktrees/`)で作業する。この worktree は `main` から作られる。そのため、分岐元を確かめてから、フェーズブランチを起点にタスクブランチを作る([[claude-code-worktree-isolation]])。
+- 同時に進めるのは 2〜4 タスク(多くても 5)。変更するファイルが重ならないタスクだけを並べる。依存するタスクは、前のタスクがフェーズブランチにマージされてから着手する。
+- 開発サーバーのポートは `4400 + タスク番号` にする。wrangler dev は `8700 + 番号`、inspector は `9300 + 番号`。SQLite と D1 のローカル状態は、worktree ごとに持つ。
+- worktree ごとに `npm ci` で `node_modules` を作る([[npm-workspaces-nested-worktree]])。
+- マージが終わった worktree は `git worktree remove` で消す。`git worktree list` で定期的に確かめる。
+- `git stash` は worktree の間で共有される。チームメイトは使わない。
+
+### そのほか
+
+- 着手する前に、ローカルの変更を `git stash` などで退避する。2026-09-23 に、未追跡だった `mise.toml` を stash に退避した。同じ内容のファイルを [[T01-scaffold|T01]] でコミットしている。
 - `git add` はパスを指定する(`-A` などで全体を追加しない)。
 - タスクノートの `status` を `todo` → `doing` → `done` と更新する。
-- スパイクのコードは使い捨てで、マージしない。結果はタスクノートの「結果」に根拠レベル付きで書く。設計が変わる場合は、仕様書と関係するタスクも更新する。
+- スパイクのコードはコミットしない(`spikes/` は git 管理外)。結果はタスクノートの「結果」と `docs/` の知見ノートに、根拠レベル付きで書く。設計が変わる場合は、仕様書と関係するタスクも更新する。
+- 作業中に得た知見や検証結果は、`docs/` に Obsidian 形式で書く。[[docs/00-index|知見の索引]] は、マージのときにリーダーが更新する。
 - 管理画面の文言は、各部品のファイル内に ja / en の辞書として持つ。共有の辞書ファイルには追記しない(同時に編集して衝突するのを防ぐため)。
-- 依存パッケージの追加が必要になったら、単独の小さな PR にする(`package-lock.json` の衝突を防ぐため)。
+- `package.json` / `package-lock.json` を変更するタスクは、1 つのフェーズで 1 つに限る。重なる場合はサブタスクに分ける(`package-lock.json` の衝突を防ぐため)。
 
 ## 共通の完了条件
 
-- `npm run typecheck` / `npm run lint` / `npm test` が通る。
+- `npm run verify` が通る。`build` は型チェックと playground のビルド、`lint` は oxlint と prettier、`test` は vitest。
 - 新しいコードには、実際の不具合で失敗しうる単体テストがある。
 - 管理画面の文言は日本語と英語の両方があり、キーボードで操作できる。
 - 仕様と違う実装にした場合は、仕様書を更新した。
+- 得た知見は `docs/` に書いた。
 
 ## ウェーブ(同時に進められるタスクのまとまり)
 
-| ウェーブ | 並列数 | タスク |
+| ウェーブ(フェーズ) | 並列数 | タスク |
 |---|---|---|
-| 0 | 2 | [[T01-scaffold\|T01]] リポジトリ雛形<br>[[T06-decision-trash-permission\|T06]] 決定: ゴミ箱の権限 |
+| 0 | 2 | [[T01-scaffold\|T01]] リポジトリ雛形<br>[[T01-1-workflow-docs-index\|T01-1]] 運用ルールと知見の索引(サブタスク)<br>[[T01-2-emdash-0-39\|T01-2]] EmDash を 0.39.1 に(サブタスク)<br>[[T06-decision-trash-permission\|T06]] 決定: ゴミ箱の権限 |
 | 1 | 4 | [[T02-playground\|T02]] playground 構築<br>[[T03-shared-contracts\|T03]] 共有の型・スキーマ<br>[[T04-webp-utils\|T04]] WebP・data URL 処理<br>[[T05-spike-canvas-webp\|T05]] スパイク: canvas の WebP |
 | 2 | 11 | [[T07-spike-git-dependency\|T07]] スパイク: git 依存<br>[[T08-spike-route-body\|T08]] スパイク: body 上限<br>[[T09-spike-query-count\|T09]] スパイク: クエリ数<br>[[T10-spike-after-save\|T10]] 調査: afterSave<br>[[T11-server-validation\|T11]] サーバー検証ロジック<br>[[T12-input-decode\|T12]] 入力判定とデコード<br>[[T13-encode-search\|T13]] 画質探索・リサイズ<br>[[T14-admin-i18n-api\|T14]] 管理画面の文言と通信<br>[[T15-site-resolve\|T15]] resolveBase64Images<br>[[T16-reference-hook\|T16]] 参照側の保存 hook<br>[[T17-admin-data-routes\|T17]] プレビュー・サムネイル取得ルート |
 | 3 | 9 | [[T18-upload-route\|T18]] アップロードルート<br>[[T19-image-entry-hook\|T19]] b64_images の保存 hook<br>[[T20-owner-tracking\|T20]] 参照元の記録<br>[[T21-orphan-routes\|T21]] 未使用判定・画像管理ルート<br>[[T22-widget-parts\|T22]] widget 共通部品<br>[[T23-upload-hook\|T23]] アップロード処理フック<br>[[T24-list-column\|T24]] 一覧サムネイル列<br>[[T25-images-page\|T25]] 画像管理ページ<br>[[T26-playground-pages\|T26]] playground のページ |
@@ -52,7 +79,7 @@ spec: "[[base64-image-plugin-spec]]"
 **クリティカルパス**(最も長い依存の連なり、8 段): [[T01-scaffold|T01]] → [[T03-shared-contracts|T03]] → [[T12-input-decode|T12]] → [[T23-upload-hook|T23]] → [[T27-image-widget|T27]] → [[T30-admin-entry|T30]] → [[T31-e2e|T31]] → [[T34-release|T34]]
 
 > [!tip] 最優先は [[T03-shared-contracts|T03]](共有の型・スキーマ)
-> 9 個のタスクが T03 の完了を直接待っている。小さく作って早く main にマージすると、全体の並列度が上がる。
+> 9 個のタスクが T03 の完了を直接待っている。フェーズ 1 では最初に着手し、小さく仕上げる。
 
 ## 依存グラフ
 
@@ -61,6 +88,8 @@ flowchart LR
     subgraph W0["ウェーブ 0"]
         direction TB
         T01["T01 リポジトリ雛形"]
+        T01_1["T01-1 運用ルールと知見の索引"]
+        T01_2["T01-2 EmDash を 0.39.1 に"]
         T06["T06 決定: ゴミ箱の権限"]
     end
     subgraph W1["ウェーブ 1"]
@@ -116,6 +145,9 @@ flowchart LR
         direction TB
         T34["T34 v0.1.0 リリース"]
     end
+    T01 --> T01_1
+    T01 --> T01_2
+    T06 -.-> T01_2
     T01 --> T02
     T01 --> T03
     T01 --> T04
@@ -182,17 +214,21 @@ flowchart LR
     classDef decision stroke-width:3px
     class T05,T07,T08,T09,T10 spike
     class T06 decision
+    classDef subtask stroke-dasharray: 2 4
+    class T01_1,T01_2 subtask
 ```
 
 - 実線の矢印: 完了を待ってから着手する依存
 - 点線の矢印: 結果を後で反映するだけで、着手はブロックしない依存
-- 点線の枠: スパイク / 太い枠: 利用者が決めること
+- 点線の枠: スパイク / 太い枠: 利用者が決めること / 細かい点線の枠: 予定外のサブタスク
 
 ## 全タスク
 
 | ID | タスク | 種別 | ウェーブ | 依存 | 主な変更ファイル |
 |---|---|---|---|---|---|
 | [[T01-scaffold\|T01]] | リポジトリの雛形を作る | 実装 | 0 | — | `package.json`<br>`package-lock.json`<br>`playground/package.json`(仮)<br>ほか |
+| [[T01-1-workflow-docs-index\|T01-1]] | 運用ルールの更新と知見の索引を作る(サブタスク) | ドキュメント | 0 | [[T01-scaffold\|T01]] | `tasks/00-index.md`<br>`docs/00-index.md`<br>`docs/claude-code-worktree-isolation.md`<br>`plans/base64-image-plugin-spec.md`(15 章) |
+| [[T01-2-emdash-0-39\|T01-2]] | EmDash を 0.39.1 に上げる(サブタスク) | 実装 | 0 | [[T01-scaffold\|T01]] | `package.json`<br>`package-lock.json`<br>`playground/package.json`<br>`plans/base64-image-plugin-spec.md`(版)<br>ほか |
 | [[T06-decision-trash-permission\|T06]] | 決定: 画像をゴミ箱に移動できる権限 | 決定 | 0 | — | `plans/base64-image-plugin-spec.md`(10・17 章)<br>このノートの「結果」 |
 | [[T02-playground\|T02]] | playground(動作確認用サイト)を作る | 実装 | 1 | [[T01-scaffold\|T01]] | `playground/**` |
 | [[T03-shared-contracts\|T03]] | 共有の型・スキーマ・定数を定める | 実装 | 1 | [[T01-scaffold\|T01]] | `src/shared/constants.ts`<br>`src/shared/types.ts`<br>`src/shared/schema.ts`<br>ほか |

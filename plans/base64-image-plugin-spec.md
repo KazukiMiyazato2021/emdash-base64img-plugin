@@ -10,8 +10,8 @@ tags:
   - webp
 status: 合意済み
 created: 2026-09-23
-updated: 2026-09-23
-emdash-version: 0.38.0
+updated: 2026-09-24
+emdash-version: 0.39.1
 plugin-id: base64-image
 package: emdash-plugin-base64-image
 ---
@@ -27,7 +27,7 @@ package: emdash-plugin-base64-image
 > [!info] 根拠レベルと参照パス
 > - 事実には根拠レベルを付ける: **実測+公式ドキュメント** / **実測のみ** / **公式ドキュメントのみ** / **外部ドキュメントのみ** / **推測のみ**
 > - EmDash のソースコードを読んで確認した事実(実行はしていない)は「公式ドキュメントのみ」に含める。
-> - ファイルパスは、特に断りがなければ `references/emdash/` 以下を指す(EmDash 0.38.0 時点)。
+> - ファイルパスは、特に断りがなければ `references/emdash/` 以下を指す(EmDash 0.39.1 時点。タグ `emdash@0.39.1`)。2026-09-23 に書いた時点では、0.38.0 のあとの未リリースの開発版(`ea275faf`)を読んでいた。0.39.1 との差で行がずれた箇所は直した([[T01-2-emdash-0-39|T01-2]])。
 
 ## 目次
 
@@ -84,7 +84,8 @@ package: emdash-plugin-base64-image
 ### 2.1 想定する環境
 
 - Cloudflare Workers Free + D1 Free。storage(R2)は使わない。
-- EmDash 0.38.0(1.0 前のため、マイナーバージョンでも破壊的変更がありうる)。
+- EmDash 0.39.1(1.0 前のため、マイナーバージョンでも破壊的変更がありうる)。
+  - 最初は 0.38.0 を想定していた。npm の 0.38.0 には、このプラグインが使う capability(`schema:read` / `content:publish` / `content:revisions:read`)が無い(実測)。そのため、それらが入った 0.39.x を対象にした(2026-09-24、利用者の判断。[[T01-2-emdash-0-39|T01-2]])。
 - 管理画面を操作するブラウザは Chrome / Edge / Firefox。**Safari は対象外。**
 
 ### 2.2 プラットフォームの上限
@@ -141,7 +142,7 @@ package: emdash-plugin-base64-image
 
 **native プラグインにする理由**
 - sandboxed プラグインの field widget で使えるのは、Block Kit 要素(`text_input` / `number_input` / `toggle` / `select` / `media_picker`)だけ。ファイル選択、canvas での圧縮、プレビューができない。
-- 根拠: `skills/creating-plugins/references/admin-ui.md`、`packages/admin/src/components/ContentEditor.tsx:1800`(公式ドキュメントのみ)
+- 根拠: `skills/creating-plugins/references/admin-ui.md`、`packages/admin/src/components/ContentEditor.tsx:1806`(公式ドキュメントのみ)
 
 **画像本体を投稿に直接持たせない理由(Q4)**
 - 管理画面の一覧は、1ページ100件を全データ込み(`SELECT *`)で取得する(`packages/admin/src/router.tsx:440`、`packages/core/src/database/repositories/content.ts:760`)。
@@ -372,7 +373,11 @@ flowchart LR
 
 - 画像は作成後に変更しない。既存画像の再利用もしない。自動削除もしない。
 - 削除は、画像管理ページから手動で行う。
-  - **ゴミ箱への移動**: Contributor 以上(`ctx.content.delete`)。ただし権限は [[#17. 実装時に再確認する事項]] で再確認する。
+  - **ゴミ箱への移動**: Contributor 以上(2026-09-24 に利用者が決定。[[T06-decision-trash-permission#結果|T06]])。プラグインのルートに `permission: "content:create"` を宣言し、ハンドラーで `ctx.content.delete("b64_images", id)` を呼ぶ。
+    - `ctx.content.delete` は、呼び出した利用者の権限を確かめない(公式ドキュメントのみ。`packages/core/src/plugins/context.ts:897`)。権限の確認はルートの `permission` だけになる(省略すると `plugins:manage` で、管理者のみ。実測+公式ドキュメント。`skills/creating-plugins/references/api-routes.md:81`)。
+    - EmDash の標準より緩い。標準 API では、Contributor は自分のコンテンツもゴミ箱に移せない(`content:delete_own` は Author 以上。`packages/auth/src/rbac.ts:22`。実測+公式ドキュメント)。そのため Contributor が、他人の投稿で使われている画像もゴミ箱に移せる。ゴミ箱に入った画像は、サイトに表示されなくなる(サイト側の取得は `deleted_at IS NULL` のものだけ。`packages/core/src/loader.ts:1341`。公式ドキュメントのみ)。
+    - ゴミ箱から戻せるのは Editor 以上(標準 API の restore)。プラグインが作った画像は作成者(`authorId`)が空なので、`content:edit_any` で判定される(`packages/core/src/astro/routes/api/content/[collection]/[id]/restore.ts:44`)。根拠: 実測+公式ドキュメント
+    - 画像管理ページでは、ゴミ箱に移す前に確認し、使用中の画像ならそのことを示す([[#11.5 画像管理ページ]])。
   - **完全削除**: 管理者のみ。標準の API `DELETE /_emdash/api/content/b64_images/{id}/permanent` を、ログイン中の管理者の権限で呼ぶ(`packages/core/src/astro/routes/api/content/[collection]/[id]/permanent.ts:14`。権限は `content:delete_permanent`)。
 - プラグインは完全削除ができない(`skills/creating-plugins/references/sandbox-boundaries.md`)。ゴミ箱を自動で空にする処理も見当たらない。容量が戻るのは完全削除したときだけ。
 - EmDash 標準の `b64_images` 一覧画面とゴミ箱画面は、1ページ100件分の base64 を読み込むので使わない(1件約 100KB)。
@@ -384,7 +389,7 @@ flowchart LR
 - コンポーネントは Kumo(`@cloudflare/kumo`)を使う(公式の field-kit と同じ)。
 - 文言は日本語と英語を用意し、`<html lang>` で切り替える。どちらでもなければ英語にする(`packages/admin/src/locales/LocaleDirectionProvider.tsx:21`)。
 - ファイル選択、並べ替え、削除は、すべてキーボードでも操作できるようにする。進捗は `aria-live` でスクリーンリーダーに伝える。
-- plugin widget には `readOnly` が渡されない(`packages/admin/src/components/ContentEditor.tsx:1827`)。そのため、編集ロック中でも widget は操作できてしまう。これは EmDash 側の制約。
+- plugin widget には `readOnly` が渡されない(`packages/admin/src/components/ContentEditor.tsx:1833`)。そのため、編集ロック中でも widget は操作できてしまう。これは EmDash 側の制約。
 
 ### 11.2 単一画像 widget(`base64-image:image`)
 
@@ -547,8 +552,10 @@ export default defineConfig({
 - TS ソースのまま配布する(`files: ["src"]`、ビルドなし)。
   - 公式プラグインも `"main": "src/index.ts"` で配布している(`packages/plugins/color/package.json`)。
   - ビルドがないので、git 依存でインストールするたびに `prepare` でビルドが走ることもない。
-- peer dependency: `emdash: "^0.38.0"`(`>=0.38.0 <0.39.0`)、`react`、`@cloudflare/kumo`、`@emdash-cms/admin`
+- peer dependency: `emdash: "^0.39.0"`(`>=0.39.0 <0.40.0`)、`react`、`@cloudflare/kumo`、`@emdash-cms/admin`
   - EmDash のマイナーバージョンが上がるたびに動作を確認し、範囲を広げる。
+  - 範囲([[T01-scaffold]] で決め、[[T01-2-emdash-0-39|T01-2]] で 0.39 に変更): `@emdash-cms/admin: "^0.39.0"`、`@cloudflare/kumo: "2.6.0"`(`@emdash-cms/admin` 0.39.1 の依存と同じ版に固定)、`react: "^18.0.0 || ^19.0.0"`(`@emdash-cms/admin` 0.39.1 の peer と同じ)。開発には `emdash` / `@emdash-cms/admin` の 0.39.1 を使う。
+- dependency: `zod: "^4.5.4"`(`emdash` 0.39.1 が依存する 4.5.4 と同じ版を使う)。
 - GitHub リポジトリを非公開にする場合、サイトのビルド環境(Cloudflare Workers Builds など)に、そのリポジトリを読むためのトークンが必要になる。
 
 ## 15. リポジトリ構成・ツール・テスト
@@ -572,7 +579,7 @@ export default defineConfig({
 
 **ツール**
 - mise で固定した npm 12 を使い、ルートと `playground/` を npm workspaces でまとめる。
-- TypeScript は strict。lint と format は EmDash と同じ oxlint + prettier。
+- TypeScript は strict。lint は oxlint、format は prettier。EmDash 0.39.1 は、lint に oxlint を、整形に oxfmt と prettier(`.astro` 用)を使っている(`package.json:24-27`、公式ドキュメントのみ)。このリポジトリは合意どおり prettier に統一する([[T01-1-workflow-docs-index|T01-1]])。
 
 **テスト**
 
@@ -598,7 +605,7 @@ export default defineConfig({
 ## 17. 実装時に再確認する事項
 
 > [!question] 合意内容のうち、実装時に確認・調整するもの
-> - **ゴミ箱に移動できる権限**: 合意したのは Contributor 以上。ただし EmDash の RBAC では、自分のコンテンツを削除する `content:delete_own` でも Author 以上(`packages/auth/src/rbac.ts:22`)。画像は複数の投稿から参照されうるので、Editor 以上(`content:delete_any`)に揃えるかを確認する。
+> - **ゴミ箱に移動できる権限**(決定済み): Contributor 以上のまま(2026-09-24、利用者の判断)。Editor 以上(`content:delete_any`)に揃える案は採らなかった。ルートの permission は `content:create`。→ [[T06-decision-trash-permission#結果|T06 の結果]]、[[#10. 画像のライフサイクル|10 章]]
 > - **一覧の列を出すコレクションの判定方法**: `contentListColumns` の `collections` は同期関数。マニフェストをどう参照するかを確認する。
 > - **`content:afterSave` に渡される内容**: 下書きを保存したときに、下書きのデータが渡るのか公開版のデータが渡るのかを確認する(`packages/core/src/emdash-runtime.ts:3670`)。
 > - **`b64_images` の seed**: タイトル用のフィールドなど、最低限必要な構成を確認する。
@@ -644,6 +651,7 @@ export default defineConfig({
 | Q12 | 一覧ページの画像 | メイン画像を使う(派生画像は作らない) | 利用者の選択 |
 | Q13 | 配布 | npm には公開しない。git 依存で配布する | 利用者の選択 |
 | Q14 | 構成とテスト | [[#15. リポジトリ構成・ツール・テスト]] のとおり | — |
+| — | 対象の EmDash の版(2026-09-24) | 0.39.1(peer は `^0.39.0`)。公開から 3 日未満だったので、`~/.npmrc` の `min-release-age` の例外として入れた | npm の 0.38.0 には必要な capability が無い(実測)。0.39.x にはある(公式ドキュメントのみ)。利用者の選択([[T01-2-emdash-0-39\|T01-2]]) |
 
 ---
 
@@ -694,7 +702,7 @@ export default defineConfig({
 
 ## 付録 B. 参考資料
 
-### EmDash(`references/emdash/`、0.38.0)
+### EmDash(`references/emdash/`、0.39.1)
 
 | パス | 内容 |
 |---|---|
@@ -702,7 +710,7 @@ export default defineConfig({
 | `skills/creating-plugins/references/admin-ui.md` | field widget(sandboxed で使える要素、native の React) |
 | `skills/creating-plugins/references/sandbox-boundaries.md` | ルートの body 上限、完全削除できないこと |
 | `skills/creating-plugins/references/storage.md` | プラグインストレージの API(`getMany` / `putMany`) |
-| `packages/admin/src/components/ContentEditor.tsx:1800` | plugin widget の解決方法と、widget に渡される props |
+| `packages/admin/src/components/ContentEditor.tsx:1806` | plugin widget の解決方法と、widget に渡される props |
 | `packages/admin/src/router.tsx:440` | 管理画面の一覧は 100件ずつ取得する |
 | `packages/admin/src/lib/content-list-columns.tsx:23` | 一覧の列を追加する拡張 |
 | `packages/admin/src/components/FieldEditor.tsx:362` | スキーマ編集 UI では widget を指定できない |
