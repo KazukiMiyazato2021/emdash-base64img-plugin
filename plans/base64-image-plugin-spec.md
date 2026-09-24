@@ -752,6 +752,8 @@ export default defineConfig({
 | アニメーション | GIF・アニメーション WebP・APNG は、最初のフレームの静止画になる。アニメーションが消える注意書きは GIF だけに出す([[#6.5 入力形式と上限(Q8)\|6.5]]) |
 | Firefox でのデコード | Firefox 155 は、デコードの間(6,400 万画素の JPEG で 78〜92ms)画面を止め、その間の中断はデコードが終わってから届く。途中で切れた JPEG・PNG は、欠けた部分を白・透明にしてデコードする(検出しない)。libheif で作ったグリッドの AVIF はデコードできない(`INPUT_DECODE_FAILED`)([[T12-input-decode#結果\|T12]]) |
 | 編集ロック | plugin widget には `readOnly` が渡らない(EmDash 側の制約)。編集ロックは、EmDash がフィールドを包む `<fieldset disabled>` に頼っている(ボタンと入力欄はブラウザが無効にし、枠へのドロップは widget が受け付けない。[[#11.1 共通方針\|11.1]])。EmDash の版が変わったら、実際の管理画面で確かめ直す。根拠: 実測+公式ドキュメント([[emdash-plugin-field-widget]]) |
+| 処理中の保存 | 画像の処理中に「Save」を押すと、保存の要求を送ってから応答が届くまでに widget が値に加えた画像が、フォームから外れる。EmDash が手動の保存の応答でフォームの値を置き換えるため(自動保存では置き換えない)。外れた画像のエントリは残り、使われない画像になる。新規作成の最初の保存では、widget が作り直されて残りの処理が止まるとみられる(推測のみ)。根拠: 実測+公式ドキュメント(ギャラリーで 4 枚 → 1〜2 枚。[[gallery-widget-reorder-focus#4. 処理中に「Save」を押したとき(EmDash の挙動)]]) |
+| 必須のギャラリー | 必須(`required`)のギャラリーでも、画像を全部消した `[]` のまま保存できる。EmDash の必須の確認は、値なし・`null`・空文字だけを拒否するため(単一画像の `null` は拒否される)。根拠: 公式ドキュメントのみ(`packages/core/src/api/handlers/validation.ts:196-221`。[[T28-gallery-widget#未解決・サブタスクの候補\|T28]]) |
 | 画像管理ページの表示 | サイドバーのプラグインのページの項目は、ロールで絞られない(閲覧者にも出る)。閲覧者が開くと、一覧は 403 になり、ページは「寄稿者以上」と示す。根拠: 実測+公式ドキュメント([[emdash-admin-plugin-pages]]) |
 | コマンドパレット | 管理画面のコマンドパレットで「Images」などと入力すると、非表示のコレクション `b64_images` も候補に出る。選ぶと、使わないとした標準の一覧(`/_emdash/admin/content/b64_images`。1 ページ 100 件の base64 を読む。[[#10. 画像のライフサイクル\|10 章]])に移る。根拠: 実測(候補に出ることと、移る先。[[T25-images-page#影響・サブタスクの候補\|T25]]、[[T29-plugin-definition#他のタスクへの影響・サブタスクの候補\|T29]])、推測のみ(一覧の重さは測っていない) |
 | 一覧の列の見出し | 列の見出しは、管理画面の辞書にある「Image」のメッセージ ID を使って、管理画面の言語で表示する。EmDash の版が変わって辞書から「Image」が消えると、見出しに ID(`hG89Ed`)がそのまま出る。インストールした `@emdash-cms/admin` の辞書に ID があることは、単体テストで確かめている([[T24-list-column#結果\|T24]]) |
@@ -783,7 +785,7 @@ export default defineConfig({
 - 画像管理ページに、ゴミ箱から戻す操作(編集者以上。標準 API の `POST /_emdash/api/content/b64_images/{id}/restore`)を置く。今は、標準 API で戻し(標準の画面は 1 ページ 100 件の base64 を読むので使わない)、戻した画像(下書き)を画像管理ページの「公開」で公開し直す([[T25-images-page#影響・サブタスクの候補|T25]])
 - 記録だけが残った画像(画像管理の一覧の `missing`。完全削除の hook の失敗などで、`b64_images` のエントリが無いのに `imageRefs` の記録がある)の記録を、画像管理ページから消す操作([[T21-orphan-routes#未解決・サブタスクの候補|T21]])
 - 必須(`required`)の画像フィールドで画像が無いときの表示。EmDash 標準の画像フィールドは「This field is required」を出すが、widget は出さない(必須の確認は EmDash の保存の検証が行う)。揃えるなら、辞書に文言を足して空の表示の下に出す([[T27-image-widget#未解決・サブタスクの候補|T27]])
-- サイトのビジュアル編集から `?field=<slug>` で開いたときに、widget にフォーカスを移す。管理画面は `#field-<slug>` を `focus()` するが、widget の根の fieldset はフォーカスできず、body のままになる(スクロールはする)。fieldset に `tabIndex={-1}` を付ける案がある(推測のみ。[[emdash-plugin-field-widget]])
+- サイトのビジュアル編集から `?field=<slug>` で開いたときに、単一画像の widget にフォーカスを移す。管理画面は `#field-<slug>` を `focus()` するが、単一画像の widget は `id` を根の fieldset に付けているのでフォーカスできず、body のままになる(スクロールはする)。fieldset に `tabIndex={-1}` を付ける案がある(推測のみ。[[emdash-plugin-field-widget]])。ギャラリーは `id` をドロップゾーンのボタンに付けていて、フォーカスが移る([[T28-gallery-widget#決めたこと\|T28]])
 
 ## 20. 決定ログ
 
