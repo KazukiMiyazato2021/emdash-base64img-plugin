@@ -16,7 +16,7 @@ spec: "[[base64-image-plugin-spec]]"
 > - 依存関係から決まる「ウェーブ」は 0〜7 の 8 段。ウェーブ N を「フェーズ N」として、ブランチ `phase/N` で進める。同じウェーブのタスクは同時に進められる。
 > - 各タスクは、変更してよいファイルを分けてある。そのため、同じウェーブのタスクを別々のブランチで進めても衝突しにくい。
 > - 各タスクのノートの frontmatter に、依存(`depends_on`)・後続(`blocks`)・変更してよいファイル(`files`)・状態(`status`)を書いてある。
-> - 予定外の作業は、サブタスク `TNN-M` として追加する(現在 14 件: [[T01-1-workflow-docs-index|T01-1]]、[[T01-2-emdash-0-39|T01-2]]、[[T02-1-prettier-storage-capacity|T02-1]]、[[T04-1-consumer-typecheck|T04-1]]、[[T05-1-spec-browser-results|T05-1]]、[[T07-1-spec-distribution|T07-1]]、[[T08-1-spec-route-body|T08-1]]、[[T09-1-spec-locale-query-count|T09-1]]、[[T10-1-spec-d1-limits|T10-1]]、[[T11-1-handoff-server-results|T11-1]]、[[T12-1-handoff-input-decode|T12-1]]、[[T16-1-handoff-save-hook|T16-1]]、[[T16-2-image-refs-batches|T16-2]]、[[T17-1-preview-limit-reason|T17-1]])。
+> - 予定外の作業は、サブタスク `TNN-M` として追加する(現在 29 件: [[T01-1-workflow-docs-index|T01-1]]、[[T01-2-emdash-0-39|T01-2]]、[[T02-1-prettier-storage-capacity|T02-1]]、[[T04-1-consumer-typecheck|T04-1]]、[[T05-1-spec-browser-results|T05-1]]、[[T07-1-spec-distribution|T07-1]]、[[T08-1-spec-route-body|T08-1]]、[[T09-1-spec-locale-query-count|T09-1]]、[[T10-1-spec-d1-limits|T10-1]]、[[T11-1-handoff-server-results|T11-1]]、[[T12-1-handoff-input-decode|T12-1]]、[[T16-1-handoff-save-hook|T16-1]]、[[T16-2-image-refs-batches|T16-2]]、[[T17-1-preview-limit-reason|T17-1]]、[[T18-1-handoff-upload-route|T18-1]]、[[T18-2-invalid-target-message|T18-2]]、[[T19-1-handoff-image-entry-hook|T19-1]]、[[T20-1-handoff-owner-tracking|T20-1]]、[[T21-1-handoff-orphan-routes|T21-1]]、[[T21-2-list-publish-status|T21-2]]、[[T22-1-admin-css-test-helper|T22-1]]、[[T22-2-handoff-widget-parts|T22-2]]、[[T23-1-handoff-upload-hook|T23-1]]、[[T23-2-hooks-test-cleanup|T23-2]]、[[T24-1-handoff-list-column|T24-1]]、[[T25-1-handoff-images-page|T25-1]]、[[T25-2-page-registration-prep|T25-2]]、[[T26-1-typecheck-playground-scripts|T26-1]]、[[T26-2-handoff-playground-pages|T26-2]])。
 > - 対象の EmDash は 0.39.1(peer は `^0.39.0`)。2026-09-24 に 0.38.0 から変更した([[T01-2-emdash-0-39|T01-2]])。
 > - 作業中に得た知見は [[docs/00-index|知見の索引]] から辿れる。
 
@@ -70,7 +70,7 @@ spec: "[[base64-image-plugin-spec]]"
 | 0 | 2 | [[T01-scaffold\|T01]] リポジトリ雛形<br>[[T01-1-workflow-docs-index\|T01-1]] 運用ルールと知見の索引(サブタスク)<br>[[T01-2-emdash-0-39\|T01-2]] EmDash を 0.39.1 に(サブタスク)<br>[[T06-decision-trash-permission\|T06]] 決定: ゴミ箱の権限 |
 | 1 | 4 | [[T02-playground\|T02]] playground 構築<br>[[T02-1-prettier-storage-capacity\|T02-1]] 生成物の prettier 除外と storage・容量の記述(サブタスク)<br>[[T03-shared-contracts\|T03]] 共有の型・スキーマ<br>[[T04-webp-utils\|T04]] WebP・data URL 処理<br>[[T05-spike-canvas-webp\|T05]] スパイク: canvas の WebP<br>[[T05-1-spec-browser-results\|T05-1]] T05 の結果を仕様書と T13 に反映(サブタスク) |
 | 2 | 11 | [[T04-1-consumer-typecheck\|T04-1]] 利用者の tsc で src の型を通す(サブタスク)<br>[[T07-spike-git-dependency\|T07]] スパイク: git 依存<br>[[T07-1-spec-distribution\|T07-1]] T07 の結果を仕様書と後続タスクに反映(サブタスク)<br>[[T08-spike-route-body\|T08]] スパイク: body 上限<br>[[T08-1-spec-route-body\|T08-1]] T08 の結果を仕様書と後続タスクに反映(サブタスク)<br>[[T09-spike-query-count\|T09]] スパイク: クエリ数<br>[[T09-1-spec-locale-query-count\|T09-1]] T09 の結果を仕様書に反映(サブタスク)<br>[[T10-spike-after-save\|T10]] 調査: afterSave<br>[[T10-1-spec-d1-limits\|T10-1]] D1 の上限と T10 の結果を反映(サブタスク)<br>[[T11-server-validation\|T11]] サーバー検証ロジック<br>[[T11-1-handoff-server-results\|T11-1]] T11・T17 の結果を後続タスクに反映(サブタスク)<br>[[T12-input-decode\|T12]] 入力判定とデコード<br>[[T12-1-handoff-input-decode\|T12-1]] T12 の結果を後続タスクに反映(サブタスク)<br>[[T13-encode-search\|T13]] 画質探索・リサイズ<br>[[T14-admin-i18n-api\|T14]] 管理画面の文言と通信<br>[[T15-site-resolve\|T15]] resolveBase64Images<br>[[T16-reference-hook\|T16]] 参照側の保存 hook<br>[[T16-1-handoff-save-hook\|T16-1]] T16 の結果を後続タスクに反映(サブタスク)<br>[[T16-2-image-refs-batches\|T16-2]] imageRefs の getMany の分割を共通にする(サブタスク)<br>[[T17-admin-data-routes\|T17]] プレビュー・サムネイル取得ルート<br>[[T17-1-preview-limit-reason\|T17-1]] PREVIEW_MAX_IDS の理由を直す(サブタスク) |
-| 3 | 9 | [[T18-upload-route\|T18]] アップロードルート<br>[[T19-image-entry-hook\|T19]] b64_images の保存 hook<br>[[T20-owner-tracking\|T20]] 参照元の記録<br>[[T21-orphan-routes\|T21]] 未使用判定・画像管理ルート<br>[[T22-widget-parts\|T22]] widget 共通部品<br>[[T23-upload-hook\|T23]] アップロード処理フック<br>[[T24-list-column\|T24]] 一覧サムネイル列<br>[[T25-images-page\|T25]] 画像管理ページ<br>[[T26-playground-pages\|T26]] playground のページ |
+| 3 | 9 | [[T18-upload-route\|T18]] アップロードルート<br>[[T18-1-handoff-upload-route\|T18-1]] T18 の結果を後続タスクに反映(サブタスク)<br>[[T18-2-invalid-target-message\|T18-2]] INVALID_TARGET の文言(サブタスク)<br>[[T19-image-entry-hook\|T19]] b64_images の保存 hook<br>[[T19-1-handoff-image-entry-hook\|T19-1]] T19 の結果を後続タスクに反映(サブタスク)<br>[[T20-owner-tracking\|T20]] 参照元の記録<br>[[T20-1-handoff-owner-tracking\|T20-1]] T20 の結果を後続タスクに反映(サブタスク)<br>[[T21-orphan-routes\|T21]] 未使用判定・画像管理ルート<br>[[T21-1-handoff-orphan-routes\|T21-1]] T21 の結果を後続タスクに反映(サブタスク)<br>[[T21-2-list-publish-status\|T21-2]] 一覧に公開の状態と参照元の件数(サブタスク)<br>[[T22-widget-parts\|T22]] widget 共通部品<br>[[T22-1-admin-css-test-helper\|T22-1]] CSS のクラスを確かめるテストの補助(サブタスク)<br>[[T22-2-handoff-widget-parts\|T22-2]] T22 の結果を後続タスクに反映(サブタスク)<br>[[T23-upload-hook\|T23]] アップロード処理フック<br>[[T23-1-handoff-upload-hook\|T23-1]] T23 の結果を後続タスクに反映(サブタスク)<br>[[T23-2-hooks-test-cleanup\|T23-2]] フックのテストの後片付け(サブタスク)<br>[[T24-list-column\|T24]] 一覧サムネイル列<br>[[T24-1-handoff-list-column\|T24-1]] T24 の結果を後続タスクに反映(サブタスク)<br>[[T25-images-page\|T25]] 画像管理ページ<br>[[T25-1-handoff-images-page\|T25-1]] T25 の結果を後続タスクに反映(サブタスク)<br>[[T25-2-page-registration-prep\|T25-2]] 画像管理ページの登録の準備(サブタスク)<br>[[T26-playground-pages\|T26]] playground のページ<br>[[T26-1-typecheck-playground-scripts\|T26-1]] playground のスクリプトの型チェック(サブタスク)<br>[[T26-2-handoff-playground-pages\|T26-2]] T26 の結果を後続タスクに反映(サブタスク) |
 | 4 | 3 | [[T27-image-widget\|T27]] 単一画像 widget<br>[[T28-gallery-widget\|T28]] ギャラリー widget<br>[[T29-plugin-definition\|T29]] プラグイン定義の組み立て |
 | 5 | 1 | [[T30-admin-entry\|T30]] 管理画面エントリの組み立て |
 | 6 | 3 | [[T31-e2e\|T31]] E2E テスト<br>[[T32-cloudflare-check\|T32]] Cloudflare での確認<br>[[T33-readme\|T33]] README |
@@ -128,14 +128,29 @@ flowchart LR
     subgraph W3["ウェーブ 3"]
         direction TB
         T18["T18 アップロードルート"]
+        T18_1["T18-1 T18 の結果を反映"]
+        T18_2["T18-2 INVALID_TARGET の文言"]
         T19["T19 b64_images の保存 hook"]
+        T19_1["T19-1 T19 の結果を反映"]
         T20["T20 参照元の記録"]
+        T20_1["T20-1 T20 の結果を反映"]
         T21["T21 未使用判定・画像管理ルート"]
+        T21_1["T21-1 T21 の結果を反映"]
+        T21_2["T21-2 一覧に公開の状態と参照元の件数"]
         T22["T22 widget 共通部品"]
+        T22_1["T22-1 CSS のクラスの確かめ方を共通に"]
+        T22_2["T22-2 T22 の結果を反映"]
         T23["T23 アップロード処理フック"]
+        T23_1["T23-1 T23 の結果を反映"]
+        T23_2["T23-2 フックのテストの後片付け"]
         T24["T24 一覧サムネイル列"]
+        T24_1["T24-1 T24 の結果を反映"]
         T25["T25 画像管理ページ"]
+        T25_1["T25-1 T25 の結果を反映"]
+        T25_2["T25-2 画像管理ページの登録の準備"]
         T26["T26 playground のページ"]
+        T26_1["T26-1 スクリプトの型チェック"]
+        T26_2["T26-2 T26 の結果を反映"]
     end
     subgraph W4["ウェーブ 4"]
         direction TB
@@ -197,21 +212,40 @@ flowchart LR
     T03 --> T17
     T11 --> T18
     T08 --> T18
+    T18 --> T18_1
+    T18 --> T18_2
     T11 --> T19
+    T19 --> T19_1
+    T20 --> T20_1
     T03 --> T20
     T10 --> T20
     T03 --> T21
     T06 --> T21
     T10 --> T21
+    T21 --> T21_1
+    T21 --> T21_2
     T14 --> T22
+    T22 --> T22_1
+    T22 --> T22_2
+    T22_1 --> T22_2
     T12 --> T23
     T13 --> T23
     T14 --> T23
+    T23 --> T23_1
+    T23 --> T23_2
+    T25 --> T23_2
     T14 --> T24
+    T24 --> T24_1
     T14 --> T25
     T06 --> T25
+    T25 --> T25_1
+    T25_2 --> T25_1
+    T25 --> T25_2
+    T24 --> T25_2
     T02 --> T26
     T15 --> T26
+    T26 --> T26_1
+    T26 --> T26_2
     T22 --> T27
     T23 --> T27
     T22 --> T28
@@ -243,7 +277,7 @@ flowchart LR
     class T05,T07,T08,T09,T10 spike
     class T06 decision
     classDef subtask stroke-dasharray: 2 4
-    class T01_1,T01_2,T02_1,T04_1,T05_1,T07_1,T08_1,T09_1,T10_1,T11_1,T12_1,T16_1,T16_2,T17_1 subtask
+    class T01_1,T01_2,T02_1,T04_1,T05_1,T07_1,T08_1,T09_1,T10_1,T11_1,T12_1,T16_1,T16_2,T17_1,T18_1,T18_2,T19_1,T20_1,T21_1,T21_2,T22_1,T22_2,T23_1,T23_2,T24_1,T25_1,T25_2,T26_1,T26_2 subtask
 ```
 
 - 実線の矢印: 完了を待ってから着手する依存
@@ -286,14 +320,29 @@ flowchart LR
 | [[T17-admin-data-routes\|T17]] | 管理画面用のデータ取得ルートを作る | 実装 | 2 | [[T03-shared-contracts\|T03]] | `src/server/routes/admin-data.ts`<br>`tests/server/admin-data.test.ts` |
 | [[T17-1-preview-limit-reason\|T17-1]] | PREVIEW_MAX_IDS の理由を T17 の実測に合わせて直す(サブタスク) | ドキュメント | 2 | [[T17-admin-data-routes\|T17]] | `src/shared/constants.ts`(コメント)<br>`docs/emdash-plugin-content-api-constraints.md`<br>`tasks/T03`・`T14` |
 | [[T18-upload-route\|T18]] | アップロード用ルートを作る | 実装 | 3 | [[T11-server-validation\|T11]]、[[T08-spike-route-body\|T08]] | `src/server/routes/upload.ts`<br>`tests/server/upload.test.ts` |
+| [[T18-1-handoff-upload-route\|T18-1]] | T18 の結果(アップロードのルート)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 3 | [[T18-upload-route\|T18]] | `tasks/T25`・`T27`〜`T29`・`T32`<br>`plans/base64-image-plugin-spec.md`(19 章) |
+| [[T18-2-invalid-target-message\|T18-2]] | INVALID_TARGET の文言を、エントリの言語がサイトに無いときにも合うようにする(サブタスク) | 実装 | 3 | [[T18-upload-route\|T18]]、[[T14-admin-i18n-api\|T14]] | `src/client/error-messages.ts`<br>`tests/client/api.test.ts` |
 | [[T19-image-entry-hook\|T19]] | b64_images の保存 hook(検証)を作る | 実装 | 3 | [[T11-server-validation\|T11]] | `src/server/hooks/image-entry.ts`<br>`tests/server/image-entry.test.ts` |
+| [[T19-1-handoff-image-entry-hook\|T19-1]] | T19 の結果(b64_images の保存 hook)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 3 | [[T19-image-entry-hook\|T19]] | `tasks/T25`・`T31`・`T32`・`T33` |
 | [[T20-owner-tracking\|T20]] | 参照元の記録(afterSave)を作る | 実装 | 3 | [[T03-shared-contracts\|T03]]、[[T10-spike-after-save\|T10]] | `src/server/hooks/owners.ts`<br>`tests/server/owners.test.ts` |
+| [[T20-1-handoff-owner-tracking\|T20-1]] | T20 の結果(参照元の記録)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 3 | [[T20-owner-tracking\|T20]] | `tasks/T21`・`T29`・`T31`・`T32` |
 | [[T21-orphan-routes\|T21]] | 未使用画像の判定と画像管理ルートを作る | 実装 | 3 | [[T03-shared-contracts\|T03]]、[[T06-decision-trash-permission\|T06]]、[[T10-spike-after-save\|T10]] | `src/server/orphans.ts`<br>`src/server/routes/images-admin.ts`<br>`src/server/hooks/image-deleted.ts`<br>ほか |
+| [[T21-1-handoff-orphan-routes\|T21-1]] | T21 の結果(画像管理のルート)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 3 | [[T21-orphan-routes\|T21]] | `tasks/T25`・`T29`・`T32`<br>`plans/base64-image-plugin-spec.md`(19 章)<br>`playground/README.md` |
+| [[T21-2-list-publish-status\|T21-2]] | 画像管理の一覧に、画像エントリの公開の状態と参照元の全体の件数を足す(サブタスク) | 実装 | 3 | [[T21-orphan-routes\|T21]] | `src/shared/schema.ts`<br>`src/server/orphans.ts`<br>`tests/server/orphans.test.ts`<br>ほか |
 | [[T22-widget-parts\|T22]] | widget 共通の UI 部品を作る | 実装 | 3 | [[T14-admin-i18n-api\|T14]] | `src/admin/parts/**`<br>`tests/admin/parts.test.tsx` |
+| [[T22-1-admin-css-test-helper\|T22-1]] | 管理画面の CSS にクラスがあるかを確かめるテストの補助を共通にする(サブタスク) | 実装 | 3 | [[T22-widget-parts\|T22]] | `tests/admin/admin-css.ts`<br>`tests/admin/admin-css.test.ts`<br>`tests/admin/parts.test.tsx`<br>ほか |
+| [[T22-2-handoff-widget-parts\|T22-2]] | T22 の結果(widget 共通の UI 部品)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 3 | [[T22-widget-parts\|T22]]、[[T22-1-admin-css-test-helper\|T22-1]] | `tasks/T24`・`T25`・`T27`・`T28`・`T31` |
 | [[T23-upload-hook\|T23]] | アップロード処理の React フックを作る | 実装 | 3 | [[T12-input-decode\|T12]]、[[T13-encode-search\|T13]]、[[T14-admin-i18n-api\|T14]] | `src/admin/hooks/**`<br>`tests/admin/hooks.test.ts` |
+| [[T23-1-handoff-upload-hook\|T23-1]] | T23 の結果(アップロード処理の React フック)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 3 | [[T23-upload-hook\|T23]] | `tasks/T27`・`T28`・`T31` |
+| [[T23-2-hooks-test-cleanup\|T23-2]] | フックのテストの afterEach で、投げる前に描画を片付ける(サブタスク) | 実装 | 3 | [[T23-upload-hook\|T23]]、[[T25-images-page\|T25]] | `tests/admin/hooks.test.ts`<br>`docs/react-hook-testing-pitfalls.md` |
 | [[T24-list-column\|T24]] | コンテンツ一覧のサムネイル列を作る | 実装 | 3 | [[T14-admin-i18n-api\|T14]] | `src/admin/ThumbnailColumn.tsx`<br>`tests/admin/ThumbnailColumn.test.tsx` |
+| [[T24-1-handoff-list-column\|T24-1]] | T24 の結果(コンテンツ一覧のサムネイル列)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 3 | [[T24-list-column\|T24]] | `tasks/T29`〜`T31` |
 | [[T25-images-page\|T25]] | 画像管理ページを作る | 実装 | 3 | [[T14-admin-i18n-api\|T14]]、[[T06-decision-trash-permission\|T06]] | `src/admin/ImagesPage.tsx`<br>`tests/admin/ImagesPage.test.tsx` |
+| [[T25-1-handoff-images-page\|T25-1]] | T25 の結果(画像管理ページ)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 3 | [[T25-images-page\|T25]]、[[T25-2-page-registration-prep\|T25-2]] | `tasks/T29`〜`T31`・`T33`<br>`plans/base64-image-plugin-spec.md`(19 章)<br>`docs/test-lint-setup.md` |
+| [[T25-2-page-registration-prep\|T25-2]] | 画像管理ページを、一覧の列と登録(T29・T30)につなぐ準備をする(サブタスク) | 実装 | 3 | [[T25-images-page\|T25]]、[[T24-list-column\|T24]] | `src/shared/constants.ts`(`IMAGES_PAGE`)<br>`src/admin/ImagesPage.tsx`<br>`tests/admin/ImagesPage.test.tsx`<br>ほか |
 | [[T26-playground-pages\|T26]] | playground に E2E 用のページとデータを用意する | 実装 | 3 | [[T02-playground\|T02]]、[[T15-site-resolve\|T15]] | `playground/src/pages/**`<br>`playground/seed/**`<br>`e2e/fixtures/**` |
+| [[T26-1-typecheck-playground-scripts\|T26-1]] | playground のスクリプトも npm run typecheck で検査する(サブタスク) | 実装 | 3 | [[T26-playground-pages\|T26]] | `tsconfig.json`(`include`)<br>`docs/test-lint-setup.md`<br>ほか |
+| [[T26-2-handoff-playground-pages\|T26-2]] | T26 の結果(playground のページと E2E の入力画像)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 3 | [[T26-playground-pages\|T26]] | `tasks/T29`・`T31`〜`T33` |
 | [[T27-image-widget\|T27]] | 単一画像の widget を作る | 実装 | 4 | [[T22-widget-parts\|T22]]、[[T23-upload-hook\|T23]] | `src/admin/ImageField.tsx`<br>`tests/admin/ImageField.test.tsx` |
 | [[T28-gallery-widget\|T28]] | ギャラリーの widget を作る | 実装 | 4 | [[T22-widget-parts\|T22]]、[[T23-upload-hook\|T23]] | `src/admin/GalleryField.tsx`<br>`tests/admin/GalleryField.test.tsx` |
 | [[T29-plugin-definition\|T29]] | プラグイン定義(src/index.ts)を組み立てる | 実装 | 4 | [[T07-spike-git-dependency\|T07]]、[[T16-reference-hook\|T16]]、[[T17-admin-data-routes\|T17]]、[[T18-upload-route\|T18]]、[[T19-image-entry-hook\|T19]]、[[T20-owner-tracking\|T20]]、[[T21-orphan-routes\|T21]] | `src/index.ts`<br>`src/server/plugin.ts` |

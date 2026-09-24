@@ -247,6 +247,14 @@ export const imageUsageSchema = z.enum(["in_use", "owner_deleted", "detached", "
  */
 export const imageEntryStatusSchema = z.enum(["active", "trashed", "missing"]);
 
+/**
+ * 画像エントリの公開の状態(サイトに出るか)。値は EmDash 0.39.1 の `status` と同じ名前(T21-2)。
+ * - `published`: サイトに出る(サイトの取得は、`status` が `published` でゴミ箱に入っていないものだけ)
+ * - `draft`: 出ない。公開の前に止まった画像と、ゴミ箱から戻した画像(戻すと必ず下書きになる)
+ * - `scheduled`: 出ない。予約の日時が来ると、EmDash の定期処理が公開する
+ */
+export const imageEntryPublicationSchema = z.enum(["published", "draft", "scheduled"]);
+
 export const imagesListRequestSchema = z.strictObject({
 	/** 前の応答の `nextCursor`。省略すると先頭から */
 	cursor: z.string().min(1).max(2048).optional(),
@@ -265,8 +273,13 @@ export const imageListItemSchema = z.object({
 	bytes: webpBytesSchema,
 	createdAt: isoDateTimeSchema,
 	entryStatus: imageEntryStatusSchema,
+	/** 画像エントリの公開の状態。`entryStatus` が `active` のときだけ値があり、`trashed` / `missing` では null */
+	entryPublication: imageEntryPublicationSchema.nullable(),
 	usage: imageUsageSchema,
+	/** 参照元(記録の順に先頭から 20 件まで。4 つのキーが同じものは 1 件) */
 	owners: z.array(imageListOwnerSchema),
+	/** 参照元の全体の件数(`owners` と同じ数え方。`owners` の件数以上) */
+	ownersTotal: z.int().min(0),
 });
 
 /** `nextCursor` が無ければ最後のページ */

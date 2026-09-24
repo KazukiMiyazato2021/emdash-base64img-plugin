@@ -11,6 +11,7 @@ import {
 	fetchPreviews,
 	fetchThumbnails,
 	listImages,
+	publishImage,
 	trashImage,
 	uploadImage,
 } from "../../src/client/api";
@@ -398,6 +399,15 @@ describe("エラーコードの文言", () => {
 		expect(ERROR_MESSAGES.en.INPUT_HEIC_REJECTED).toContain("JPEG");
 	});
 
+	it("INVALID_TARGET の文言は、フィールドの誤りと、エントリの言語がサイトに無いこと(T18)の両方を伝える", () => {
+		expect(ERROR_MESSAGES.ja.INVALID_TARGET).toContain("このプラグインの画像フィールドではない");
+		expect(ERROR_MESSAGES.ja.INVALID_TARGET).toContain(
+			"エントリの言語がサイトに設定されていません",
+		);
+		expect(ERROR_MESSAGES.en.INVALID_TARGET).toContain("not an image field of this plugin");
+		expect(ERROR_MESSAGES.en.INVALID_TARGET).toContain("locale is not configured for the site");
+	});
+
 	it("固定の上限を文言に差し込む", () => {
 		expect(ERROR_MESSAGES.ja.INPUT_FILE_TOO_LARGE).toContain("上限 40MB");
 		expect(ERROR_MESSAGES.en.INPUT_FILE_TOO_LARGE).toContain("maximum 40 MB");
@@ -496,7 +506,33 @@ const CALLS: CallCase[] = [
 		url: `${PLUGIN_API}/images/list`,
 		method: "POST",
 		body: { cursor: "next-page" },
-		data: { items: [] },
+		// 項目の値は、共有のスキーマで確かめたうえで、そのまま返る(公開の状態と参照元の全体の件数を含む。T21-2)
+		data: {
+			items: [
+				{
+					id: IMAGE_ID,
+					thumb: WEBP_DATA_URL,
+					width: 1280,
+					height: 853,
+					bytes: 74_668,
+					createdAt: "2026-09-24T12:00:00.000Z",
+					entryStatus: "active",
+					entryPublication: "draft",
+					usage: "in_use",
+					owners: [
+						{
+							collection: "posts",
+							entryId: "01J8Z3K4M5N6P7Q8R9S0POST01",
+							locale: "ja",
+							field: "cover",
+							status: "in_use",
+						},
+					],
+					ownersTotal: 23,
+				},
+			],
+			nextCursor: "c2",
+		},
 	},
 	{
 		name: "trashImage",
@@ -513,6 +549,15 @@ const CALLS: CallCase[] = [
 		method: "DELETE",
 		body: undefined,
 		data: { deleted: true, id: IMAGE_ID },
+	},
+	{
+		// 標準の公開 API(T25)。body は送らない
+		name: "publishImage",
+		call: () => publishImage(IMAGE_ID),
+		url: `/_emdash/api/content/b64_images/${IMAGE_ID}/publish`,
+		method: "POST",
+		body: undefined,
+		data: { item: { id: IMAGE_ID, status: "published" } },
 	},
 ];
 
@@ -570,6 +615,32 @@ describe("成功の応答", () => {
 		expect((await captureApiError(deleteImagePermanently(IMAGE_ID))).code).toBe(
 			"UNEXPECTED_RESPONSE",
 		);
+	});
+
+	it("公開は、画像の本体などの使わないキーを落として item の id と status だけを返す", async () => {
+		fetchMock.mockResolvedValue(
+			success({
+				item: {
+					id: IMAGE_ID,
+					status: "published",
+					data: { image: { src: WEBP_DATA_URL, width: 1280, height: 853 } },
+					publishedAt: "2026-09-24T12:00:00.000Z",
+				},
+				_rev: "rev-token",
+			}),
+		);
+		await expect(publishImage(IMAGE_ID)).resolves.toEqual({
+			item: { id: IMAGE_ID, status: "published" },
+		});
+	});
+
+	it.each([
+		["status が published でない", { item: { id: IMAGE_ID, status: "draft" } }],
+		["item が無い", { _rev: "rev-token" }],
+		["id が ID の形でない", { item: { id: "../x", status: "published" } }],
+	])("公開の data の形が違えば UNEXPECTED_RESPONSE: %s", async (_label, data) => {
+		fetchMock.mockResolvedValue(success(data));
+		expect((await captureApiError(publishImage(IMAGE_ID))).code).toBe("UNEXPECTED_RESPONSE");
 	});
 });
 
@@ -629,6 +700,24 @@ describe("エラーの応答(EmDash の { success: false, error: { code, message
 		async (responseCode, status, code) => {
 			fetchMock.mockResolvedValue(apiError(responseCode, status));
 			const error = await captureApiError(uploadImage(uploadRequest()));
+			expect(error.code).toBe(code);
+			expect(error.details).toEqual({ status, responseCode });
+		},
+	);
+
+	it.each([
+		// ほかの利用者が標準の編集画面で開いている(`core/src/api/errors.ts` の mapErrorStatus で 409)
+		["ENTRY_LOCKED", 409, "UNEXPECTED_RESPONSE"],
+		// 版の食い違い
+		["CONFLICT", 409, "UNEXPECTED_RESPONSE"],
+		// ほかのプラグインの content:beforePublish が止めた
+		["PUBLISH_REJECTED", 422, "VALIDATION_ERROR"],
+		["CONTENT_PUBLISH_ERROR", 500, "INTERNAL_ERROR"],
+	] as const)(
+		"公開 API の %s(HTTP %i)は %s にし、元のコードを details.responseCode に残す(画面が文言を補う)",
+		async (responseCode, status, code) => {
+			fetchMock.mockResolvedValue(apiError(responseCode, status));
+			const error = await captureApiError(publishImage(IMAGE_ID));
 			expect(error.code).toBe(code);
 			expect(error.details).toEqual({ status, responseCode });
 		},
@@ -751,6 +840,7 @@ describe("キャンセル(AbortSignal)", () => {
 			() => listImages({}, { signal: controller.signal }),
 			() => trashImage(IMAGE_ID, { signal: controller.signal }),
 			() => deleteImagePermanently(IMAGE_ID, { signal: controller.signal }),
+			() => publishImage(IMAGE_ID, { signal: controller.signal }),
 		];
 		await Promise.all(calls.map((call) => expect(call()).rejects.toBe(reason)));
 		expect(fetchMock).not.toHaveBeenCalled();
@@ -827,6 +917,7 @@ describe("送る前の入力の確認", () => {
 		["カーソルが空", () => listImages({ cursor: "" })],
 		["ID が不正(完全削除。パスを変えうる)", () => deleteImagePermanently("..")],
 		["ID が空(完全削除)", () => deleteImagePermanently("")],
+		["ID が不正(公開。パスを変えうる)", () => publishImage("x/../y")],
 	])("T03 のスキーマに合わなければ、送らずに VALIDATION_ERROR: %s", async (_label, call) => {
 		const error = await captureApiError(call());
 		expect(error.code).toBe("VALIDATION_ERROR");

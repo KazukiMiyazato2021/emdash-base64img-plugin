@@ -175,9 +175,10 @@ sequenceDiagram
     Editor->>W: 画像を選択 / ドロップ / 貼り付け
     W->>W: デコード・リサイズ・WebP 圧縮<br/>サムネイル生成
     W->>R: POST(data URL・サムネイル・寸法・保存先)
-    R->>R: 検証(形式・サイズ・寸法・保存先フィールド)
-    R->>C: create → getVersioned → publish
+    R->>R: 検証(保存先のフィールドとロケール・形式・サイズ・寸法)
+    R->>C: create
     R->>S: メタデータを保存(参照元がわかれば記録)
+    R->>C: getVersioned → publish
     R-->>W: 参照 { v, id, locale, width, height }
     W->>P: onChange(参照)→ 編集者が保存
     P->>P: beforeSave で参照を検証
@@ -218,7 +219,7 @@ flowchart LR
 - `meta.quality` は、ブラウザが申告した圧縮時の画質。保存済みの画像を開いたときに widget で画質を表示するために持つ([[#11. 管理画面 UI|11.2]])。サーバーは確かめない。
 - `meta.bytes` は、保存 hook([[#8. サーバー側の検証|8 章]]の②)が、`src` をデコードした WebP 本体のバイト数と一致することを確かめる([[T11-server-validation#結果|T11]])。
 - 作成時のロケールは、サイトの既定ロケールにする(`ctx.content.create` の既定値。`packages/core/src/plugins/types.ts:476`)。
-- 画像エントリは、作成したあと変更しない。
+- 画像エントリは、作成したあと変更しない。`image` を送る更新は、保存 hook([[#8. サーバー側の検証|8 章]]の②)が値によらず拒否する。`supports: []` のコレクションの更新は、公開中の値をそのまま書き換え、参照の寸法や `imageRefs` のサムネイルと食い違うため。根拠: 実測+公式ドキュメント([[T19-image-entry-hook#結果|T19]])
 
 ### 5.2 参照(投稿側フィールドの値)
 
@@ -253,12 +254,14 @@ flowchart LR
 ```
 
 - インデックス: `createdAt`
-- `owners` には追記だけを行い、保存時に削除はしない([[#9. 参照元の記録と未使用画像の検出]])。
+- `owners` には追記だけを行い、保存時に削除はしない([[#9. 参照元の記録と未使用画像の検出]])。4 つのキーがすべて同じ参照元は重複させない。
+- 参照元の記録(afterSave / afterPublish)は記録を作らない(記録を作るのはアップロード用ルート)。既存の記録を書き換えるときは、版(`revision`)を確かめて書く(`compareAndSet`)。無条件の `put` / `putMany` で書き直すと、その間に足された参照元が消える([[emdash-plugin-storage-conditional-writes]])。
 
 ### 5.4 容量の目安
 
 - 画像1枚は最大 100,000 バイト。ただし、公開するとデータを丸ごと複製したリビジョンが 1 件できる(`packages/core/src/database/repositories/content.ts:2309-2318`。`supports: []` でも同じ。実測+公式ドキュメント、[[T02-playground#結果|T02]])。そのため 1 枚で DB を約 2 倍使い、D1 の 500MB で約 2,500 枚(未使用画像を含む。推測のみ)。
-  - プラグインが公開するときに、この複製を避けられるかは [[T18-upload-route|T18]] で確かめる([[T02-1-prettier-storage-capacity|T02-1]])。
+  - プラグインからは避けられない([[T18-upload-route#結果|T18]])。作成で公開状態にはできず(`ContentCreateOptions` は `locale` と `translationOf` だけ)、初めての公開は必ずその時点の値を複製する。小さい仮の値で公開してから差し替えると複製は 166 バイトになるが、標準 API でそのリビジョンを復元すると画像が仮の値に戻り、差し替え(`ctx.content.update`)は保存 hook を通らないので採らない。根拠: 実測+公式ドキュメント([[emdash-plugin-upload-route#公開時のリビジョンの複製を避けられるか]])
+  - ゴミ箱に移す → 戻す → 公開し直す、を繰り返すと、そのたびに本体を写したリビジョンが 1 件増える(戻した画像は下書きになり、公開し直すと、前の公開のリビジョンも残る)。プラグインからは消せないので、上の見積もりに入っていない。根拠: 実測(件数)、推測のみ(大きさ)([[T21-2-list-publish-status#公開し直す操作の材料(T25 向け)|T21-2]])
 - 投稿側の行とリビジョンには参照しか入らないため、小さいまま保たれる。
 
 ## 6. 圧縮仕様(ブラウザ)
@@ -337,11 +340,11 @@ flowchart LR
 - ルートの権限は `content:create`(Contributor 以上。`packages/auth/src/rbac.ts:19`)。
 - ルートの宣言: `methods: ["POST"]`、`request: { body: "json", maxBytes: 600_000 }`、`input: uploadRequestSchema`。書き方は [[T08-spike-route-body#結果|T08]] と [[emdash-plugin-route-body-limit]]。
   - body の上限(既定 1 MiB、最大 8 MiB)は、`request` を宣言したルートにだけ掛かる。宣言しないと、EmDash は body を上限なしに読む(12MB の JSON も受け取った)。根拠: 実測+公式ドキュメント(`packages/core/src/plugins/routes.ts:129`、`route-wire.ts:177`)
-  - 600,000 バイトは、固定上限の `dataUrl`(500,000)と `thumb`(8,000)を入れた body(正しい入力で最大 509,462 バイト)に余裕を足した値。超えると、読む前か読みながら数えて 413 `INVALID_PLUGIN_REQUEST` になる。入力がスキーマに合わなければ 400 `VALIDATION_ERROR` で、ハンドラーは呼ばれない。根拠: 実測+公式ドキュメント
+  - 600,000 バイトは、固定上限の `dataUrl`(500,000)と `thumb`(8,000)を入れた body(正しい入力で最大 511,515 バイト。`target.locale` を上限の 35 文字にし、ASCII 以外を `\uXXXX` で書いたとき。[[T18-upload-route#結果|T18]])に余裕を足した値。超えると、読む前か読みながら数えて 413 `INVALID_PLUGIN_REQUEST` になる。入力がスキーマに合わなければ 400 `VALIDATION_ERROR` で、ハンドラーは呼ばれない。根拠: 実測+公式ドキュメント
   - 画面からは `X-EmDash-Request: 1` を付けて呼ぶ(無いと 403 `CSRF_REJECTED`)。根拠: 実測+公式ドキュメント
   - body の parse・スキーマ・WebP の検証の CPU 時間は、固定上限の body でも 0.28ms(新しいプロセスでの 1 回目は 1.1ms)で、Workers Free の 10ms と比べて小さい。根拠: 実測のみ(Node 26、Apple M5 Pro)
 - **1リクエストで1枚**だけ扱う。1 リクエストの処理とクエリ数を小さく保つため。
-  - アップロード 1 回のクエリ数は、SQLite での実測で 72(ルートの固定費 1、作成 30、取得 3、公開 38。公開の 28 本は EmDash 本体の、メディアの使用状況の索引の更新)。根拠: 実測のみ([[T10-spike-after-save#結果|T10]]、[[emdash-plugin-content-query-counts]])
+  - アップロード 1 回のクエリ数は、SQLite での実測で 75(ルートの固定費 1、フィールド定義 2、作成 30、`imageRefs` 1、取得 3、公開 38。作成と公開のそれぞれ 15 本は EmDash 本体の、メディアの使用状況の索引の更新)。i18n を設定したサイトでは 77。根拠: 実測のみ([[T18-upload-route#結果|T18]]、[[emdash-plugin-upload-route]])
   - Workers Free で D1 に送れるのは 1 呼び出し 1,000 クエリまでなので、収まる(公式ドキュメントのみ。[[cloudflare-workers-free-d1-limits]])。D1 の limits のページには「Free は 1 呼び出し 50」という記述が残っていて食い違う。EmDash 本体の保存も 55〜62 クエリ使うので、1,000 と読むのが妥当(推測のみ)。実際の D1 での数は [[T32-cloudflare-check|T32]] で確かめる([[T10-1-spec-d1-limits|T10-1]])。
 - 入力:
 
@@ -353,27 +356,31 @@ flowchart LR
   "height": 853,
   "quality": 0.77,   // 圧縮時の画質。画像エントリの meta.quality に保存する
   "filename": "IMG_0001.jpg",
-  "target": { "collection": "posts", "field": "cover", "entryId": "01J…", "locale": "ja" }  // entryId・locale は分かるときだけ送る(新規エントリには entryId が無い)
+  "target": { "collection": "posts", "field": "cover", "entryId": "01J…", "locale": "ja" }  // entryId と locale は組にして、管理画面の URL から両方が分かるときだけ送る(新規作成の画面と、URL に ?locale= の無い編集画面では送らない。T23)
 }
 ```
 
 - 応答: `{ "ref": { "v": 1, "id": "01J…", "locale": "ja", "width": 1280, "height": 853, "alt": "" } }`。widget はこの参照をそのままフィールドの値にできる。
 - エラー: ハンドラーは `PluginRouteError(code, message, status)` を投げる。EmDash はこれを HTTP ステータスと `{ "success": false, "error": { "code", "message" } }` に変換する。`details` は応答に含まれないので、画面の文言はコードだけで決める。根拠: 実測+公式ドキュメント(`packages/core/src/plugins/http-route-dispatch.ts:134`。[[emdash-plugin-route-errors]])。コードの一覧は `src/shared/errors.ts`。
-- 処理の順番:
-  1. 検証する([[#8. サーバー側の検証]] の①)。
-  2. `ctx.content.create("b64_images", …)` で作成する。
-  3. `getVersioned` で最新の版を取得し、`publish` で公開する。
-  4. `imageRefs` にメタデータを保存する。
+- 処理の順番([[T18-upload-route#結果|T18]]):
+  1. 検証する([[#8. サーバー側の検証]] の①)。その前に、`target.locale` をサイトに設定されたロケールと照らし合わせる(下記)。
+  2. `ctx.content.create("b64_images", …)` で作成する。同じプラグインの `content:beforeSave`(②)もここで値を確かめ、拒否されたら 400 `IMAGE_ENTRY_INVALID`(何も作られない)。
+  3. `imageRefs` にメタデータを保存する。
+  4. `getVersioned` で最新の版を取得し、`publish` で公開する。
   5. 参照を返す。
+- `imageRefs` を公開より先に保存するのは、公開で失敗したときに、作った画像を画像管理ページ(`imageRefs` を一覧する)から見つけて消せるようにするため。作成のあとで失敗したら、画像エントリをゴミ箱に移し(プラグインは完全削除できない)、500 `UPLOAD_FAILED` を返す。`imageRefs` の記録は残す。根拠: 実測+公式ドキュメント([[emdash-plugin-upload-route]])
+- ロケール: 画像エントリはサイトの既定ロケールで作り(5.1)、参照の `locale` はそのロケールにする。`target.locale`(参照元のエントリのロケール)は、`imageRefs` の参照元にだけ記録する。i18n を設定したサイトでは設定されたロケールのどれか(表記は設定にそろえる)、設定していないサイトでは 35 文字までを受け付け、ほかは 400 `INVALID_TARGET`。ロケールの設定は `emdash` の `getI18nConfig()` で読む(`ctx.site.locale` は別の値)。根拠: 実測+公式ドキュメント
+  - widget は、`target.entryId` を送るときは、そのエントリのロケールも送る。省くと参照元は既定ロケールで記録され、既定ロケール以外のエントリでは、保存時の参照元の記録(9 章)がロケールだけ違う参照元をもう 1 件足す。根拠: 実測のみ([[emdash-plugin-upload-route#参照元の記録(T20)との関係]])
 - 公開まで行う理由: Contributor には公開権限がない(`content:publish_own` は Author 以上。`packages/auth/src/rbac.ts:28`)。標準 API で作成すると下書きのまま残り、サイトに表示されない。
-- 必要な capability: `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read`
+- 必要な capability(プラグイン全体): `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read`
+  - アップロードで使うのは `schema:read`(保存先のフィールド定義)・`content:write`(作成)・`content:publish`(公開)。`content:read` は `definePlugin` が自動で足す。`content:revisions:read` は [[#9. 参照元の記録と未使用画像の検出|9 章]]の判定で使う([[T18-upload-route#T29 がルートを登録する方法|T18]])。
 
 ## 8. サーバー側の検証
 
 | 場所 | 検証内容 | 不正なとき |
 |---|---|---|
-| ① アップロード用ルート | ・保存先のフィールドが存在し、このプラグインの widget を使う `json` フィールドであること(`ctx.schema.getCollection` で `type` / `widget` / `options` を読む。`packages/core/src/plugins/types.ts:407`)<br>・`dataUrl` が `data:image/webp;base64,` で始まり、長さが `maxStoredBytes` 以下(固定上限 500,000)。長さはデコードする前に確かめる<br>・デコードした中身が静止画の WebP(RIFF / WEBP、`VP8 ` / `VP8L` / `VP8X`。アニメーションは拒否)で、ヘッダーから読んだ寸法が width / height と一致し、長辺が `maxEdge` 以下<br>・`thumb` が静止画の WebP で、長辺 96px 以下、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下) | 拒否(HTTP 400。コードと理由の対応は [[T11-server-validation#T04 の理由とエラーコードの対応\|T11]]) |
-| ② `b64_images` の `content:beforeSave` | 値の形(`base64ImageEntrySchema`)と、`src` の ① と同じ中身の検証。保存先のフィールドが分からないので、固定上限(保存 500,000 バイト・長辺 4,096px)を当てる。`meta.bytes` が WebP 本体のバイト数と一致すること。API / MCP / 管理画面など、どこからの書き込みでも実行する | 拒否 |
+| ① アップロード用ルート | ・保存先のフィールドが存在し、このプラグインの widget を使う `json` フィールドであること(`ctx.schema.getCollection` で `type` / `widget` / `options` を読む。`packages/core/src/plugins/types.ts:407`)<br>・`target.locale` がサイトのロケールであること(i18n を設定したサイトでは設定されたロケールのどれか、設定していないサイトでは 35 文字まで。[[#7. アップロード(書き込み経路)\|7 章]])<br>・`dataUrl` が `data:image/webp;base64,` で始まり、長さが `maxStoredBytes` 以下(固定上限 500,000)。長さはデコードする前に確かめる<br>・デコードした中身が静止画の WebP(RIFF / WEBP、`VP8 ` / `VP8L` / `VP8X`。アニメーションは拒否)で、ヘッダーから読んだ寸法が width / height と一致し、長辺が `maxEdge` 以下<br>・`thumb` が静止画の WebP で、長辺 96px 以下、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下) | 拒否(HTTP 400。コードと理由の対応は [[T11-server-validation#T04 の理由とエラーコードの対応\|T11]]) |
+| ② `b64_images` の `content:beforeSave` | ・作成(`isNew: true`)で、値の形(`base64ImageEntrySchema`)と、`src` の ① と同じ中身の検証。保存先のフィールドが分からないので、固定上限(保存 500,000 バイト・長辺 4,096px)を当てる。`meta.bytes` が WebP 本体のバイト数と一致すること。`image` が無い・`null` の作成も拒否する<br>・更新(`isNew: false`)で `image` が送られてきたら、値によらず拒否する(5.1)。`image` の無い更新は通す<br>・API / MCP / 管理画面 / プラグインの `ctx.content.create` など、どこからの書き込みでも実行する。クエリはしない | 拒否(`ContentSaveRejectedError`。422 `SAVE_REJECTED`)。日本語と英語を 1 行ずつ並べたメッセージで返す(英語は T11 の `message`。[[T19-image-entry-hook#決めたこと\|T19]]) |
 | ③ 参照を持つコレクションの `content:beforeSave` | 対象は、このプラグインの widget を使う `json` フィールドのうち、送られてきたものだけ(`null` と空の配列は「画像なし」として通す)<br>・参照の形(`{ v, id, locale, width, height, alt }` の型、alt は 1,000 文字以内)<br>・ギャラリーの枚数が `maxItems` 以下で、同じ画像が重複していないこと<br>・参照している画像 ID が、すべて `imageRefs` に存在すること(ID の重複を除き、50 件ずつ `getMany`。ふつうは 1 クエリ)<br>・フィールド定義の読み出し(`ctx.schema.getCollection`)で、ほかに 2 クエリ使う。widget のフィールドが無いコレクションの保存でも、この 2 クエリは増える | 拒否(`ContentSaveRejectedError`。422 `SAVE_REJECTED`)。どのフィールドの何が問題かを、日本語と英語を並べたメッセージで返す(問題は 3 件まで。[[T16-reference-hook#決めたこと\|T16]]) |
 
 - 保存 hook では書き込み元を判別できない(`runContentBeforeSave` には書き込み元のプラグインを除外する引数がない。`packages/core/src/plugins/hooks.ts:543`)。そのため、書き込み元ではなく中身で判定する。
@@ -389,27 +396,39 @@ flowchart LR
 **記録(追記のみ)**
 - アップロード時: `target.entryId` があれば、最初の参照元として記録する。アップロード用ルートの `ctx.content.create` では、このプラグイン自身の `content:afterSave` は呼ばれない(呼んだプラグインは除外される。`packages/core/src/emdash-runtime.ts:2147`)。根拠: 実測+公式ドキュメント([[T10-spike-after-save#結果|T10]])
 - 保存時: 参照を持つコレクションの `content:afterSave` で、エントリの中の参照を読み取り、`imageRefs.owners` に追記する。
+  - 参照元は `{ collection: event.collection, entryId: event.content.id, locale: event.content.locale, field }`(afterPublish も同じ)。参照として扱うのは、このプラグインの widget を使う `json` フィールドの値のうち、参照の形(`isBase64ImageRef`)に合うものだけ(ギャラリーは 1 枚ずつ)。根拠: 実測+公式ドキュメント([[T20-owner-tracking#結果|T20]])
   - 読むのは `event.content.data`(保存した下書き。公開版ではない)と、更新のときにある `event.content.liveData`(content テーブルの列の値。公開済みなら公開版)。下の判定で見る範囲と揃える。根拠: 実測+公式ドキュメント([[T10-spike-after-save#結果|T10]])
   - afterSave が呼ばれるのは、作成(`isNew: true`)と更新(保存・自動保存・メタデータだけの更新。`isNew: false`)だけ。管理画面の「公開」は保存してから公開するので、保存の側で呼ばれる。`b64_images` の保存でも呼ばれるので、参照を持たないコレクションは読み飛ばす。根拠: 実測+公式ドキュメント
   - 公開(`content:afterPublish`)でも同じ処理をする。API だけで公開したとき(一覧の一括公開など)は afterSave が呼ばれないため。afterPublish の `event.content.data` は公開したデータ。根拠: 実測+公式ドキュメント
-  - クエリ数は `getMany` の 1 と、参照元が増えた画像の数(`putMany` は 1 件 1 クエリ)。どちらも保存のリクエストと同じ呼び出しのクエリ数に入る。根拠: 実測+公式ドキュメント([[emdash-plugin-content-query-counts]])
-  - afterSave は `after()` で実行され、保存の応答を待たせない(Workers では waitUntil。`packages/core/src/emdash-runtime.ts:5560`)。例外を投げると、後に続くプラグインの afterSave が呼ばれなくなる(既定の `errorPolicy` は `"abort"`)。例外は hook の中で受け止めてログに出し、`errorPolicy: "continue"` を指定する。根拠: 実測+公式ドキュメント([[emdash-after-save-payload]])
+  - クエリ数は、参照の形の値が無ければ 0(`b64_images` や、画像が空のエントリの保存も 0)。あれば、フィールド定義の 2(`ctx.schema.getCollection`)と `getMany` の 1(50 件ずつ)。参照元が増える画像 1 枚につき、さらに 2(`getVersioned` と `compareAndSet`)。記録済みなら書かないので、ふつうの保存・自動保存・公開は 3。どれも保存のリクエストと同じ呼び出しのクエリ数に入る。根拠: 実測+公式ドキュメント([[T20-owner-tracking#結果|T20]]、[[image-owner-tracking-hooks]])
+  - 同時の保存: 「`getMany` → 追記 → `putMany`」では、同じ画像を参照するエントリを同時に保存・公開すると、あとの書き込みが先の追記を消す(プラグインが使えるトランザクションは無い)。書くときは `getVersioned` で読んだ版(`revision`)を `compareAndSet` に渡し、版が変わっていたら読み直す(最大 8 回)。ストレージの呼び出しに 20ms の待ちを入れた実測で、前者は 8 件の同時作成で 6 件の追記が消え、後者は消えなかった。根拠: 実測+公式ドキュメント([[emdash-plugin-storage-conditional-writes]])
+  - 記録が無い画像(seed で作った画像、完全削除された画像)には記録を作らない(サムネイルなど、サーバーで作れない値が要るため)。記録が `imageRefsRecordSchema` に合わなくても、`owners` が配列なら追記する(ほかのキーはそのまま)。`owners` が配列でない記録には書かない。どれもログに出す([[T20-owner-tracking#決めたこと|T20]] の決定)。
+  - afterSave は `after()` で実行され、保存の応答を待たせない(Workers では waitUntil。`packages/core/src/emdash-runtime.ts:5560`)。例外を投げると、後に続くプラグインの afterSave が呼ばれなくなる(既定の `errorPolicy` は `"abort"`)。例外は hook の中で受け止めてログに出し、`errorPolicy: "continue"` を指定する(`"continue"` の hook の例外は、EmDash がログに出さない)。`priority` は 50 にして、既定(100)のほかのプラグインの例外で飛ばされないようにする。根拠: 実測+公式ドキュメント([[emdash-after-save-payload]]、[[image-owner-tracking-hooks]])
 - 保存時に参照元を削除しない理由: 下書きと公開版の二重管理や、hook が失敗したときのずれを扱わずに済むため。
 - 複製はどの hook も呼ばない。複製先は元の公開版の値を持つ下書きになり、保存か公開をするまで参照元として記録されない。記録されると、1枚の画像の `owners` に複数並ぶ。根拠: 実測+公式ドキュメント
+- i18n を有効にしたサイトで、画像フィールドを「翻訳しない」(`translatable: false`)にすると、EmDash は公開などのときに、同じ翻訳グループのほかのロケールのエントリへ値を写す。写された側の hook は呼ばれないので、その側を保存・公開するまで参照元として記録されない(写した元は記録される)。根拠: 公式ドキュメントのみ(`packages/core/src/database/repositories/content.ts:1341`)
 
 **判定(画像管理ページを開いたときに行う)**
 - 参照元ごとに `ctx.content.get` でエントリを取得する。`null` なら「参照元が削除された」(ゴミ箱と完全削除のどちらも)。
+  - 参照元のコレクションが消されていると、`get` は例外を投げる(テーブルが無い)。そのときだけコレクションの一覧(`ctx.schema.listCollections`、2 クエリ。リクエストに 1 回)を読み、無ければ「参照元が削除された」にする。あれば例外のまま 500 にする(データベースの失敗を「削除された」と誤らないため)。根拠: 実測+公式ドキュメント([[T21-orphan-routes#結果|T21]])
 - 列の値(`get` の `data`)と、`draftRevisionId` があればその下書きリビジョン(`getRevision`)の両方で、参照元の `field` に画像 ID が残っているかを確認する。
   - 下書きは、公開版の行とは別にリビジョンのテーブルに保存されている(`packages/core/src/emdash-runtime.ts:3516`)。一度も公開していないエントリの列の値は、作成したときの値。根拠: 実測+公式ドキュメント
+  - 同じエントリはリクエストの中で 1 回だけ読み、列の値で見つかれば下書きは読まない。値は参照元の記録と同じ `readReferencedImageIds` で読み、単一画像かギャラリーかは値の形で決める。フィールドが消されていれば(列が無い)「参照元から外された」。根拠: 実測のみ([[T21-orphan-routes#結果|T21]])
 - 判定結果は4種類:
   - **使用中**
   - **参照元が削除された**(ゴミ箱に入った場合を含む)
   - **参照元から外された**
   - **参照元なし**(アップロードしたが保存されなかった)
+  - 画像の状態バッジは、参照元ごとの状態のうち、使用中 → 参照元が削除された → 外された の順で最初に見つかったもの(参照元がゴミ箱から戻ると、画像がまた要るため)。
 - 判定結果とは別に、画像エントリ自身の状態(ゴミ箱に入っていない / ゴミ箱に入っている / エントリが無い)も返す。完全削除のボタンは、ゴミ箱に入った画像にだけ出すため([[T06-decision-trash-permission#結果|T06]])。値の名前は `src/shared/schema.ts` の `imageUsageSchema` / `imageEntryStatusSchema`([[T03-shared-contracts#結果|T03]])。
   - 0.39.1 では、capability `content:restore` の `ctx.content.getTrashedVersioned` が、ゴミ箱に入っているエントリだけを返す(`packages/core/src/emdash-runtime.ts:3877`)。`ctx.content.get` はゴミ箱に入ったものと無いものの両方で `null` なので、組み合わせると区別できる。`getTrashedVersioned` は、`get` が `null` のときだけ呼ぶ(ゴミ箱に入っていないエントリに呼ぶとクエリが多い)。根拠: 実測+公式ドキュメント([[T10-spike-after-save#結果|T10]])
-- 判定はページ送りで行う。プラグインの `ctx.content.list` では ID の IN 検索ができず(`packages/core/src/plugins/types.ts:443`)、参照元ごとに取得するので、1 リクエストのクエリ数が件数に比例して増えるため。上限は 1 呼び出し 1,000 クエリ([[#2.2 プラットフォームの上限|2.2]])だが、応答時間を抑えるため、それより十分小さい予算で区切る。予算の値は [[T21-orphan-routes|T21]] で決める([[T10-1-spec-d1-limits|T10-1]])。
+  - `content:restore` を宣言して使う([[T21-orphan-routes#結果|T21]])。「記録があって `get` が `null` ならゴミ箱」とみなすと、記録だけが残った画像(完全削除の hook の失敗など)をゴミ箱と誤り、完全削除のボタンが 404 になるため。
+- ゴミ箱に入っていない画像には、公開の状態(`entryPublication`)も返す。値は EmDash の `status` と同じ `published` / `draft` / `scheduled`(知らない値は `draft`)で、ゴミ箱・無い画像は null。サイトに出るのは `published` だけで、戻した画像と公開の前に止まった画像は `draft`。あわせて、参照元の全体の件数(`ownersTotal`。一覧に載せる参照元は先頭から 20 件)も返す。どちらも追加のクエリは使わない(`get` の `status` と記録の `owners` から決める)。根拠: 実測+公式ドキュメント([[T21-2-list-publish-status#結果|T21-2]])
+- 判定はページ送りで行う。プラグインの `ctx.content.list` では ID の IN 検索ができず(`packages/core/src/plugins/types.ts:443`)、参照元ごとに取得するので、1 リクエストのクエリ数が件数に比例して増えるため。上限は 1 呼び出し 1,000 クエリ([[#2.2 プラットフォームの上限|2.2]])だが、応答時間を抑えるため、それより十分小さい予算で区切る([[T10-1-spec-d1-limits|T10-1]])。予算は 1 リクエスト 100 クエリ(ルートの固定費を含む)にした([[T21-orphan-routes#結果|T21]])。
   - 1 回に扱う件数は固定にせず、クエリ数の見積もりで決める。1 件のクエリ数は、参照元が 1 / 3 / 6(削除済み / 下書きなし / 下書きあり)、画像の状態が 2 / 5 / 3(ゴミ箱に入っていない / ゴミ箱 / 無い)。同じ参照元は、リクエストの中で 1 回だけ調べる。参照元がそれぞれ別の投稿だと、10 件で 50 を超える。根拠: 実測のみ([[emdash-plugin-content-query-counts]])
+  - 見積もりは最悪の値で行う: 画像 1 枚につき 5、まだ読んでいない参照元のエントリ 1 件につき 6、参照元があればコレクションの一覧の 2(リクエストに 1 回)。予算に収まるだけ載せ、1 ページは最大 10 枚。参照元が 1 件ずつの画像なら 8 枚で、実際のクエリは 42(下書きなし)〜 90(画像がゴミ箱、参照元は下書きだけに画像)。根拠: 実測のみ(SQLite。[[image-management-routes]])
+  - 並びは `imageRefs` の `createdAt` の新しい順(同じ時刻は ID の大きい順)。カーソルには最後に読んだ記録の `createdAt` と ID を入れる。EmDash のストレージのカーソルは、その記録が消えると先頭から読み直すので使わない(完全削除でページがずれないようにする)。根拠: 公式ドキュメントのみ(EmDash のカーソル。`packages/core/src/database/repositories/plugin-storage.ts:381`)。記録が消えても続きから読めることは実測のみ(単体テスト)
+  - 1 枚だけで予算を超える画像(参照元のエントリが 16 件以上)は、その画像だけを扱うリクエストを続けて、1 回に 15〜16 件ずつ調べる。その間の応答は `items` が空で `nextCursor` がある(画面は続けて読む)。一覧に載せる参照元(記録の順に先頭から 20 件)の状態が分かり、どれかが使用中なら、残りは調べない。参照元 40 件の画像で 2〜3 リクエスト、1 回最大 98 クエリだった。根拠: 実測のみ
 
 > [!warning] 「参照されていない」は「消しても安全」ではない
 > 判定の対象は、現在のコンテンツ(公開版と下書き)だけ。古いリビジョンや、複製したまま保存も公開もしていないエントリからは、まだ参照されている可能性がある。警告文にもそう明記する。
@@ -423,18 +442,30 @@ flowchart LR
     - EmDash の標準より緩い。標準 API では、Contributor は自分のコンテンツもゴミ箱に移せない(`content:delete_own` は Author 以上。`packages/auth/src/rbac.ts:22`。実測+公式ドキュメント)。そのため Contributor が、他人の投稿で使われている画像もゴミ箱に移せる。ゴミ箱に入った画像は、サイトに表示されなくなる(サイト側の取得は `deleted_at IS NULL` のものだけ。`packages/core/src/loader.ts:1341`。公式ドキュメントのみ)。
     - ゴミ箱から戻せるのは Editor 以上(標準 API の restore)。プラグインが作った画像は作成者(`authorId`)が空なので、`content:edit_any` で判定される(`packages/core/src/astro/routes/api/content/[collection]/[id]/restore.ts:44`)。根拠: 実測+公式ドキュメント
     - 画像管理ページでは、ゴミ箱に移す前に確認し、使用中の画像ならそのことを示す([[#11.5 画像管理ページ]])。
+    - ルート(`images/trash`)は、`imageRefs` に記録のある画像だけを移す(無ければ 404 `IMAGE_NOT_FOUND`)。使用中でも移す(使用中かは画面が一覧の状態で確かめる)。もうゴミ箱に入っていれば成功として返す。クエリは 9。根拠: 実測のみ([[T21-orphan-routes#結果|T21]])
+    - プラグインの `ctx.content.delete` では、`content:afterDelete` は呼ばれない(標準 API のゴミ箱への移動・完全削除では呼ばれる)。根拠: 実測+公式ドキュメント(`packages/core/src/emdash-runtime.ts:3705`、`:3759`)
+    - ゴミ箱から戻した画像は下書き(公開版なし)になる。サイトの取得は公開済みのものだけなので、標準 API の `POST …/publish` で公開し直すまで表示されない。根拠: 実測(下書きになること)+公式ドキュメント(`packages/core/src/database/repositories/content.ts:1513`、`packages/core/src/loader.ts:1233`)
   - **完全削除**: 管理者のみ。標準の API `DELETE /_emdash/api/content/b64_images/{id}/permanent` を、ログイン中の管理者の権限で呼ぶ(`packages/core/src/astro/routes/api/content/[collection]/[id]/permanent.ts:14`。権限は `content:delete_permanent`)。
+    - 完全削除のあと、`content:afterDelete`(`b64_images` で `permanent: true`)で `imageRefs` の記録を消す。hook は `priority: 50`・`errorPolicy: "continue"` で、失敗はログに出す。記録が残ると、一覧に「エントリが無い」画像として出る。根拠: 実測+公式ドキュメント([[T21-orphan-routes#結果|T21]])
+- ゴミ箱に入っているかは `imageRefs` に記録しない。画像管理の一覧は画像エントリを読んで判定する。0.39.1 には戻したときの hook(`content:afterRestore`)があるが、プラグインの `ctx.content.delete` では hook が呼ばれず、記録を書く場所が増えるため([[T21-orphan-routes#結果|T21]])。
 - プラグインは完全削除ができない(`skills/creating-plugins/references/sandbox-boundaries.md`)。ゴミ箱を自動で空にする処理も見当たらない。容量が戻るのは完全削除したときだけ。
 - EmDash 標準の `b64_images` 一覧画面とゴミ箱画面は、1ページ100件分の base64 を読み込むので使わない(1件約 100KB)。
+- 標準の編集画面からは、`b64_images` のエントリを保存も公開もできない。保存・自動保存・「Publish now」のたびに `image` を送り、保存 hook が拒否するため(「Unpublish」は通る)。根拠: 実測+公式ドキュメント([[T19-image-entry-hook#結果|T19]])
 
 ## 11. 管理画面 UI
 
 ### 11.1 共通方針
 
 - コンポーネントは Kumo(`@cloudflare/kumo`)を使う(公式の field-kit と同じ)。
+  - 管理画面の CSS はビルド済みで、プラグインのファイルを読まない。Tailwind のクラスは、管理画面の CSS にあるものだけを使い、無いものは style で書く。枠の色のクラス(`border-kumo-brand` など)は、層の外の `*` の `border-color` に負けて当たらないので、style で付ける。根拠: 実測+公式ドキュメント([[emdash-admin-plugin-ui-styling]])
+  - 単一画像とギャラリーが共通で使う部品(ドロップゾーン・進捗・プレビュー・代替テキスト・エラー・「画像が見つかりません」)は `src/admin/parts/` に置く([[T22-widget-parts#結果|T22]])。
 - 文言は日本語と英語を用意し、`<html lang>` で切り替える。どちらでもなければ英語にする(`packages/admin/src/locales/LocaleDirectionProvider.tsx:21`)。
   - 管理画面の設定で言語を変えると、再読み込みせずに `<html lang>` が書き換わる。部品はこの変化を監視して文言を切り替える(`src/client/i18n.ts` の `useLocale()`)。根拠: 実測+公式ドキュメント([[emdash-admin-locale-lang]]、[[T14-admin-i18n-api#結果|T14]])
 - ファイル選択、並べ替え、削除は、すべてキーボードでも操作できるようにする。進捗は `aria-live` でスクリーンリーダーに伝える。
+  - 画像の追加: ドロップゾーンは枠の全体が 1 つのボタンで、Tab で移り、Enter / Space でファイルの選択を開く。ボタンにフォーカスがある状態で Ctrl+V(Mac は ⌘V)を押すと、クリップボードの画像を貼り付けられる。ドロップはキーボードではできないので、選択と貼り付けで代える。
+  - 貼り付けのイベントが届く要素はブラウザで違う(Chromium 153 はフォーカスのあるボタン、Firefox 155 は body)。`document` で受け、イベントの対象かフォーカスのある要素がドロップゾーンの中のときだけ扱う。根拠: 実測のみ([[admin-image-input-browser-behavior]])
+  - 進捗の読み上げは、段階(読み込み・圧縮・サムネイルの作成・アップロード)と何枚目かが変わったときだけにする。画質を探すたびには読み上げない。
+- widget は、アップロードの保存先(`target`)を、管理画面の URL(`/_emdash/admin/content/<collection>/<エントリ ID か new>` と `?locale=`)と props の `id`(`field-<slug>`)から求める。plugin widget には、コレクション・エントリ ID・ロケールが渡らない。`entryId` と `locale` は組にして、URL から両方が分かるときだけ送る。`?locale=` の無い画面(ダッシュボードなどから開いた編集画面)では参照元を送らず、保存のときに記録する。根拠: 公式ドキュメントのみ([[emdash-admin-content-editor-url]]、[[T23-upload-hook#結果|T23]])
 - plugin widget には `readOnly` が渡されない(`packages/admin/src/components/ContentEditor.tsx:1833`)。そのため、編集ロック中でも widget は操作できてしまう。これは EmDash 側の制約。
 
 ### 11.2 単一画像 widget(`base64-image:image`)
@@ -451,6 +482,8 @@ flowchart LR
 ```
 
 - アップロードのタイミング: 圧縮が終わった時点で、すぐにルートへ送る。失敗したらその場にエラーを表示し、フィールドの値は変えない。
+- キャンセルはエラーにせず、処理を始める前の表示に戻す(フィールドの値は変えない)。処理中に別の画像を選ぶと、前の処理を中断してから始める([[T23-upload-hook#結果|T23]])。
+- 空のときに複数のファイルをドロップ・貼り付けされたら、受け付けずに「画像は 1 枚ずつ追加してください。」と表示する(EmDash 標準の画像フィールドのドロップ先と同じ。`packages/admin/src/components/media/ImageDropTarget.tsx:47`)。
 - プレビュー:
   - 追加したばかりの画像は、手元にある data URL をそのまま表示する。
   - 保存済みの画像は、編集画面を開いたときに、プラグインのルート(`preview`)からまとめて取得する。1 回の要求は 10 件(`PREVIEW_MAX_IDS`)までで、超える分は分けて並行に送る(20 枚のギャラリーは 2 回)。1 件は最大 500,000 バイトで、20 件をまとめると応答は最大 10MB、JS の処理は約 7〜10.5ms になり、Workers Free の CPU 時間(10ms)に届くため。10 件なら最大 5MB・約 3.5〜5.6ms で、クエリは 21。根拠: 実測のみ(Node + SQLite。Workers では未実測。[[T17-admin-data-routes#結果|T17]])
@@ -461,6 +494,8 @@ flowchart LR
 ### 11.3 ギャラリー widget(`base64-image:gallery`)
 
 - 複数枚をまとめて選択・ドロップでき、1枚ずつ順に処理する(それぞれの進捗を表示)。
+  - 受け付けたファイルは、先にまとめて形式を確かめる。HEIC などの受け付けない形式は、ほかのファイルの処理を待たずに失敗として表示する。`maxItems` を超える分は処理せず、ファイルごとに失敗として表示する。
+  - 1 枚が終わるたびに値に加える。1 枚が失敗しても残りを処理し、失敗したファイルは値に加えずにエラーを出す。進捗は何枚目か(2 / 3 枚目)を出す([[T23-upload-hook#結果|T23]])。
 - サムネイルを並べて表示する。ドラッグ、または ↑↓ ボタンで並べ替えられる。1枚ずつ削除や代替テキストの入力ができる。
 - 「あと N 枚追加できます」と表示し、`maxItems` を超える追加は拒否する。
 
@@ -470,18 +505,27 @@ flowchart LR
 - 表示する画像:
   - 単一画像のフィールドがあれば、スキーマ上で最初のものを表示する。
   - なければ、最初のギャラリーの1枚目を表示し、「+N」で残りの枚数を添える。
-- プラグインのフィールドを持つコレクションにだけ列を出す。どのフィールドがプラグインの widget かは、`@emdash-cms/admin` の `fetchManifest` で判別する。
+- プラグインのフィールドを持つコレクションにだけ列を出す。どのフィールドがプラグインの widget かは、管理画面のマニフェスト(`GET /_emdash/api/manifest`)で判別する。`@emdash-cms/admin` の `fetchManifest` は、管理画面の Lingui が有効になる前に呼ぶと失敗するので、同じ要求を `emdash/plugin-utils` の `apiFetch` / `parseApiResponse`(プラグインの管理画面向け。Lingui を使わない)で送る。根拠: 実測+公式ドキュメント([[T24-list-column#結果|T24]])
+  - 列の `collections` は同期関数で、一覧の画面はコレクションや利用者のロールが変わったときにだけ呼び直す(`packages/admin/src/components/ContentList.tsx:382-385`)。そのため、管理画面の入口の読み込み時にマニフェストの取得を始め、その結果で判定する。取得の前は列を出し、フィールドが無いと分かったコレクションではセルが何も描かない。根拠: 実測+公式ドキュメント([[emdash-admin-content-list-columns]])
+  - 列の見出しは、管理画面の辞書にある「Image」のメッセージ ID を `label` にして、管理画面の言語で表示する(ja は「画像」)。文字列のままでは訳されない。根拠: 実測+公式ドキュメント([[emdash-admin-content-list-columns]])
 - サムネイルは、そのページに表示中の全行(`visibleItems`)の分を、1ページにつき1回のリクエスト(`thumbnails`、100 件まで)でまとめて `imageRefs` から取得する。100行で最大約 810KB(サムネイル 8,000 バイト × 100)で、各行の base64 本体は読み込まない。
+  - 0.39.1 の一覧は 1 ページ 20 行なので、1 回の要求は 20 件まで。取得したサムネイルは 1 分間覚えておき、ページを戻ったときなどに同じ画像を要求し直さない。根拠: 実測のみ([[T24-list-column#結果|T24]])
   - ルートは ID を 50 件ずつに分けて `getMany` を呼ぶ(100 件で 3 クエリ)。`getMany` は ID を分けずに IN 句に入れ、バインド変数を「ID の数 + 2」個使うので、D1 の上限(1 クエリ 100 個)を 99 件から超えて例外になる。根拠: 実測+公式ドキュメント(上限は node:sqlite で模擬した。[[T17-admin-data-routes#結果|T17]])
 - 画像が未設定の行は「—」を表示する。参照先の画像が `imageRefs` に無い行(完全削除した・記録が無い)は、警告アイコンを表示する。
   - ゴミ箱に入った画像は `imageRefs` に残るので、サムネイルを表示する。区別するには `b64_images` を 1 件ずつ読む必要があり、100 行で最大 200 クエリと本体(1 件最大 500,000 バイト)の読み込みになるため([[T17-admin-data-routes#結果|T17]])。
 
 ### 11.5 画像管理ページ
 
-- `admin.pages` で登録する(例: `/_emdash/admin/plugins/base64-image/images`)。
-- 一覧に出すもの: サムネイル、寸法、保存サイズ、参照元へのリンク、状態バッジ([[#9. 参照元の記録と未使用画像の検出]])、作成日時。
-- 操作: ゴミ箱への移動、完全削除(管理者のみ)。
-- メニューのラベルは静的な文字列になる(マニフェストのラベルは翻訳されない)。
+- `admin.pages` で登録する。パスは `/images`(`/_emdash/admin/plugins/base64-image/images`)、ラベルは管理画面の辞書にある「Images」の ID `an5hVd`、アイコンは `image`。部品は `src/admin/ImagesPage.tsx` の `ImagesPage`(props なし)。
+  - サイドバーとコマンドパレットは、ラベルを管理画面の Lingui で訳す(`i18n._(label)`)。辞書のキーは Lingui の ID なので、文字列の「Images」は訳されず(日本語の画面でも「Images」)、本番のビルドでは「Uncompiled message detected!」の警告が出る。ID なら日本語は「画像」、英語は「Images」になり、警告も出ない。根拠: 実測+公式ドキュメント([[T25-images-page#結果|T25]]、[[emdash-admin-plugin-pages]])
+- 一覧に出すもの: サムネイル、寸法、保存サイズ、参照元へのリンク、状態バッジ([[#9. 参照元の記録と未使用画像の検出]])、作成日時、公開の状態(下書きの画像はサイトに出ない)、参照元の全体の件数(載せきれない分は「ほか N 件」)。
+  - 参照元は記録ごとに 1 行で並べ、フィールド・ロケール・状態を添える。リンク先は編集画面(`/_emdash/admin/content/<collection>/<エントリ ID>?locale=<ロケール>`)。削除された参照元はリンクにしない。
+- 操作(ボタンは利用者のロールと画像の状態で出し分ける。表示のためだけで、権限はサーバーが判定する):
+  - ゴミ箱への移動: ゴミ箱に入っていない画像。Contributor 以上。必ず確認し、使用中ならそのことを示す。
+  - 完全削除: ゴミ箱に入った画像。管理者のみ。必ず確認し、使用中なら参照している投稿が保存できなくなることを示す。
+    - 成功したら、コンテンツ一覧の列([[#11.4 コンテンツ一覧のサムネイル列(Q10)|11.4]])の覚え書きを消し、すぐにマニフェストを読み直す。列は取得したサムネイルを 1 分覚えていて、完全削除で表示が変わる(サムネイル → 警告アイコン)ため。消すだけだと、次に開いた一覧で、このプラグインのフィールドの無いコレクションに空の列が出た。ゴミ箱への移動と公開では、列の表示は変わらない。根拠: 実測のみ([[T25-2-page-registration-prep#結果|T25-2]])
+  - 公開: 下書きの画像(ゴミ箱から戻した画像・アップロードの途中で止まった画像)。Editor 以上。標準 API の `POST /_emdash/api/content/b64_images/{id}/publish` を body なしで呼ぶ(`src/client/api.ts` の `publishImage`)。予約済みの画像には置かない(予約の日時に公開される)。根拠: 実測+公式ドキュメント([[T25-images-page#結果|T25]])
+  - エントリの無い画像(記録だけが残ったもの)には操作が無い。
 
 ## 12. サイト側の描画
 
@@ -492,8 +536,10 @@ flowchart LR
   - バイラインとタクソノミーは、本体のクエリに畳み込まれる(`packages/core/src/loader.ts:124`)。そのため、50 件までの 1 回の呼び出しは 1 クエリ。サイトにバイラインが 1 件でもあると、バイラインの補完のクエリが加わる。このプラグインで作った画像(authorId なし)では、リクエストあたり +1、バイラインのカスタムフィールドもあれば呼び出しごとにさらに +1 で、1 ページ(1 ロケール・50 件まで)は 1〜3 クエリ。標準の REST API や管理画面で作った画像(authorId あり)では、最悪で呼び出しごとに 4 クエリとリクエストあたり +2 になる。根拠: 実測+公式ドキュメント([[T09-spike-query-count#結果|T09]]、[[emdash-query-count-b64-images]])
 - 描画は `emdash/ui` の `Image` を使う。data URL は responsive 変換の対象外なので、`<img src="data:…" width height loading="lazy" decoding="async">` がそのまま出力される(`packages/core/src/components/EmDashImage.astro`、`packages/core/src/media/responsive.ts:127`)。
 - LCP の対象になる画像には `priority` を付ける。
+  - 対象の画像が見つからない(`get` が `undefined`)と、どの画像にも付かないことがある。playground の一覧(`/posts/`)は描画できる最初のカバーに付け、詳細(`/posts/<slug>/`)はカバーに付ける(カバーの無い投稿はギャラリーの最初の画像。見つからないカバーは代わりの枠が上部を占めるので、ほかの画像には付けない)。Chromium 153 で LCP の要素がその画像になり、Layout Shift は 0 回だった。根拠: 実測のみ([[T26-playground-pages#結果|T26]])
 - 画像が見つからないとき(ゴミ箱に入った・削除された)、値が不正なとき(seed や手での書き換え)、取得に失敗したときは、`get` が `undefined` を返し、警告ログを出す。例外は投げない(画像のためにページの描画を止めない)。
 - 一覧ページ(カード表示)でもメイン画像を使う(Q12 は (a) を選択)。表示中のエントリの参照をまとめて1回で解決する。10件並べると HTML は最大約 1MB になる。
+  - playground の一覧(10 件)と詳細(カバーとギャラリー 10 枚)は、どちらもページのクエリが 2 本(投稿 1、画像 1)だった。プロセスで最初の画像の取得だけ、`where` のためにタクソノミーの定義の読み出しが 1 本増える(`packages/core/src/loader.ts:1273`、結果はプロセスの中に持つ)。根拠: 実測+公式ドキュメント([[T26-playground-pages#結果|T26]]、[[playground-site-pages]])
 
 ```astro
 ---
@@ -654,6 +700,8 @@ export default defineConfig({
 
 - `@emdash-cms/plugin-test` は使わない。sandboxed プラグイン向け(workerd とマニフェストが前提)のため(`packages/plugin-test/package.json`)。
 - playground: 普段の開発は Node + SQLite で素早く確認し、`wrangler dev` + D1 でも動くことを確かめる。
+  - サイト側のページ(投稿の一覧 `/posts/`、詳細 `/posts/<slug>/`)と、アップロードのルートでサンプルの投稿を作るスクリプト(`playground/scripts/create-sample-posts.ts`)がある。seed には画像と投稿を入れない(seed の画像は `imageRefs` に記録が無く、それを参照する投稿は保存できないため)([[T26-playground-pages|T26]])。
+  - E2E の入力画像(形式ごとの画像・大きすぎる画像・壊れた画像)は `e2e/fixtures/make-images.ts` で作り、git に入れない(40MB を超えるファイルを含むため)。macOS の `sips` と Playwright の Chromium を使う([[T26-playground-pages|T26]]、[[e2e-input-image-fixtures]])。
 - Cloudflare の本番環境(Workers Free)でクエリ数と CPU 時間を測るのは任意。利用者のアカウントに手動でデプロイして行う。
 
 ## 16. 実装前の検証(スパイク)
@@ -669,7 +717,7 @@ export default defineConfig({
 
 > [!question] 合意内容のうち、実装時に確認・調整するもの
 > - **ゴミ箱に移動できる権限**(決定済み): Contributor 以上のまま(2026-09-24、利用者の判断)。Editor 以上(`content:delete_any`)に揃える案は採らなかった。ルートの permission は `content:create`。→ [[T06-decision-trash-permission#結果|T06 の結果]]、[[#10. 画像のライフサイクル|10 章]]
-> - **一覧の列を出すコレクションの判定方法**: `contentListColumns` の `collections` は同期関数。マニフェストをどう参照するかを確認する。
+> - **一覧の列を出すコレクションの判定方法**(決定済み、2026-09-24): `collections` は、一覧の画面がコレクションや利用者のロールが変わったときに `useMemo` の中で呼ぶ同期関数で、非同期の結果を待って呼び直させる方法は無い。管理画面の入口の読み込み時にマニフェストの取得を始め、取得した結果で判定する(取得の前は列を出し、セルがフィールドの有無で描き分ける)。`fetchManifest` は Lingui が有効になる前に失敗するので、同じ要求を `emdash/plugin-utils` の `apiFetch` / `parseApiResponse` で送る。→ [[T24-list-column#結果|T24 の結果]]、[[#11.4 コンテンツ一覧のサムネイル列(Q10)|11.4]]
 > - **`content:afterSave` に渡される内容**(確認済み、2026-09-24): `content.data` は保存した下書きで、公開版ではない。更新のときは、content テーブルの列の値(公開済みなら公開版)が `content.liveData` に入る。`isNew` は作成で `true`、更新で `false`。公開・複製・ゴミ箱・復元では呼ばれない。`after()` で実行され、応答を待たせない(`packages/core/src/emdash-runtime.ts:3670`)。→ [[T10-spike-after-save#結果|T10 の結果]]、[[#9. 参照元の記録と未使用画像の検出|9 章]]
 > - **`b64_images` の seed**(確認済み、2026-09-24): [[#13.1 seed|13.1]] の構成(`hidden: true` / `routable: false` / `supports: []` / `image` は json・必須)で足りる。タイトル用のフィールドは要らない。`routable: false` は必須(slug の無いエントリを公開するため)。公開すると、内容を複製したリビジョンが 1 件できる。→ [[T02-playground#結果|T02 の結果]]
 
@@ -682,12 +730,16 @@ export default defineConfig({
 | アニメーション | GIF・アニメーション WebP・APNG は、最初のフレームの静止画になる。アニメーションが消える注意書きは GIF だけに出す([[#6.5 入力形式と上限(Q8)\|6.5]]) |
 | Firefox でのデコード | Firefox 155 は、デコードの間(6,400 万画素の JPEG で 78〜92ms)画面を止め、その間の中断はデコードが終わってから届く。途中で切れた JPEG・PNG は、欠けた部分を白・透明にしてデコードする(検出しない)。libheif で作ったグリッドの AVIF はデコードできない(`INPUT_DECODE_FAILED`)([[T12-input-decode#結果\|T12]]) |
 | 編集ロック | 編集ロック中でも widget を操作できる(EmDash 側の制約) |
+| 画像管理ページの表示 | サイドバーのプラグインのページの項目は、ロールで絞られない(閲覧者にも出る)。閲覧者が開くと、一覧は 403 になり、ページは「寄稿者以上」と示す。根拠: 実測+公式ドキュメント([[emdash-admin-plugin-pages]]) |
+| コマンドパレット | 管理画面のコマンドパレットで「Images」などと入力すると、非表示のコレクション `b64_images` も候補に出る。選ぶと、使わないとした標準の一覧(1 ページ 100 件の base64 を読む。[[#10. 画像のライフサイクル\|10 章]])が開くとみられる。根拠: 実測(候補に出ること)、推測のみ(開いたときの動き)([[T25-images-page#影響・サブタスクの候補\|T25]]) |
+| 一覧の列の見出し | 列の見出しは、管理画面の辞書にある「Image」のメッセージ ID を使って、管理画面の言語で表示する。EmDash の版が変わって辞書から「Image」が消えると、見出しに ID(`hG89Ed`)がそのまま出る。インストールした `@emdash-cms/admin` の辞書に ID があることは、単体テストで確かめている([[T24-list-column#結果\|T24]]) |
 | 容量 | D1 の 500MB で約 2,500 枚(公開時にできるリビジョンを含む。[[#5.4 容量の目安\|5.4]])。使われなくなった画像は自動では消えず、プラグインからは完全削除もできない。使用量は Cloudflare のダッシュボードで監視する |
 | バックアップ | D1 Time Travel(直近7日)だけ |
 | D1 の 1 日の上限 | Free では、読み 500 万行・書き 10 万行 / 日を超えると、その日はクエリが失敗する(2026-09-01 から)。画像 1 枚のアップロードで書く行は、公開時の索引の更新を含めて数十行の見込み(推測のみ。[[T32-cloudflare-check\|T32]] で確かめる) |
 | ページの重さ | 画像は HTML にインラインで埋め込まれる。一覧ページ10件で最大約 1MB、カバー1枚+ギャラリー10枚のページで約 1.1MB。圧縮すれば転送量はほぼ WebP 本体の合計まで下がる見込み(推測のみ) |
-| 標準画面 | `b64_images` の標準の一覧画面・ゴミ箱画面は重い(1ページ100件 × 約 100KB) |
+| 標準画面 | `b64_images` の標準の一覧画面・ゴミ箱画面は重い(1ページ100件 × 約 100KB)。標準の編集画面からは保存も公開もできない(保存 hook が `image` を送る更新を拒否する)。非公開にしたものは、標準の API の `POST …/publish` で公開し直す([[#10. 画像のライフサイクル\|10 章]]) |
 | スコープ外 | 本文中の画像と OGP 画像には対応しない |
+| 参照元の記録の同時書き込み | 同じ画像を参照するエントリを同時に保存・公開すると、参照元の記録の書き込みが重なる。版を確かめて書く(`compareAndSet`、最大 8 回)ので消えないが、8 回で書けなかった参照元は、そのエントリを次に保存・公開するまで記録されない。D1 での起きやすさは [[T32-cloudflare-check\|T32]] で確かめる([[#9. 参照元の記録と未使用画像の検出\|9 章]]) |
 | git 依存(npm 12) | 利用者のサイトの `.npmrc` に `allow-git=root` が要る([[npm12-git-dependency-policy]]) |
 | 利用者の型チェック | 利用者のサイトの `tsc` は、TS ソースのまま配布する `src` を利用者の設定で検査する。このリポジトリでは、緩い設定と厳しい設定の代わりの tsconfig で確かめている([[T04-1-consumer-typecheck\|T04-1]])。TypeScript 5.x の実物での確認は、T07 の時点のコードだけ |
 | マイグレーションのコマンド | `emdash migrate --from-config` は、Node が `node_modules` の中の `.ts` を読めないので失敗する。既定の `emdash migrate`(build のマニフェストを使う)は使える。EmDash は `--from-config` をローカルの調査用としている([[git-dependency-ts-source]]) |
@@ -704,7 +756,9 @@ export default defineConfig({
 - npm での公開
 - Safari 対応(EmDash 本体で、CSP に `'wasm-unsafe-eval'` を許可する変更が必要)
 - アニメーション WebP・APNG・AVIF のシーケンスにも、アニメーションが消える注意書きを出す。判定はファイルの先頭で行える(WebP の `VP8X` のフラグ、APNG の `acTL`、AVIF の `avis`)が、注意のコードと文言の追加が要る([[T12-input-decode#未解決・サブタスクの候補|T12]])
-- 既存の `b64_images`(seed や移行で作ったもの)を `imageRefs` に登録する機能。サムネイルはブラウザでしか作れないので、管理画面から行う必要がある([[T16-reference-hook#未解決・サブタスクの候補|T16]])
+- 既存の `b64_images`(seed や移行で作ったもの)を `imageRefs` に登録する機能。サムネイルはブラウザでしか作れないので、管理画面から行う必要がある([[T16-reference-hook#未解決・サブタスクの候補|T16]])。アップロードの途中(作成と `imageRefs` の保存の間)で処理が止まったときや、`imageRefs` の保存に失敗したときに残るエントリも、この機能で拾える([[T18-upload-route#未解決|T18]])
+- 画像管理ページに、ゴミ箱から戻す操作(編集者以上。標準 API の `POST /_emdash/api/content/b64_images/{id}/restore`)を置く。今は、標準 API で戻し(標準の画面は 1 ページ 100 件の base64 を読むので使わない)、戻した画像(下書き)を画像管理ページの「公開」で公開し直す([[T25-images-page#影響・サブタスクの候補|T25]])
+- 記録だけが残った画像(画像管理の一覧の `missing`。完全削除の hook の失敗などで、`b64_images` のエントリが無いのに `imageRefs` の記録がある)の記録を、画像管理ページから消す操作([[T21-orphan-routes#未解決・サブタスクの候補|T21]])
 
 ## 20. 決定ログ
 
@@ -825,6 +879,14 @@ export default defineConfig({
 | `packages/core/src/plugins/save-rejection.ts` | 保存 hook から保存を拒否する例外(`ContentSaveRejectedError`) |
 | `packages/core/src/emdash-runtime.ts:513` | 保存 hook の拒否の応答(422 `SAVE_REJECTED`)。ほかの例外は 500 `CONTENT_HOOK_ERROR` |
 | `packages/admin/src/router.tsx:1097` | 保存の失敗の通知(`message` をそのまま出す) |
+| `packages/admin/src/router.tsx:1483` | 「Publish now」は保存してから公開する |
+| `packages/core/src/emdash-runtime.ts:2151` | プラグインの `ctx.content.create` は、保存 hook の拒否を通常の `Error`(`code: "SAVE_REJECTED"`)にする |
+| `packages/core/src/emdash-runtime.ts:3632` | `supports` に `revisions` の無いコレクションの更新は、公開中の値を書き換える |
+| `packages/core/src/astro/middleware/auth.ts:270` | MCP は Bearer のトークンでしか呼べない |
+| `packages/core/src/database/repositories/plugin-storage.ts:174` | プラグインストレージの条件付きの書き込み(`getVersioned` / `compareAndSet`) |
+| `packages/core/src/database/migrations/077_plugin_storage_revisions.ts` | プラグインストレージの版(`revision`)を、書き込みのたびに変える |
+| `packages/core/src/plugins/hooks.ts:630` | hook の `errorPolicy`(`"continue"` の hook の例外はログに出ない) |
+| `packages/core/src/database/instrumentation.ts:83` | 開発サーバーのクエリログ(応答のあとに実行された hook のクエリは出ない) |
 | `packages/core/src/emdash-runtime.ts:3516` / `:5560` | 下書きはリビジョンに保存される、afterSave は遅れて実行される |
 | `packages/auth/src/rbac.ts:19` | 権限(content:create / delete_own / publish_own) |
 
