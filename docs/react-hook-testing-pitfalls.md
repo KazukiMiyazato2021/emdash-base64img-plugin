@@ -65,6 +65,8 @@ beforeEach(() => {
 	consoleError = vi.spyOn(console, "error");
 });
 afterEach(() => {
+	// 投げる前に描画を片付ける(投げると、tests/setup/dom.ts の cleanup が呼ばれない)
+	cleanup();
 	const warnings = consoleError.mock.calls.map((args) => args.map(String).join(" "));
 	consoleError.mockRestore();
 	// afterEach で投げると、そのテストが失敗になる
@@ -72,6 +74,7 @@ afterEach(() => {
 });
 ```
 
+- `cleanup()` を先に呼ぶのは、Vitest 4.1.11 の `afterEach` は 1 つが投げると残りを呼ばないため。呼ばないと、失敗したテストの描画が次のテストに残り、関係の無いテストまで失敗した。T23 の最初の版はこの呼び出しが無く、[[T23-2-hooks-test-cleanup|T23-2]] で足した([[react-effect-lint-and-vitest-hooks]])。根拠: **実測のみ**
 - `afterEach` の中の `expect` は、oxlint 1.83.0 の `vitest(no-standalone-expect)` がエラーにする。そのため `throw` で失敗させる(`console.error` を 1 回呼ぶテストで、失敗になることを確かめた)。
 - 途中の状態を見るときは、処理を同期の `act(() => { outcome = result.current.upload(file); })` の中で始め、`await waitFor(() => expect(...))` で待つ。`waitFor` は待つ間を act で包む。
 - 最後まで進めるときは、`await act(async () => { await outcome; })` の中で待つ。
