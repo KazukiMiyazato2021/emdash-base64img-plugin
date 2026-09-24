@@ -487,8 +487,11 @@ flowchart LR
 - 表示する画像:
   - 単一画像のフィールドがあれば、スキーマ上で最初のものを表示する。
   - なければ、最初のギャラリーの1枚目を表示し、「+N」で残りの枚数を添える。
-- プラグインのフィールドを持つコレクションにだけ列を出す。どのフィールドがプラグインの widget かは、`@emdash-cms/admin` の `fetchManifest` で判別する。
+- プラグインのフィールドを持つコレクションにだけ列を出す。どのフィールドがプラグインの widget かは、管理画面のマニフェスト(`GET /_emdash/api/manifest`)で判別する。`@emdash-cms/admin` の `fetchManifest` は、管理画面の Lingui が有効になる前に呼ぶと失敗するので、同じ要求を `emdash/plugin-utils` の `apiFetch` / `parseApiResponse`(プラグインの管理画面向け。Lingui を使わない)で送る。根拠: 実測+公式ドキュメント([[T24-list-column#結果|T24]])
+  - 列の `collections` は同期関数で、一覧の画面はコレクションや利用者のロールが変わったときにだけ呼び直す(`packages/admin/src/components/ContentList.tsx:382-385`)。そのため、管理画面の入口の読み込み時にマニフェストの取得を始め、その結果で判定する。取得の前は列を出し、フィールドが無いと分かったコレクションではセルが何も描かない。根拠: 実測+公式ドキュメント([[emdash-admin-content-list-columns]])
+  - 列の見出しは、管理画面の辞書にある「Image」のメッセージ ID を `label` にして、管理画面の言語で表示する(ja は「画像」)。文字列のままでは訳されない。根拠: 実測+公式ドキュメント([[emdash-admin-content-list-columns]])
 - サムネイルは、そのページに表示中の全行(`visibleItems`)の分を、1ページにつき1回のリクエスト(`thumbnails`、100 件まで)でまとめて `imageRefs` から取得する。100行で最大約 810KB(サムネイル 8,000 バイト × 100)で、各行の base64 本体は読み込まない。
+  - 0.39.1 の一覧は 1 ページ 20 行なので、1 回の要求は 20 件まで。取得したサムネイルは 1 分間覚えておき、ページを戻ったときなどに同じ画像を要求し直さない。根拠: 実測のみ([[T24-list-column#結果|T24]])
   - ルートは ID を 50 件ずつに分けて `getMany` を呼ぶ(100 件で 3 クエリ)。`getMany` は ID を分けずに IN 句に入れ、バインド変数を「ID の数 + 2」個使うので、D1 の上限(1 クエリ 100 個)を 99 件から超えて例外になる。根拠: 実測+公式ドキュメント(上限は node:sqlite で模擬した。[[T17-admin-data-routes#結果|T17]])
 - 画像が未設定の行は「—」を表示する。参照先の画像が `imageRefs` に無い行(完全削除した・記録が無い)は、警告アイコンを表示する。
   - ゴミ箱に入った画像は `imageRefs` に残るので、サムネイルを表示する。区別するには `b64_images` を 1 件ずつ読む必要があり、100 行で最大 200 クエリと本体(1 件最大 500,000 バイト)の読み込みになるため([[T17-admin-data-routes#結果|T17]])。
@@ -686,7 +689,7 @@ export default defineConfig({
 
 > [!question] 合意内容のうち、実装時に確認・調整するもの
 > - **ゴミ箱に移動できる権限**(決定済み): Contributor 以上のまま(2026-09-24、利用者の判断)。Editor 以上(`content:delete_any`)に揃える案は採らなかった。ルートの permission は `content:create`。→ [[T06-decision-trash-permission#結果|T06 の結果]]、[[#10. 画像のライフサイクル|10 章]]
-> - **一覧の列を出すコレクションの判定方法**: `contentListColumns` の `collections` は同期関数。マニフェストをどう参照するかを確認する。
+> - **一覧の列を出すコレクションの判定方法**(決定済み、2026-09-24): `collections` は、一覧の画面がコレクションや利用者のロールが変わったときに `useMemo` の中で呼ぶ同期関数で、非同期の結果を待って呼び直させる方法は無い。管理画面の入口の読み込み時にマニフェストの取得を始め、取得した結果で判定する(取得の前は列を出し、セルがフィールドの有無で描き分ける)。`fetchManifest` は Lingui が有効になる前に失敗するので、同じ要求を `emdash/plugin-utils` の `apiFetch` / `parseApiResponse` で送る。→ [[T24-list-column#結果|T24 の結果]]、[[#11.4 コンテンツ一覧のサムネイル列(Q10)|11.4]]
 > - **`content:afterSave` に渡される内容**(確認済み、2026-09-24): `content.data` は保存した下書きで、公開版ではない。更新のときは、content テーブルの列の値(公開済みなら公開版)が `content.liveData` に入る。`isNew` は作成で `true`、更新で `false`。公開・複製・ゴミ箱・復元では呼ばれない。`after()` で実行され、応答を待たせない(`packages/core/src/emdash-runtime.ts:3670`)。→ [[T10-spike-after-save#結果|T10 の結果]]、[[#9. 参照元の記録と未使用画像の検出|9 章]]
 > - **`b64_images` の seed**(確認済み、2026-09-24): [[#13.1 seed|13.1]] の構成(`hidden: true` / `routable: false` / `supports: []` / `image` は json・必須)で足りる。タイトル用のフィールドは要らない。`routable: false` は必須(slug の無いエントリを公開するため)。公開すると、内容を複製したリビジョンが 1 件できる。→ [[T02-playground#結果|T02 の結果]]
 
