@@ -29,6 +29,7 @@ updated: 2026-09-24
 | [[vite-watch-scope-playground\|playground の開発サーバーが監視する範囲]] | `docs/vite-watch-scope-playground.md` | 監視は playground の中と、読み込まれたプラグインのソースだけ。ルート自身へのリンク・`spikes/`・`.claude/` はたどらない(除外の設定は不要) | [[T02-playground\|T02]] |
 | [[git-dependency-ts-source\|git 依存 + TS ソースのプラグインを利用者のサイトで読み込む]] | `docs/git-dependency-ts-source.md` | ビルドなしの TS ソースを git 依存で入れ、Node と Cloudflare の両アダプターで読み込めた。利用者の `tsc` は `src` を検査する(`astro check` はしない)。緩い設定・厳しい設定の代わりの tsconfig で確かめる。`emdash migrate --from-config` は失敗する | [[T07-spike-git-dependency\|T07]]、[[T04-1-consumer-typecheck\|T04-1]] |
 | [[npm12-git-dependency-policy\|npm 12 の git 依存・install スクリプトの既定と min-release-age]] | `docs/npm12-git-dependency-policy.md` | npm 12 は git 依存を既定で拒否する(サイトの `.npmrc` に `allow-git=root` が要る)。依存の install スクリプト(git 依存の `prepare` も)は既定で止まる。`min-release-age` で peer の解決が `ERESOLVE` になる | [[T07-spike-git-dependency\|T07]] |
+| [[readme-install-verification\|README の導入手順で新しいサイトを作って確かめた結果]] | `docs/readme-install-verification.md` | README の手順だけで playground と同じ構成を作れた(widget でのアップロード・保存・公開と、サイトのページの表示)。例のページには `<meta charset>` が要る。`min-release-age` のままプラグインを入れると `ERESOLVE`(`--force` か `--min-release-age=0`)。EmDash 0.39.1 の例外で EmDash の外に新しい版が入ったときの `overrides`。schema API での `b64_images` の作成、標準の画面のゴミ箱からの復元 | [[T33-readme\|T33]] |
 
 ## EmDash
 
