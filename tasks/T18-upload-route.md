@@ -41,6 +41,8 @@ created: 2026-09-23
   - 単体テストで、スキーマに合わない入力が拒否されること(`input` の書き忘れは型エラーにならない)と、固定上限の入力を `JSON.stringify` したバイト数が `UPLOAD_MAX_BODY_BYTES` 以下であることを確かめる
 - [ ] `target.locale` を、サイトに設定されたロケールと照らし合わせる。`localeSchema` は EmDash の `LOCALE_CODE_PATTERN`(`references/emdash/packages/core/src/i18n/config.ts:15`)と同じ正規表現で、長さの上限が無い。450,002 文字のロケールも `uploadRequestSchema` を通った([[T08-spike-route-body#仕様書とほかのタスクへの影響|T08]])。照らし合わせ方(EmDash の i18n の設定の読み方)と、スキーマに長さの上限を足すかを決める([[T08-1-spec-route-body|T08-1]])
 - [ ] 検証([[T11-server-validation|T11]])→ `ctx.content.create("b64_images", …)` → `getVersioned` → `publish` → `imageRefs.put` → 参照を返す
+  - 検証は `validateUpload(ctx.input, await ctx.schema.getCollection(ctx.input.target.collection))`。`checked.ok === false` なら `throw new PluginRouteError(checked.code, checked.message, ERROR_HTTP_STATUS[checked.code])`。`meta.bytes` と `imageRefs.bytes` には `checked.image.webpBytes` を入れる([[T11-server-validation#T18・T19 が使う export|T11]])
+  - `ctx.schema` が無いのはプラグインの定義の誤りなので、500 にする(`INVALID_TARGET` にしない)
 - [ ] `target.entryId` があれば、最初の参照元として記録する
 - [ ] 途中で失敗したときの後始末(作成済みのエントリの扱い)を決めて実装する
 - [ ] アップロード 1 回は SQLite で 72 クエリ([[T10-spike-after-save#結果|T10]]。公開が 38 本で、うち 28 本は EmDash 本体の、メディアの使用状況の索引の更新)。上限(1 呼び出し 1,000。仕様書 2.2)には収まるが、減らせるところがあれば減らし、実装後のクエリ数を playground で測って記録する

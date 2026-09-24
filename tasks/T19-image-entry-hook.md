@@ -37,6 +37,7 @@ created: 2026-09-23
 
 - [ ] `content:beforeSave` で、コレクションが `b64_images` のときだけ [[T11-server-validation|T11]] の検証を行う
 - [ ] 部分更新、不正な値、上限を超えた値を拒否する
+- [ ] 検証は `validateImageEntry(event.content[IMAGE_FIELD])`([[T11-server-validation#T18・T19 が使う export|T11]])。失敗したら `ContentSaveRejectedError` を投げる。ほかの例外は、EmDash が `CONTENT_HOOK_ERROR` の固定の文に置き換え、メッセージを隠す(`references/emdash/packages/core/src/emdash-runtime.ts:513`。[[server-image-validation]])
 
 ## 完了条件
 
