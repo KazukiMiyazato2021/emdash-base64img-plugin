@@ -31,14 +31,8 @@ import type { ServerErrorCode } from "../../shared/errors";
 import { normalizeFieldOptions } from "../../shared/options";
 import { base64ImageRefSchema } from "../../shared/schema";
 import type { Base64ImageRef } from "../../shared/types";
+import { getManyInBatches } from "../image-refs";
 import { getFieldWidgetKind } from "../validate";
-
-/**
- * 1 回の `getMany` に入れる画像 ID の数。EmDash 0.39.1 の `getMany` は ID を分けずに IN 句に入れ、
- * バインド変数は「ID の数 + 2」になる(`packages/core/src/database/repositories/plugin-storage.ts:271`)。
- * D1 の上限(1 クエリ 100 個)に余裕を残し、EmDash の IN 句の分割単位(`SQL_BATCH_SIZE`)と揃える。
- */
-export const IMAGE_REFS_BATCH_SIZE = 50;
 
 /**
  * `message` に並べる問題の数。超えた分は件数だけを書く。管理画面の通知は幅 340px で約 5 秒で消え、
@@ -316,22 +310,13 @@ function invalidKeys(issues: readonly z.core.$ZodIssue[]): string[] {
 	return [...keys];
 }
 
-/** `imageRefs` にある ID を返す。ID は重複を除き、`IMAGE_REFS_BATCH_SIZE` 件ずつ `getMany` に渡す */
+/** `imageRefs` にある ID を返す。ID は重複を除き、`IMAGE_REFS_BATCH_SIZE` 件ずつ `getMany` に渡す(`getManyInBatches`) */
 async function findStoredIds(
 	imageRefs: ImageRefsLookup,
 	ids: readonly string[],
 ): Promise<Set<string>> {
-	const unique = [...new Set(ids)];
-	const batches: string[][] = [];
-	for (let start = 0; start < unique.length; start += IMAGE_REFS_BATCH_SIZE) {
-		batches.push(unique.slice(start, start + IMAGE_REFS_BATCH_SIZE));
-	}
-	const results = await Promise.all(batches.map((batch) => imageRefs.getMany(batch)));
-	const stored = new Set<string>();
-	for (const result of results) {
-		for (const id of result.keys()) stored.add(id);
-	}
-	return stored;
+	const found = await getManyInBatches(imageRefs, ids);
+	return new Set(found.keys());
 }
 
 /** 問題を、フィールドの定義の順、ギャラリーでは何枚目かの順に並べる(ギャラリー全体の問題が先) */

@@ -1,8 +1,8 @@
 import type { ContentAccess, RouteContext, StorageCollection } from "emdash";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
+import { IMAGE_REFS_BATCH_SIZE } from "../../src/server/image-refs";
 import {
-	IMAGE_REFS_BATCH_SIZE,
 	PREVIEW_MAX_BODY_BYTES,
 	THUMBNAILS_MAX_BODY_BYTES,
 	handlePreview,

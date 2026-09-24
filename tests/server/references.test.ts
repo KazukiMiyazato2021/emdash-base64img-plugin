@@ -8,13 +8,13 @@ import {
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
-	IMAGE_REFS_BATCH_SIZE,
 	MAX_LISTED_ISSUES,
 	getImageFields,
 	validateReferencesBeforeSave,
 	type ReferenceFieldInfo,
 	type ReferenceHookContext,
 } from "../../src/server/hooks/references";
+import { IMAGE_REFS_BATCH_SIZE } from "../../src/server/image-refs";
 import { MAX_ALT_LENGTH, MAX_ITEMS_LIMIT } from "../../src/shared/constants";
 import type { Base64ImageRef } from "../../src/shared/types";
 
