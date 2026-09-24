@@ -59,6 +59,7 @@ http://localhost:4402/_emdash/api/setup/dev-bypass?redirect=/_emdash/admin
 - 開発サーバーのときだけ使える(`npm run preview` では 403)。
 - 初めてのときは、マイグレーション・seed の適用・管理者の作成もまとめて行う。「Welcome to EmDash, Dev!」のダイアログが出たら「Get Started」で閉じる。
 - ログインのセッションは `playground/node_modules/.astro/sessions` に保存される。データベースを消したあとは、もう一度この URL を開く。
+- この URL は、開くたびに seed を適用し直す。seed にあるコレクションを管理画面で消すと、`COLLECTION_EXISTS` で 500 になる(EmDash 0.39.1 の動き)。seed からそのコレクションを外して起動し直すか、先にログインした cookie を使い回す([[image-management-routes]])。
 
 ## seed
 
