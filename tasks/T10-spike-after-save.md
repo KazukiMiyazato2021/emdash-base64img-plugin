@@ -110,7 +110,7 @@ created: 2026-09-23
 | 画像エントリの状態 | `get("b64_images", id)` があれば active(2 クエリ)。`null` のときだけ `getTrashedVersioned` → あれば trashed(計 5)、無ければ missing(計 3)。ゴミ箱に入っていないエントリへの `getTrashedVersioned` は 9 クエリ(posts)と重い | 実測+公式ドキュメント |
 | 1 回に扱う件数 | ルートの固定費 1 + `imageRefs` の query 1 + 画像ごとの状態 + 参照元ごと(同じエントリはリクエストの中で 1 回だけ)。参照元がそれぞれ別の投稿だと、10 件で 52(下書きなし)〜82(下書きあり)になり、仕様書 9 章にあった「10 件程度」では 50 を超える。件数は、最悪の見積もり(状態 5 + 未確認の参照元 × 6)が予算内に収まるところで止め、`nextCursor` で続ける | 実測のみ(式は推測のみ) |
 | 参照元が多い画像 | 参照元が 8 件以上あると、1 枚だけでも 50 を超える(2 + 5 + 8 × 6 = 55)。参照元の上限か、参照元のページ送りが要る | 推測のみ |
-| D1 との差 | 表の数は SQLite の値。D1 では同じ処理でも多いことがある(EmDash の計測で `GET /` が 6 → 10)。予算に余裕を残し、[[T32-cloudflare-check|T32]] で確かめる | 公式ドキュメントのみ |
+| D1 との差 | 表の数は SQLite の値。D1 では同じ処理でも多いことがある(EmDash の計測で `GET /` が 6 → 10)。予算に余裕を残し、[[T32-cloudflare-check\|T32]] で確かめる | 公式ドキュメントのみ |
 | 完全削除の検知 | `content:afterDelete` の event は `{ id, collection, permanent }`。`collection === "b64_images"` かつ `permanent === true` のときだけ `imageRefs` から消す。`b64_images` は slug が無いので `id` は必ず ID(slug で完全削除すると `id` に slug が入る)。afterDelete も `after()` で実行され、前のプラグインの例外で飛ばされうるので、`imageRefs` だけが残った画像は missing として扱う | 実測+公式ドキュメント |
 | ゴミ箱への移動(自分のルート) | `ctx.content.delete` では afterDelete が呼ばれない。T06 の前提のまま | 実測+公式ドキュメント |
 

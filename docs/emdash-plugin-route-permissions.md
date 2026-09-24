@@ -22,12 +22,13 @@ updated: 2026-09-24
 > - プラグインの `ctx.content.*` は、呼び出した利用者の権限を確かめない。権限の確認はルートの `permission` だけ。
 > - プラグインが作ったエントリは `author_id` が NULL なので、標準 API では `*_any` の権限(Editor 以上)が要る。
 > - 画面側は `@emdash-cms/admin` の `useCurrentUser()` でロールを取る。プラグインのページ自体には、ロールの制限が無い。
+> - 0.39.1 でも、動いているサイトで測り直して同じ結果だった。CSRF の確認は、ミドルウェア(`Origin`)とディスパッチ(`X-EmDash-Request`)の 2 か所にある → [[#0.39.1 での再計測]]
 > - 関連: [[T06-decision-trash-permission]]、[[T18-upload-route]]、[[T21-orphan-routes]]、[[T25-images-page]]、[[base64-image-plugin-spec#7. アップロード(書き込み経路)|仕様書 7 章]]、[[base64-image-plugin-spec#10. 画像のライフサイクル|仕様書 10 章]]、[[emdash-reference-vs-npm-0-38]]
 
 > [!info] 対象の版
 > npm からインストールした `emdash@0.38.0` / `@emdash-cms/auth@0.38.0` / `@emdash-cms/admin@0.38.0`(`node_modules/`)で確かめた。`references/emdash` は 0.38.0 より新しい開発版で、ファイルの分け方が違う([[emdash-reference-vs-npm-0-38]])。このノートの判定の中身は、両方で同じ。
 > - 2026-09-24 に対象を 0.39.1 に上げた([[T01-2-emdash-0-39|T01-2]])。`node_modules/` のパスと行番号は 0.38.0 のときのもので、今の `node_modules`(0.39.1)とはずれることがある。`references/emdash/` の行番号は 0.39.1 でも同じ(プラグイン関係のソースに差が無い)。
-> - 0.39.1 での実測のやり直しは、[[T08-spike-route-body|T08]](ルートの権限チェックの挙動を確かめる)で行う。
+> - 0.39.1 では、[[T08-spike-route-body|T08]] で動いているサイト(開発サーバーと本番のビルド)を使って測り直した。結果は下の表と同じだった → [[#0.39.1 での再計測]]
 
 ## 判定の流れ
 
@@ -186,3 +187,68 @@ for (const permission of [undefined, "content:create", "content:delete_any"]) {
 
 - 標準 API(`dist/astro/routes/api/content/_collection_/_id_.mjs` ほか)も同じ形で呼べる。`handleContentGet` などを偽の `locals.emdash` で返し、`DELETE` は権限の確認を通ると `emdash.db`(entry lock)に触るので、そこで投げる例外を「通過」とみなした。
 - 型の確認は、`spikes/`(git 管理外)に `definePlugin({ routes: { x: { permission: "content:trash", handler } } })` を書き、ルートの `tsconfig.json` を継承して `tsc --noEmit -p` を実行した。
+
+## 0.39.1 での再計測
+
+[[T08-spike-route-body|T08]] で、EmDash 0.39.1 の動いているサイトを使って測り直した。上の表(0.38.0)と同じ結果で、[[T06-decision-trash-permission|T06]] の結論は変わらない。
+
+> [!info] 方法
+> - playground を複製した使い捨てのサイトに、`permission` だけを変えたルートを並べた native プラグインを入れた([[emdash-plugin-route-body-limit#再現手順]])。
+> - 開発サーバー(`astro dev`)と本番のビルド(`astro build` + `astro preview`)で、すべて同じ結果だった。
+> - ロールは、開発用の管理者の `users.role` をデータベースで書き換えて変えた。EmDash は、リクエストのたびにセッションの利用者 ID から `users` の行を読み直す(`references/emdash/packages/core/src/astro/middleware/auth.ts:437-447`)。
+> - POST、`X-EmDash-Request: 1` あり、セッション認証、body は `{}`。macOS 26.4、Node 26.10.0、emdash 0.39.1、Astro 7.3.3、`@astrojs/node` 11.1.6。2026-09-24 に計測。
+
+| permission \ ロール | 未ログイン | Subscriber(10) | Contributor(20) | Author(30) | Editor(40) | Admin(50) |
+|---|---|---|---|---|---|---|
+| (省略) | 401 | 403 | 403 | 403 | 403 | 200 |
+| `content:read` | 401 | 200 | 200 | 200 | 200 | 200 |
+| `content:create` | 401 | 403 | 200 | 200 | 200 | 200 |
+| `content:read_drafts` | 401 | 403 | 200 | 200 | 200 | 200 |
+| `media:upload` | 401 | 403 | 200 | 200 | 200 | 200 |
+| `content:delete_own` | 401 | 403 | 403 | 200 | 200 | 200 |
+| `content:delete_any` | 401 | 403 | 403 | 403 | 200 | 200 |
+| `content:delete_permanent` | 401 | 403 | 403 | 403 | 403 | 200 |
+| `plugins:manage` | 401 | 403 | 403 | 403 | 403 | 200 |
+| `content:trash`(存在しない) | 500 | 500 | 500 | 500 | 500 | 500 |
+
+- 根拠: **実測+公式ドキュメント**
+- 401 は `UNAUTHORIZED`(「Authentication required」)、403 は `FORBIDDEN`(「Insufficient permissions」)、500 は `INVALID_PLUGIN_ROUTE`。
+- `content:read`(Subscriber 以上)と `media:upload`(Contributor 以上)の行は、0.39.1 で足した。
+- `content:create` のルートは、GET / DELETE / PUT / PATCH でも POST と同じ結果だった。
+
+### CSRF の確認は 2 か所にある
+
+`content:create` のルートと公開ルート(`public: true`)に送った。根拠: **実測+公式ドキュメント**
+
+| リクエスト | 結果 | 返したところ |
+|---|---|---|
+| 未ログイン、ヘッダーなし | 401 `UNAUTHORIZED` | ディスパッチ(権限の確認が先) |
+| Subscriber、ヘッダーなし | 403 `FORBIDDEN` | 同上 |
+| Contributor、ヘッダーなし、Origin なし | 403 `CSRF_REJECTED`「Missing required header」 | ディスパッチ(`core/src/plugins/http-route-dispatch.ts:75-77`) |
+| Contributor、ヘッダーなし、同じ Origin | 403 `CSRF_REJECTED`「Missing required header」 | 同上 |
+| Contributor、ヘッダーなし、別の Origin | 403 `CSRF_REJECTED`「Cross-origin request blocked」 | ミドルウェア(`core/src/astro/middleware/auth.ts:216-223` → `core/src/api/csrf.ts:31-59`) |
+| Contributor、ヘッダーあり、別の Origin | 200 | — |
+| Contributor、GET、ヘッダーなし | 403 `CSRF_REJECTED`「Missing required header」 | ディスパッチ |
+| 公開ルート、未ログイン、ヘッダーなし、Origin なし / 同じ Origin | 200 | — |
+| 公開ルート、未ログイン、ヘッダーなし、別の Origin | 403 `CSRF_REJECTED`「Cross-origin request blocked」 | ミドルウェア |
+
+- ミドルウェアは、`/_emdash/api/plugins/` への GET / HEAD / OPTIONS 以外のリクエストで、`X-EmDash-Request: 1` が無く、`Origin` が別のサイトのものなら拒否する。公開ルートも対象になる。`Origin` が無ければ通す。
+- ディスパッチは、private ルートをセッションで呼ぶとき、メソッドに関係なく `X-EmDash-Request: 1` を求める。権限の確認のあとなので、権限が足りなければ 401 / 403 が先に返る。
+- どちらもコードは `CSRF_REJECTED` なので、画面の文言はコードだけで決めてよい。
+
+### API トークン
+
+| トークン(作った利用者) | ルートの permission | 結果 |
+|---|---|---|
+| `content:read` + `content:write`(Admin) | `content:create` | 403 `INSUFFICIENT_SCOPE`(「Token lacks required scope: admin」) |
+| `admin`(Admin) | `content:create` / `plugins:manage` | 200 / 200 |
+| `admin`(作ったあと Contributor に下げた) | `content:create` / `plugins:manage` | 200 / 403 `FORBIDDEN` |
+
+- トークンでも、ルートの `permission` は利用者の今のロールで判定される。`X-EmDash-Request` は要らない。根拠: **実測+公式ドキュメント**(`core/src/plugins/http-route-dispatch.ts:71-75`)
+- トークンは `POST /_emdash/api/admin/api-tokens`(`{ name, scopes }`、Admin のみ)で作った。
+
+### 0.39.1 でのソースの場所
+
+- 0.38.0 の npm 版で catch-all のルート(`astro/routes/api/plugins/[pluginId]/[...path].ts`)にあった判定は、0.39.1 では `core/src/plugins/http-route-dispatch.ts:49-79`(権限・スコープ・CSRF)と `:93-135`(ディスパッチ)にある。catch-all のルートは、これを呼ぶだけになった(`core/src/astro/routes/api/plugins/[pluginId]/[...path].ts:22-38`)。根拠: 公式ドキュメントのみ
+- 判定の中身(省略すると `plugins:manage`、`Permissions` に無い文字列は 500、トークンは `admin` スコープ、セッションは `X-EmDash-Request: 1`)は 0.38.0 と同じ。
+- body の読み方と上限は [[emdash-plugin-route-body-limit]]。

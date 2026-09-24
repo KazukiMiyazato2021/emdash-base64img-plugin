@@ -1,0 +1,12 @@
+{
+	// 利用者のサイトの tsc が、TS ソースのまま配布するこのプラグインの src を検査するときの「緩い」設定の代わり。
+	// strict を切った設定と、lib を ES2022 に絞った設定(TypeScript 5.x の lib に近い)で型が通ることを確かめる。
+	// 経緯: docs/git-dependency-ts-source.md(T07)、tasks/T04-1-consumer-typecheck.md
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"lib": ["es2022", "dom", "dom.iterable"],
+		"strict": false,
+		"noUncheckedIndexedAccess": false
+	},
+	"include": ["src"]
+}

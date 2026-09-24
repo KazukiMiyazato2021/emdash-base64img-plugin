@@ -44,7 +44,13 @@ created: 2026-09-23
 - [ ] 状態: 使用中 / 参照元が削除された / 参照元から外された / 参照元なし
 - [ ] ゴミ箱へ移動するルート([[T06-decision-trash-permission|T06]] で決めた権限)
 - [ ] `content:afterDelete` で `b64_images` が完全削除されたら、`imageRefs` からも削除する
-- [ ] 1リクエストのクエリ数が 50 未満になるよう、1回に扱う件数を計算して決める
+- [ ] 1 回に扱う件数は、固定にせずクエリ数の見積もりで決める([[T10-spike-after-save#結果|T10]]、仕様書 9 章)
+  - 1 件あたりのクエリ数: 参照元は 1 / 3 / 6、画像の状態は 2 / 5 / 3
+  - 同じ参照元はリクエストの中で 1 回だけ調べる
+  - 予算(1 リクエストのクエリ数)の値を決める。上限は 1 呼び出し 1,000 だが、応答時間を抑えるため、十分小さくする
+  - 参照元が多い画像(1 枚で予算を超えるもの)は、参照元をページ送りするか上限を設ける
+- [ ] 画像の状態(ゴミ箱に入っていない / ゴミ箱 / 無い)は、`get` と `getTrashedVersioned` で判定する。`getTrashedVersioned` は `get` が `null` のときだけ呼ぶ。capability `content:restore` を宣言するかを決める(復元の権限も含むため。[[T03-shared-contracts#結果|T03]])
+- [ ] `content:afterDelete` の `id` は URL に書いた値そのまま(slug のこともある)。`permanent === true` のときだけ `imageRefs` を消す([[T10-spike-after-save#結果|T10]])
 
 ## 完了条件
 
