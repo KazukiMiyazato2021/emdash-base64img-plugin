@@ -149,3 +149,6 @@ E2E と手動確認のために、サイト側のページとテストデータ�
 2. ルートの `package.json` に、入力画像とサンプルの投稿を作る script(例: `"e2e:images": "node e2e/fixtures/make-images.ts"`)を足すかは、リーダーの判断(T26 では `package.json` を変更しない)。
 3. 本物の playground でのスクリプトの確認(ルートの登録のあと)は、T29・T31 で行う。
 4. `sips` の無い環境(Linux の CI など)で E2E を動かすなら、JPEG・AVIF・BMP・TIFF・ICO・HEIC の作り方を替える必要がある(Chromium の canvas は JPEG と WebP を書ける。HEIC と AVIF は書けない)。
+
+> [!note] 反映済み(リーダー、マージのとき)
+> 知見ノート 2 つを索引に登録した。「他のタスクへの影響」と 3・4 は後続タスクのノートに、1 はサブタスクで扱う。2 は、E2E の実行の仕組みを作る [[T31-e2e|T31]] が `package.json` を変えるときに合わせて決める。
