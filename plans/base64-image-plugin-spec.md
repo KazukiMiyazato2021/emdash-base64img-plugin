@@ -420,6 +420,7 @@ flowchart LR
 
 - コンポーネントは Kumo(`@cloudflare/kumo`)を使う(公式の field-kit と同じ)。
 - 文言は日本語と英語を用意し、`<html lang>` で切り替える。どちらでもなければ英語にする(`packages/admin/src/locales/LocaleDirectionProvider.tsx:21`)。
+  - 管理画面の設定で言語を変えると、再読み込みせずに `<html lang>` が書き換わる。部品はこの変化を監視して文言を切り替える(`src/client/i18n.ts` の `useLocale()`)。根拠: 実測+公式ドキュメント([[emdash-admin-locale-lang]]、[[T14-admin-i18n-api#結果|T14]])
 - ファイル選択、並べ替え、削除は、すべてキーボードでも操作できるようにする。進捗は `aria-live` でスクリーンリーダーに伝える。
 - plugin widget には `readOnly` が渡されない(`packages/admin/src/components/ContentEditor.tsx:1833`)。そのため、編集ロック中でも widget は操作できてしまう。これは EmDash 側の制約。
 
