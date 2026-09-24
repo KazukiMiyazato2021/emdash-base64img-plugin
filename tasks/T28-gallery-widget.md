@@ -41,6 +41,12 @@ created: 2026-09-23
 - [ ] `maxItems` の表示と、超える分の拒否
 - [ ] ファイルの選択は [[T27-image-widget|T27]] と同じく `accept="image/*"` にし、デコードの前に「読み込み中…」を描画する([[T12-input-decode#後続タスク向けのメモ|T12]])
 - [ ] 保存済みの画像のプレビューは `fetchPreviews`(10 件ずつ並行。[[T17-admin-data-routes|T17]])。`imageRefs` に記録が無い画像の扱いは [[T27-image-widget|T27]] と揃える([[T16-reference-hook#他のタスクへの影響|T16]])
+- [ ] 部品は `src/admin/parts/` から import する。props と使い方の例は [[T22-widget-parts#部品と props(T27・T28 向け)|T22 の表]] と [[T22-widget-parts#使い方の例|使い方の例]]。部品は表示と操作だけを受け持ち、アップロードの処理([[T23-upload-hook|T23]])や API の呼び出しは持たない
+- [ ] `UploadProgress`・`ErrorMessage`・`UploadNotices` は、処理の有無にかかわらず常に描画する(読み上げの領域を先に DOM に置くため)。フォーカスは、処理を始めたらキャンセルボタンへ(`cancelButtonRef`)、キャンセル・失敗のあとはドロップゾーンへ(`buttonRef`)移す(押したボタンが消えるとフォーカスが失われるため)
+- [ ] `ImageDropZone` は `multiple` にし、`description` に「あと N 枚追加できます」を渡す(ボタンの説明にもなる)。上限に達したときと処理中は `disabled`。上限を超える分の拒否と、その文字は T28 が持つ
+- [ ] 1 枚ずつの部品は、画像ごとに区別できる名前を付ける: `FileSelectButton` の `aria-label`(「画像 2 を差し替え」)、`AltTextInput` の `itemLabel`(「画像 2」)、`ImageNotFound` の `size="small"` と `removeLabel`、`ImagePreview` の `size="small"`(96px の枠)。進捗は `UploadProgress` の `index`・`total`、追加し終えた枚数は `completed`
+- [ ] 「差し替え」「削除」「↑」「↓」「あと N 枚追加できます」などの文字は、自分の辞書(`defineMessages`)に持つ。部品は持たない
+- [ ] 見た目のクラスは、管理画面の CSS にあるものだけを使う(管理画面の CSS はビルド済みで、プラグインのファイルを読まない)。無いクラスと枠の色は style で書く。テストでは `tests/admin/admin-css.ts` の `findMissingClasses(container, sourceTokens("<自分のソース>"))` で、使うクラスが CSS にあることを確かめる([[T22-1-admin-css-test-helper|T22-1]]、[[emdash-admin-plugin-ui-styling]])
 
 ## 完了条件
 
