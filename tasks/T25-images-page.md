@@ -46,6 +46,9 @@ created: 2026-09-23
 - [ ] Kumo 2.6.0 の注意([[emdash-admin-plugin-ui-styling#Kumo 2.6.0 の注意点|知見ノート]]): `Loader` は英語の `aria-label="Loading"` と `role="status"` を持つ(飾りなら `aria-hidden` の要素で包み、伝えるなら訳した `aria-label` を渡す)。`Button` の名前は `title` でなく `aria-label` で付ける(`title` はツールチップで包む)。`Label`(`Input` の `label`)に `required={false}` を渡すと英語の「(optional)」が出る。Kumo の省略できる props に `undefined` になりうる値を渡すと、利用者の厳しい型チェック(`exactOptionalPropertyTypes`)で型エラーになるので、値があるときだけ展開する。読み上げの領域は `role="status"` でなく `<output>`(oxlint の `jsx-a11y/prefer-tag-over-role`)
 - [ ] アップロードの途中で失敗した画像も一覧に出る([[T18-upload-route#失敗したときの後始末|T18]])。公開に失敗した画像は、ゴミ箱に入った下書き(参照元なし、または `target.entryId` の参照元)として出る。`imageRefs` の保存と公開の間で処理が止まった画像は、ゴミ箱に入っていない下書き(参照元なし)として出る。どちらも完全削除(管理者)の対象にする。非公開(下書き)を状態バッジで区別するかは、[[T21-orphan-routes|T21]] のルートが返す状態に合わせて決める
 - [ ] `owners` には、ロケールだけが違う同じエントリの参照元が並ぶことがある(widget が `target.locale` を省いたとき。[[T23-upload-hook|T23]] はエントリのロケールを送る)。参照元へのリンクを、そのまま並べるか、同じエントリをまとめるかを決める([[T18-upload-route#参照元の記録(T20)との関係|T18]])
+- [ ] 一覧は T14 の `listImages({ cursor })` で読む。応答は `{ items, nextCursor? }` で、並びは新しい順。1 ページの枚数は 0〜10 で変わる(10 枚を前提にしない)。**`items: []` で `nextCursor` があるときは、続けて次を読む**(参照元の多い画像を調べている途中で、一覧の終わりではない)。400 `INVALID_CURSOR` なら最初から読み直す([[T21-orphan-routes#T25 への引き継ぎ(応答の形とページ送り)|T21]]、[[image-management-routes#応答の形とページ送り(T25 向け)]])
+- [ ] ボタンは `entryStatus` で出し分ける。ゴミ箱は `active` の画像に出す(`usage: "in_use"` なら、確認で使用中であることを示す。`trashImage(id)`)。完全削除は `trashed` の画像にだけ出す(管理者。`deleteImagePermanently(id)`)。`missing`(記録だけが残った画像)には操作が無いので、そのことが分かる表示にする。ゴミ箱に移したら、その項目を `trashed` にする。完全削除したら、項目を画面から消す(記録は応答のあとの hook が消すので、すぐ読み直すと残って見えることがある)
+- [ ] 公開済みかどうか(復元した画像と、アップロードの途中で止まった画像は下書きで、サイトに出ない)と、参照元の全体の件数(`owners` は先頭から 20 件)は、サブタスク T21-2 で一覧の項目に足す。T25 は T21-2 のマージのあとに始め、その項目を使う
 
 ## 完了条件
 
