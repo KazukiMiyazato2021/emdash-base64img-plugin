@@ -20,5 +20,5 @@
 		// 親ディレクトリ(worktree の外側)の node_modules/@types を自動で読み込まないよう、明示する。
 		"types": ["node"]
 	},
-	"include": ["src", "tests", "e2e", "*.config.ts"]
+	"include": ["src", "tests", "e2e", "playground/scripts", "*.config.ts"]
 }
