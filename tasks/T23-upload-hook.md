@@ -421,6 +421,6 @@ return (
 
 1. `?locale=` の無い画面でも参照元を送るなら、翻訳の一覧の API(`GET /_emdash/api/content/{collection}/{id}/translations`)でエントリのロケールを引く(決定 3。今は不要)。
 2. 保存先を求められないとき(プラグインのページなど、編集画面の外で widget が描かれたとき)の専用のエラーコードと文言。今は `INVALID_TARGET` の文言(フィールドとサイトの言語の設定を確かめる案内)になる。
-3. 実際の管理画面(playground)で、URL と widget の作り直しの時期を確かめていない(T27・T31)。
+3. 実際の管理画面(playground)で、URL と widget の作り直しの時期を確かめていない(T27・T31)。→ [[T27-image-widget#他のタスクへの影響|T27]] で確かめた。新規作成を保存すると、URL は `/_emdash/admin/content/posts/<ID>?locale=en` になり、widget は作り直された(フィールドの `key` にエントリ ID が入るため)。翻訳の切り替えは確かめていない(T31)。
 4. `docs/00-index.md` に [[emdash-admin-content-editor-url]]・[[react-hook-testing-pitfalls]]・[[upload-hook-browser-check]] を登録する(リーダー)。
 5. Firefox はデコードと縮小(合わせて 48MP で約 120ms)の間、画面が止まる。Worker でデコード・縮小すれば避けられるが、[[T12-input-decode|T12]] と同じ理由(管理画面の CSP、TS ソースのまま配布)で見送る。止まる間は「読み込み中…」が出ている。
