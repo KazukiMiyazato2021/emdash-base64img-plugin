@@ -680,11 +680,13 @@ export default defineConfig({
 /                        ← パッケージのルート(git 依存でインストールされる対象)
 ├─ package.json          files: ["src"]、exports: "." / "./admin" / "./astro"
 ├─ src/
-│  ├─ index.ts           definePlugin(ルート・hook・ストレージ・capability)
-│  ├─ admin.tsx          widget(単一画像 / ギャラリー)・画像管理ページ・一覧の列
+│  ├─ index.ts           createPlugin()・descriptor(base64ImagePlugin())
+│  ├─ admin.tsx          管理画面の入口(widget・画像管理ページ・一覧の列を export する)
 │  ├─ astro.ts           resolveBase64Images・型・type guard(サイト側で使う)
-│  ├─ server/            アップロード用ルート・検証・参照元の記録
-│  ├─ client/            圧縮処理(canvas)・サムネイル生成
+│  ├─ admin/             widget・画像管理ページ・一覧の列・共通の部品(parts/)・アップロードのフック(hooks/)
+│  ├─ server/            plugin.ts(definePlugin)・ルート(routes/)・保存 hook と参照元の記録(hooks/)・検証
+│  ├─ client/            入力画像の判定とデコード・圧縮(canvas)・サムネイル・文言・API クライアント
+│  ├─ site/              サイト側の画像の解決(resolveBase64Images の本体)
 │  └─ shared/            WebP ヘッダーの解析・参照のスキーマ・定数
 ├─ tests/                vitest(単体テスト)
 ├─ playground/           動作確認用の EmDash サイト(配布物には含めない)
