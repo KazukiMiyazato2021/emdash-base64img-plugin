@@ -37,6 +37,10 @@ created: 2026-09-23
 ## 作業内容
 
 - [ ] インストール(git 依存でタグを指定する方法。非公開リポジトリの場合のトークン)
+- [ ] サイトの `.npmrc` に `allow-git=root` を書く(npm 12 は git 依存を既定で拒否する。`npm ci` を実行する CI とビルドの環境でも要る)([[npm12-git-dependency-policy]]、[[T07-1-spec-distribution|T07-1]])
+- [ ] Cloudflare アダプターで開発するとき: `vite.ssr.optimizeDeps.include` にプラグインを入れると、最初のリクエストでの再読み込みが起きない(任意)([[git-dependency-ts-source#Cloudflare アダプターの astro dev の再最適化]])
+- [ ] 型チェック: サイトで `tsc --noEmit` を実行すると、プラグインの `src` も検査される(`astro check` は検査しない)。どちらでもエラーが出ないこと([[T04-1-consumer-typecheck|T04-1]])
+- [ ] マイグレーション: `emdash migrate --from-config` は使えない。既定の `emdash migrate` を使う([[git-dependency-ts-source]])
 - [ ] `astro.config.mjs` の設定(storage を指定しない)
 - [ ] seed(`b64_images` とフィールドの定義)と options の一覧
 - [ ] サイト側の使い方(`resolveBase64Images` と `Image`、一覧ページでまとめて解決する方法)

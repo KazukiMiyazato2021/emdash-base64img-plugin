@@ -587,6 +587,7 @@ export default defineConfig({
 ## 14. 配布とバージョン
 
 - **npm には公開しない。** git 依存として配布する(例: `"emdash-plugin-base64-image": "github:<owner>/emdash-base64img-plugin#v0.1.0"`)。
+  - npm 12 は git 依存を既定で拒否する(`allow-git` の既定が `none` で、`EALLOWGIT` になる)。利用者のサイトの `.npmrc` に `allow-git=root` を書く。`npm ci` を実行する CI やビルドの環境でも要る。根拠: 実測+公式ドキュメント([[npm12-git-dependency-policy]])
 - 名前:
   - パッケージ名: `emdash-plugin-base64-image`
   - プラグイン ID: `base64-image`(`^[a-z0-9-]+$` を満たす。`packages/core/src/plugins/define-plugin.ts`)
@@ -594,7 +595,9 @@ export default defineConfig({
 - プラグイン本体はリポジトリ直下に置く。npm はサブディレクトリを git 依存として入れられないため。
 - TS ソースのまま配布する(`files: ["src"]`、ビルドなし)。
   - 公式プラグインも `"main": "src/index.ts"` で配布している(`packages/plugins/color/package.json`)。
-  - ビルドがないので、git 依存でインストールするたびに `prepare` でビルドが走ることもない。
+  - ビルドがないので、git 依存でインストールするたびに `prepare` でビルドが走ることもない。npm 12 は依存の install スクリプト(git 依存の `prepare` を含む)を既定で止めるので、`prepare` でビルドする配布にすると、利用者に許可の設定が要る。根拠: 実測のみ([[npm12-git-dependency-policy]])
+  - git 依存で入れたサイトで、Node アダプター(`astro dev` / `astro build` / `astro preview`)と Cloudflare アダプター(`astro build` + `wrangler dev`、`astro dev`)のすべてで、サーバー側・サイト側・管理画面の入口を読み込めた。Vite は `.ts` / `.tsx` の入口を外部化せずに変換する。根拠: 実測+公式ドキュメント([[T07-spike-git-dependency#結果|T07]]、[[git-dependency-ts-source]])
+  - 利用者のサイトの `tsc` は、プラグインの `src` を利用者の設定で型チェックする(`astro check` はしない)。緩い設定(`strict: false`、lib が ES2022)と厳しい設定(`exactOptionalPropertyTypes` など)の代わりの tsconfig で、`npm run typecheck` のたびに確かめる([[T04-1-consumer-typecheck|T04-1]])。
 - peer dependency: `emdash: "^0.39.0"`(`>=0.39.0 <0.40.0`)、`react`、`@cloudflare/kumo`、`@emdash-cms/admin`
   - EmDash のマイナーバージョンが上がるたびに動作を確認し、範囲を広げる。
   - 範囲([[T01-scaffold]] で決め、[[T01-2-emdash-0-39|T01-2]] で 0.39 に変更): `@emdash-cms/admin: "^0.39.0"`、`@cloudflare/kumo: "2.6.0"`(`@emdash-cms/admin` 0.39.1 の依存と同じ版に固定)、`react: "^18.0.0 || ^19.0.0"`(`@emdash-cms/admin` 0.39.1 の peer と同じ)。開発には `emdash` / `@emdash-cms/admin` の 0.39.1 を使う。
@@ -640,7 +643,7 @@ export default defineConfig({
 
 問題が見つかったら、設計に戻る。
 
-- [ ] git 依存 + TS ソースのプラグインを、Vite(Node と workerd)が読み込めるか(現状は推測のみ)
+- [x] git 依存 + TS ソースのプラグインを、Vite(Node と workerd)が読み込めるか → 読み込めた。ビルドは入れない。npm 12 では、サイトの `.npmrc` に `allow-git=root` が要る。Cloudflare アダプターの `astro dev` では、最初のリクエストで 1 回だけ再読み込みが起きる([[T07-spike-git-dependency#結果|T07]]、[[#14. 配布とバージョン|14 章]]、[[#18. 既知の制約とリスク|18 章]])
 - [ ] プラグインのルートの body 上限(既定 1MiB。`skills/creating-plugins/references/sandbox-boundaries.md`)で、100KB の data URL を問題なくやり取りできるか
 - [x] `resolveBase64Images` で画像を解決するのに、実際に何クエリかかるか(画像エントリの authorId によってバイライン取得のクエリが増えるかも含めて) → 50 件までの 1 回の呼び出しは 1 クエリ。このプラグインの画像(authorId なし)では、1 ページ 1〜3 クエリ。authorId のある画像はバイラインの補完で増える([[T09-spike-query-count#結果|T09]]、[[#12. サイト側の描画|12 章]])
 - [x] canvas の WebP のファイルサイズが、ブラウザ間と cwebp とでどれだけずれるか → 同じ画素ならエンコーダーの差は小さい(Firefox は cwebp と同じ、Chromium は +0.2〜1.2%)。ずれの主な原因は縮小の方法で、上の 6.3 の方法に決めた([[T05-spike-canvas-webp#結果|T05]]、[[#A.5 ブラウザの canvas での確認|付録 A.5]])
@@ -666,6 +669,10 @@ export default defineConfig({
 | ページの重さ | 画像は HTML にインラインで埋め込まれる。一覧ページ10件で最大約 1MB、カバー1枚+ギャラリー10枚のページで約 1.1MB。圧縮すれば転送量はほぼ WebP 本体の合計まで下がる見込み(推測のみ) |
 | 標準画面 | `b64_images` の標準の一覧画面・ゴミ箱画面は重い(1ページ100件 × 約 100KB) |
 | スコープ外 | 本文中の画像と OGP 画像には対応しない |
+| git 依存(npm 12) | 利用者のサイトの `.npmrc` に `allow-git=root` が要る([[npm12-git-dependency-policy]]) |
+| 利用者の型チェック | 利用者のサイトの `tsc` は、TS ソースのまま配布する `src` を利用者の設定で検査する。このリポジトリでは、緩い設定と厳しい設定の代わりの tsconfig で確かめている([[T04-1-consumer-typecheck\|T04-1]])。TypeScript 5.x の実物での確認は、T07 の時点のコードだけ |
+| マイグレーションのコマンド | `emdash migrate --from-config` は、Node が `node_modules` の中の `.ts` を読めないので失敗する。既定の `emdash migrate`(build のマニフェストを使う)は使える。EmDash は `--from-config` をローカルの調査用としている([[git-dependency-ts-source]]) |
+| Cloudflare の開発サーバー | Cloudflare アダプターの `astro dev` では、最初のリクエストでプラグインが依存の最適化に加わり、1 回だけ再読み込みが起きる。サイトの `vite.ssr.optimizeDeps.include` にプラグインを入れると起きない([[git-dependency-ts-source#Cloudflare アダプターの astro dev の再最適化\|T07]]) |
 
 ## 19. 対象外・将来の検討事項
 
