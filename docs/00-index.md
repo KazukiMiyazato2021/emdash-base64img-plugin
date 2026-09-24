@@ -56,6 +56,7 @@ updated: 2026-09-24
 | [[emdash-plugin-content-api-constraints\|EmDash 0.39.1 のプラグイン API で、データの形に関わる制約]] | `docs/emdash-plugin-content-api-constraints.md` | エントリ ID は作成まで決まらない。seed の ID はそのまま使われる。`getTrashedVersioned` でゴミ箱を判定できる。`get` は 1 件 2 クエリ。widget に collection / entryId / locale は渡らない | [[T03-shared-contracts\|T03]] |
 | [[emdash-admin-api-requests\|EmDash 0.39.1 の API を管理画面の部品から呼ぶときの送り方とエラーの形]] | `docs/emdash-admin-api-requests.md` | 同じオリジンの `/_emdash/api/...` を `X-EmDash-Request: 1` 付きの `fetch` で呼ぶ。未ログインはプラグインのルートが `UNAUTHORIZED`、標準 API が `NOT_AUTHENTICATED`。外部の認証の失敗は `text/plain`。`src/client/api.ts` のコードの決め方 | [[T14-admin-i18n-api\|T14]] |
 | [[emdash-admin-locale-lang\|EmDash 0.39.1 の管理画面の言語と html の lang 属性]] | `docs/emdash-admin-locale-lang.md` | `<html lang>` は cookie `emdash-locale` → `Accept-Language` → `en` で決まる。設定画面で言語を変えると再読み込みせずに書き換わるので、`MutationObserver` で追随する | [[T14-admin-i18n-api\|T14]] |
+| [[emdash-admin-content-editor-url\|EmDash 0.39.1 の管理画面の編集画面の URL と、widget の保存先の求め方]] | `docs/emdash-admin-content-editor-url.md` | plugin widget の props にはコレクション・エントリ ID・ロケールが無いので、URL(`/_emdash/admin/content/<collection>/<ID か new>` と `?locale=`)と props の `id`(`field-<slug>`)から求める。`?locale=` はダッシュボード・コマンドパレット・サイトのツールバーから開くと付かない。ルーターの `?locale=` の読み方 | [[T23-upload-hook\|T23]] |
 | [[emdash-admin-plugin-ui-styling\|EmDash 0.39.1 の管理画面で、プラグインの部品に Kumo と CSS のクラスを使うときの注意]] | `docs/emdash-admin-plugin-ui-styling.md` | 管理画面の CSS はビルド済みでプラグインのファイルを読まないので、CSS にあるクラスだけが当たる(テストで確かめる)。層の外の `*` の `border-color` が枠の色のクラスより強い。Kumo 2.6.0 の `Loader`・`Label`・`Button`・`Banner` の注意。厳しい型チェックでは、Kumo の省略できる props に `undefined` を渡せない | [[T22-widget-parts\|T22]] |
 
 ## ライブラリ
@@ -63,6 +64,7 @@ updated: 2026-09-24
 | ノート | パス | 内容 | 元のタスク |
 |---|---|---|---|
 | [[zod-string-length-code-points\|zod 4.5 の文字列の長さはコードポイントで数える]] | `docs/zod-string-length-code-points.md` | `max` / `min` はコードポイント単位。data URL のスキーマは ASCII に限り、長さの上限をバイトの上限と一致させた | [[T03-shared-contracts\|T03]] |
+| [[react-hook-testing-pitfalls\|React のフックのテストで気を付けること(StrictMode・act の外の更新・oxlint の誤検出)]] | `docs/react-hook-testing-pitfalls.md` | `renderHook` の `wrapper` で `<StrictMode>` を包んでも effect は 2 回動かない(`reactStrictMode: true` を使う)。`console.error` を見張って act の外の更新を失敗にする。oxlint 1.83.0 の `react(memo-dependencies)` は `catch` の無い `try` / `finally` で誤って報告する | [[T23-upload-hook\|T23]] |
 
 ## ブラウザ・画像処理
 
@@ -76,6 +78,7 @@ updated: 2026-09-24
 | [[input-image-decode\|入力画像の形式の判定とデコード]] | `docs/input-image-decode.md` | `File.type` は拡張子だけで決まり、`createImageBitmap` は中身で形式を決める(ICO もデコードする)ので、形式は先頭のバイトで判定する。デコードは 1 画素約 4 バイトのメモリを使うので、画素数はヘッダーで確かめる。Firefox はデコードの間、画面を止める | [[T12-input-decode\|T12]] |
 | [[admin-image-input-browser-behavior\|画像の入力(ファイルの選択・ドロップ・貼り付け)のブラウザでの挙動]] | `docs/admin-image-input-browser-behavior.md` | 貼り付けのイベントが届く要素は、Chromium 153 がフォーカスのあるボタン、Firefox 155 が body なので、`document` で受けて判定する。Firefox のヘッドレスはクリップボードの画像を読めず、合成した `ClipboardEvent` は空になる(貼り付けの E2E は Chromium で行う)。ドロップは両方で試せる | [[T22-widget-parts\|T22]] |
 | [[e2e-input-image-fixtures\|E2E の入力画像を Node・sips・Chromium で作る方法]] | `docs/e2e-input-image-fixtures.md` | 28 個を、新しいパッケージを入れずに約 1.5 秒で作る。macOS の `sips` は WebP を書けないので、WebP は Chromium の canvas で作る。本番の判定・圧縮に通した結果。HEIC の拒否は本物の HEIC で確かめる(中身が JPEG なら受け付けられる)。git には入れない | [[T26-playground-pages\|T26]] |
+| [[upload-hook-browser-check\|アップロードのフックを Chromium・Firefox で動かした結果]] | `docs/upload-hook-browser-check.md` | 「読み込み中…」をデコードの前に描画するには `requestAnimationFrame` を 2 回待つ(1 回では 30 回中 20 回で間に合わない)。Firefox 155 はデコードと縮小の間に主スレッドを最大約 120ms 止め、キャンセルはそのあとに届く。送った要求 36 件はサーバーの検証を通った | [[T23-upload-hook\|T23]] |
 
 ## Cloudflare
 
