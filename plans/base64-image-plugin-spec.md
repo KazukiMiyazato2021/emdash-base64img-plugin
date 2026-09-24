@@ -246,7 +246,7 @@ flowchart LR
   "bytes": 74668,
   "width": 1280,
   "height": 853,
-  "thumb": "data:image/webp;base64,…",  // 長辺 96px 程度、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下)
+  "thumb": "data:image/webp;base64,…",  // 長辺 96px 以下、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下)
   "createdAt": "2026-09-23T12:00:00.000Z",
   "createdBy": "<userId>"
 }
@@ -366,12 +366,12 @@ flowchart LR
 
 | 場所 | 検証内容 | 不正なとき |
 |---|---|---|
-| ① アップロード用ルート | ・保存先のフィールドが存在し、このプラグインの widget であること(`ctx.schema.getCollection` で `widget` / `options` を読む。`packages/core/src/plugins/types.ts:407`)<br>・`dataUrl` が `data:image/webp;base64,` で始まり、長さが `maxStoredBytes` 以下(固定上限 500,000)<br>・デコードした中身が WebP(RIFF / WEBP、`VP8 ` / `VP8L` / `VP8X`)で、ヘッダーから読んだ寸法が width / height と一致し、長辺が `maxEdge` 以下<br>・`thumb` が WebP で、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下) | 拒否 |
-| ② `b64_images` の `content:beforeSave` | ①と同じ中身の検証。API / MCP / 管理画面など、どこからの書き込みでも実行する | 拒否 |
+| ① アップロード用ルート | ・保存先のフィールドが存在し、このプラグインの widget を使う `json` フィールドであること(`ctx.schema.getCollection` で `type` / `widget` / `options` を読む。`packages/core/src/plugins/types.ts:407`)<br>・`dataUrl` が `data:image/webp;base64,` で始まり、長さが `maxStoredBytes` 以下(固定上限 500,000)。長さはデコードする前に確かめる<br>・デコードした中身が静止画の WebP(RIFF / WEBP、`VP8 ` / `VP8L` / `VP8X`。アニメーションは拒否)で、ヘッダーから読んだ寸法が width / height と一致し、長辺が `maxEdge` 以下<br>・`thumb` が静止画の WebP で、長辺 96px 以下、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下) | 拒否(HTTP 400。コードと理由の対応は [[T11-server-validation#T04 の理由とエラーコードの対応\|T11]]) |
+| ② `b64_images` の `content:beforeSave` | 値の形(`base64ImageEntrySchema`)と、`src` の ① と同じ中身の検証。保存先のフィールドが分からないので、固定上限(保存 500,000 バイト・長辺 4,096px)を当てる。`meta.bytes` が WebP 本体のバイト数と一致すること。API / MCP / 管理画面など、どこからの書き込みでも実行する | 拒否 |
 | ③ 参照を持つコレクションの `content:beforeSave` | ・参照の形(`{ v, id, locale, width, height, alt }` の型、alt は 1,000 文字以内)<br>・ギャラリーの枚数が `maxItems` 以下で、同じ画像が重複していないこと<br>・参照している画像 ID が、すべて `imageRefs` に存在すること(`getMany` でまとめて1クエリ) | 拒否し、どのフィールドの何が問題かをメッセージで返す |
 
 - 保存 hook では書き込み元を判別できない(`runContentBeforeSave` には書き込み元のプラグインを除外する引数がない。`packages/core/src/plugins/hooks.ts:543`)。そのため、書き込み元ではなく中身で判定する。
-- 処理の重さ: 約 100KB の data URL のデコードと WebP ヘッダーの解析は、`Uint8Array.fromBase64` で 0.011ms、`atob` で 0.149ms(実測のみ。[[#付録 A. 実測データ|付録 A.4]])。
+- 処理の重さ: 約 100KB の data URL のデコードと WebP ヘッダーの解析は、`Uint8Array.fromBase64` で 0.011ms、`atob` で 0.149ms(実測のみ。[[#付録 A. 実測データ|付録 A.4]])。固定上限の入力でのルートの検証全体(JSON の parse・スキーマ・①・②)は、中央値 0.40ms / 0.93ms(`fromBase64` / `atob`)、新しいプロセスの 1 回目で 1.9ms / 3.1ms(実測のみ。Node 26。[[T11-server-validation#処理時間(Workers Free の CPU 時間は 10ms)|T11]])。
 - ③の存在確認の影響: 管理者が画像を完全削除したあと、その画像を参照している投稿を保存しようとすると、保存が拒否される。widget 側では「画像が見つかりません」と表示し、削除ボタンで参照を外せるようにする。
 
 ## 9. 参照元の記録と未使用画像の検出
@@ -758,6 +758,7 @@ export default defineConfig({
   - `Uint8Array.fromBase64`: 0.011ms
   - `atob` + ループ: 0.149ms
 - 実装([[T04-webp-utils|T04]] の `parseWebpDataUrl`)では、Node 26 で 0.009ms(`fromBase64`)/ 0.062ms(`atob`)、Chromium 153・Firefox 155 でも 0.15ms 以下だった(実測のみ。[[webp-data-url-validation]])。
+- ルートの検証全体([[T11-server-validation|T11]] の `validateUpload` と `validateImageEntry`、JSON の parse とスキーマを含む)は、固定上限(data URL 500,000 バイト)の入力で、中央値 0.40ms(`fromBase64`)/ 0.93ms(`atob`)、新しいプロセスの 1 回目で 1.9ms / 3.1ms だった(実測のみ。Node 26。[[server-image-validation]])。
 
 ### A.5 ブラウザの canvas での確認
 
