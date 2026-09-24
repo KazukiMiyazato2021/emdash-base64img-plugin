@@ -2,7 +2,7 @@
 id: T28
 title: "ギャラリーの widget を作る"
 type: 実装
-status: doing
+status: done
 wave: 4
 depends_on:
   - "[[T22-widget-parts]]"
@@ -36,25 +36,25 @@ created: 2026-09-23
 
 ## 作業内容
 
-- [ ] 複数枚の選択・ドロップと、1枚ずつ順に処理する流れ
-- [ ] 並べ替え(ドラッグと ↑↓ ボタン)、1枚ずつの削除と代替テキストの入力
-- [ ] `maxItems` の表示と、超える分の拒否
-- [ ] ファイルの選択は [[T27-image-widget|T27]] と同じく `accept="image/*"` にし、デコードの前に「読み込み中…」を描画する([[T12-input-decode#後続タスク向けのメモ|T12]])
-- [ ] 保存済みの画像のプレビューは `fetchPreviews`(10 件ずつ並行。[[T17-admin-data-routes|T17]])。`imageRefs` に記録が無い画像の扱いは [[T27-image-widget|T27]] と揃える([[T16-reference-hook#他のタスクへの影響|T16]])
-- [ ] 部品は `src/admin/parts/` から import する。props と使い方の例は [[T22-widget-parts#部品と props(T27・T28 向け)|T22 の表]] と [[T22-widget-parts#使い方の例|使い方の例]]。部品は表示と操作だけを受け持ち、アップロードの処理([[T23-upload-hook|T23]])や API の呼び出しは持たない
-- [ ] `UploadProgress`・`ErrorMessage`・`UploadNotices` は、処理の有無にかかわらず常に描画する(読み上げの領域を先に DOM に置くため)。フォーカスは、処理を始めたらキャンセルボタンへ(`cancelButtonRef`)、キャンセル・失敗のあとはドロップゾーンへ(`buttonRef`)移す(押したボタンが消えるとフォーカスが失われるため)
-- [ ] `ImageDropZone` は `multiple` にし、`description` に「あと N 枚追加できます」を渡す(ボタンの説明にもなる)。上限に達したときと処理中は `disabled`。上限を超える分の拒否と、その文字は T28 が持つ
-- [ ] 1 枚ずつの部品は、画像ごとに区別できる名前を付ける: `FileSelectButton` の `aria-label`(「画像 2 を差し替え」)、`AltTextInput` の `itemLabel`(「画像 2」)、`ImageNotFound` の `size="small"` と `removeLabel`、`ImagePreview` の `size="small"`(96px の枠)。進捗は `UploadProgress` の `index`・`total`、追加し終えた枚数は `completed`
-- [ ] 「差し替え」「削除」「↑」「↓」「あと N 枚追加できます」などの文字は、自分の辞書(`defineMessages`)に持つ。部品は持たない
-- [ ] 見た目のクラスは、管理画面の CSS にあるものだけを使う(管理画面の CSS はビルド済みで、プラグインのファイルを読まない)。無いクラスと枠の色は style で書く。テストでは `tests/admin/admin-css.ts` の `findMissingClasses(container, sourceTokens("<自分のソース>"))` で、使うクラスが CSS にあることを確かめる([[T22-1-admin-css-test-helper|T22-1]]、[[emdash-admin-plugin-ui-styling]])
-- [ ] アップロードの応答の `ref`(`{ v, id, locale, width, height, alt: "" }`)は、そのままフィールドの値にする。`ref.locale` は画像エントリのロケール(サイトの既定)で、編集中のエントリのロケールではないので書き換えない。代替テキストは、入力欄の値を `alt` に入れる([[T18-upload-route#T23 が使う応答|T18]])
-- [ ] アップロードのエラーは、T14 の `useErrorMessage` でコードごとの文言を出す。`UPLOAD_FAILED`(500)は、作った画像エントリをルートがゴミ箱に移したあとのエラー、`IMAGE_ENTRY_INVALID`(400)は保存 hook が作成を拒否したもの。どちらもフィールドの値は変えない。複数の画像を順に送るとき、失敗した画像は値に足さず、その画像のエラーを出して次の画像に進むかを決める
-- [ ] 処理と状態は `src/admin/hooks/` のフックを使う([[T23-upload-hook#T27・T28 が使うもの|T23 の表]]、[[T23-upload-hook#使い方の例|使い方の例]])。保存先は `useUploadTarget(id)`(props の `id` を渡す)の結果をそのまま `target` に渡す。フックは表示を持たないので、段階(`state.status`)を T22 の `UploadProgress` の `stage` にそのまま渡す。ギャラリーは `useUploadQueue({ target, options, onUploaded })`。`onUploaded` は続けて呼ばれるので、最新の値を ref に持って後ろに足す(描画を待たない)。`enqueue(files, { limit })` の `limit` は `maxItems - 値の枚数 - pendingCount`。進捗の `index`・`total`・`completed` は `finishedCount`・`pendingCount`・`uploadedCount` から作る。1 枚ごとの失敗は `items` に残る(値には加えない)
-- [ ] 保存済みの画像は `usePreviewImages(ids)` で取得する(10 件ずつ並行。状態は `loading` / `loaded` / `missing` / `error`。`missing` は「画像が見つかりません」、`error` は `retry()`)。追加したばかりの画像は `prime(ref.id, entry)` で手元の data URL を表示し、取得しない
+- [x] 複数枚の選択・ドロップと、1枚ずつ順に処理する流れ
+- [x] 並べ替え(ドラッグと ↑↓ ボタン)、1枚ずつの削除と代替テキストの入力
+- [x] `maxItems` の表示と、超える分の拒否
+- [x] ファイルの選択は [[T27-image-widget|T27]] と同じく `accept="image/*"` にし、デコードの前に「読み込み中…」を描画する([[T12-input-decode#後続タスク向けのメモ|T12]])
+- [x] 保存済みの画像のプレビューは `fetchPreviews`(10 件ずつ並行。[[T17-admin-data-routes|T17]])。`imageRefs` に記録が無い画像の扱いは [[T27-image-widget|T27]] と揃える([[T16-reference-hook#他のタスクへの影響|T16]])
+- [x] 部品は `src/admin/parts/` から import する。props と使い方の例は [[T22-widget-parts#部品と props(T27・T28 向け)|T22 の表]] と [[T22-widget-parts#使い方の例|使い方の例]]。部品は表示と操作だけを受け持ち、アップロードの処理([[T23-upload-hook|T23]])や API の呼び出しは持たない
+- [x] `UploadProgress`・`ErrorMessage`・`UploadNotices` は、処理の有無にかかわらず常に描画する(読み上げの領域を先に DOM に置くため)。フォーカスは、処理を始めたらキャンセルボタンへ(`cancelButtonRef`)、キャンセル・失敗のあとはドロップゾーンへ(`buttonRef`)移す(押したボタンが消えるとフォーカスが失われるため)
+- [x] `ImageDropZone` は `multiple` にし、`description` に「あと N 枚追加できます」を渡す(ボタンの説明にもなる)。上限に達したときと処理中は `disabled`。上限を超える分の拒否と、その文字は T28 が持つ
+- [x] 1 枚ずつの部品は、画像ごとに区別できる名前を付ける: `FileSelectButton` の `aria-label`(「画像 2 を差し替え」)、`AltTextInput` の `itemLabel`(「画像 2」)、`ImageNotFound` の `size="small"` と `removeLabel`、`ImagePreview` の `size="small"`(96px の枠)。進捗は `UploadProgress` の `index`・`total`、追加し終えた枚数は `completed`
+- [x] 「差し替え」「削除」「↑」「↓」「あと N 枚追加できます」などの文字は、自分の辞書(`defineMessages`)に持つ。部品は持たない
+- [x] 見た目のクラスは、管理画面の CSS にあるものだけを使う(管理画面の CSS はビルド済みで、プラグインのファイルを読まない)。無いクラスと枠の色は style で書く。テストでは `tests/admin/admin-css.ts` の `findMissingClasses(container, sourceTokens("<自分のソース>"))` で、使うクラスが CSS にあることを確かめる([[T22-1-admin-css-test-helper|T22-1]]、[[emdash-admin-plugin-ui-styling]])
+- [x] アップロードの応答の `ref`(`{ v, id, locale, width, height, alt: "" }`)は、そのままフィールドの値にする。`ref.locale` は画像エントリのロケール(サイトの既定)で、編集中のエントリのロケールではないので書き換えない。代替テキストは、入力欄の値を `alt` に入れる([[T18-upload-route#T23 が使う応答|T18]])
+- [x] アップロードのエラーは、T14 の `useErrorMessage` でコードごとの文言を出す。`UPLOAD_FAILED`(500)は、作った画像エントリをルートがゴミ箱に移したあとのエラー、`IMAGE_ENTRY_INVALID`(400)は保存 hook が作成を拒否したもの。どちらもフィールドの値は変えない。複数の画像を順に送るとき、失敗した画像は値に足さず、その画像のエラーを出して次の画像に進むかを決める
+- [x] 処理と状態は `src/admin/hooks/` のフックを使う([[T23-upload-hook#T27・T28 が使うもの|T23 の表]]、[[T23-upload-hook#使い方の例|使い方の例]])。保存先は `useUploadTarget(id)`(props の `id` を渡す)の結果をそのまま `target` に渡す。フックは表示を持たないので、段階(`state.status`)を T22 の `UploadProgress` の `stage` にそのまま渡す。ギャラリーは `useUploadQueue({ target, options, onUploaded })`。`onUploaded` は続けて呼ばれるので、最新の値を ref に持って後ろに足す(描画を待たない)。`enqueue(files, { limit })` の `limit` は `maxItems - 値の枚数 - pendingCount`。進捗の `index`・`total`・`completed` は `finishedCount`・`pendingCount`・`uploadedCount` から作る。1 枚ごとの失敗は `items` に残る(値には加えない)
+- [x] 保存済みの画像は `usePreviewImages(ids)` で取得する(10 件ずつ並行。状態は `loading` / `loaded` / `missing` / `error`。`missing` は「画像が見つかりません」、`error` は `retry()`)。追加したばかりの画像は `prime(ref.id, entry)` で手元の data URL を表示し、取得しない
 
 ## 完了条件
 
-- [ ] コンポーネントのテスト(並べ替えのキーボード操作を含む)
+- [x] コンポーネントのテスト(並べ替えのキーボード操作を含む)
 
 ## 変更してよいファイル
 
@@ -62,3 +62,109 @@ created: 2026-09-23
 - `tests/admin/GalleryField.test.tsx`
 
 > [!note] ここに挙げたファイル以外を変更する必要が出てきたら、そのファイルを担当するタスクと調整する(並列作業での衝突を避けるため)。
+
+## 結果
+
+> [!success] 概要(2026-09-24)
+> - `src/admin/GalleryField.tsx` にギャラリーの widget `GalleryField` を作った。処理と状態は T23 のフック(`useUploadQueue`・`usePreviewImages`・`useUploadTarget`)、表示は T22 の部品だけを使い、部品とフックは変えていない。
+> - 値は任意の JSON として読む(`readGalleryValue`)。配列でない値・参照の形でない要素・同じ画像の重複を、それぞれ表示して利用者に直させる(勝手に直さない)。
+> - 並べ替えは ↑↓ ボタン(Enter / Space)と HTML の Drag and Drop(新しい npm パッケージなし)。並べ替え・削除・差し替えは `<output>` で読み上げる。
+> - `tests/admin/GalleryField.test.tsx` に 55 件のテスト。実装を 1 か所ずつ壊す 58 種類のうち、55 種類でテストが失敗した(残る 3 種類は、jsdom で測れない余白 2 種と、同じ確認が 2 か所にある 1 種)。
+> - 実際の管理画面(`spikes/` の使い捨てのサイト)で、Chromium 153 と Firefox 155 を使って 97 項目を確かめた。Chromium はすべて通った。Firefox は、狭い画面で T22 の代替テキストの入力欄がはみ出す 1 項目(未解決 3)のほかは通った。
+> - T27 の結果に合わせて、編集ロック・差し替えの代替テキスト・`imageRefs` を確かめないこと・余白・フォーカスの移し方・登録の型を揃えた(下の「T27 と揃えたこと・違うこと」)。
+> - 知見ノート: [[gallery-widget-reorder-focus]](並べ替えのドラッグ・React DOM のフォーカスの戻し・`disabled` とフォーカス・処理中の保存で画像が外れること・狭い画面・実際の管理画面での確認)。widget に共通のことは [[emdash-plugin-field-widget]]。
+
+### T30 への登録のしかた
+
+```tsx
+// src/admin.tsx(T30)
+import { GalleryField } from "./admin/GalleryField";
+import { ImageField } from "./admin/ImageField";
+
+// 型の注釈(`PluginAdminModule["fields"]` や `satisfies`)を付けない(T27 と同じ)
+export const fields = { image: ImageField, gallery: GalleryField };
+```
+
+- キー `gallery` は `WIDGET_KINDS`(`src/shared/constants.ts`)の名前で、`base64-image:gallery` の `:` の後ろ。プラグイン定義の `admin.fieldWidgets`(T29)はマニフェストに載るだけで、描くのは入口の `fields`。
+- `PluginAdminModule["fields"]` は `Record<string, React.ComponentType>`(props 無し)で、必須の props を持つ `GalleryField` は代入できない(TS2322)。テストの `@ts-expect-error` で確かめた(T27 と同じ形)。根拠: 公式ドキュメントのみ+型チェックの実測
+- export しているもの: `GalleryField`(部品)、`GalleryFieldProps`(EmDash が渡す props と、テスト用の `dependencies`)、`readGalleryValue` / `GalleryValue` / `GalleryEntry`(値の読み方)、`GALLERY_DRAG_TYPE`(並べ替えのドラッグで運ぶデータの種類)。
+- 実際の管理画面では、spike の入口で `export const fields = { gallery: GalleryField };` として動いた(両方のブラウザ)。
+
+### 決めたこと
+
+| # | 決定 | 理由 | 根拠レベル |
+|---|---|---|---|
+| 1 | `null` / `undefined` は画像なし。配列でない値は「ギャラリーの形ではありません」と、値を空にする(`[]`)ボタンを出す。値が参照 1 つなら「1 枚目にする」(`[参照]`)ボタンも出す。直すまで画像を追加できない | 保存 hook ③ は配列でない値を拒否し、管理画面は保存のたびに全フィールドを送るので、直さないと保存できない。参照 1 つの値は、単一画像のフィールドをギャラリーに変えたときに起こりうるので、捨てずに使える形にする | 公式ドキュメントのみ(T16 の hook の実装)。参照 1 つが起こる場面は推測のみ |
+| 2 | 参照の形でない要素は、その位置に「データが正しくありません」と説明を出し、削除と並べ替えだけをできるようにする。値を勝手に直さず、捨てない | ID と寸法が無いので表示も編集もできない。黙って捨てると、気付かないまま値が変わる。ほかの画像はそのまま使える。hook ③ が拒否する | 設計判断(拒否は T16 の実装とテスト) |
+| 3 | 同じ画像が 2 回以上あれば、2 回目以降に「同じ画像が N 番目にもあります」を出す(削除ボタンの説明にも結ぶ) | hook ③ が重複を拒否する。どちらを消すかは利用者が決める | 設計判断 |
+| 4 | 最後の 1 枚を削除した値は `[]`(`null` にしない) | 配列の操作の結果のまま。`null` にすると、必須のギャラリーでは画像を全部消した直後の自動保存が拒否される(EmDash は必須のフィールドの `null` を拒否し、`[]` は通す)。必須の扱いは未解決 4 | 公式ドキュメントのみ(`references/emdash/packages/core/src/api/handlers/validation.ts:196-221`) |
+| 5 | 追加は、ドロップゾーン(`multiple`)で受け取り、`enqueue(files, { limit: maxItems - 枚数 })` で 1 枚ずつ処理する。処理中・上限・配列でない値のときはドロップゾーンを押せない。作業内容の `limit` の式から `pendingCount` を省いた(処理中は受け付けないので 0) | T23 のフックが上限を超える分をファイルごとに失敗にする(仕様書 11.3)。処理中の「あと N 枚」は処理待ちを引いて出す | 実測のみ(jsdom と両方のブラウザ) |
+| 6 | 完了の読み上げ(`completed`)には、`uploadedCount` ではなく、値に足した枚数を渡す | 差し替えも `uploadedCount` に入るので、「追加しました」と読まない。差し替えは「N 番目の画像を差し替えました。」と別に読む | 実測のみ(jsdom) |
+| 7 | 1 枚が終わるたびに、最新の値(`valueRef`。送った値は親が描き直す前から入れる)の後ろに足す。処理中の並べ替え・削除・代替テキスト・外からの値の変化のあとも、最新の値に足す | T23 の `onUploaded` は続けて呼ばれる。親の描き直しが遅れても画像を失わない | 実測のみ(jsdom。親の描き直しを遅らせたテスト) |
+| 8 | 差し替えは、その位置の参照を新しい画像にし、代替テキストを空にする。処理中に行が動いても最新の位置で差し替え、差し替える画像を処理中に消したら差し替えを取り消す | T27 の決めたこと 2 と同じ(前の画像の説明を新しい画像に黙って残さない) | 実測のみ(jsdom と両方のブラウザ) |
+| 9 | ↑↓ は Enter / Space。端の ↑↓ は `aria-disabled`(押しても何もしない)。ドラッグはつまみと縮小画像(`pointer-events: none`)をつかみ、独自の種類を運び、この widget の中で始まったドラッグだけを受け付ける。落とす位置は行の中央で前後を決め、`box-shadow` の線で示す | [[gallery-widget-reorder-focus#1. 並べ替えのドラッグ(HTML の Drag and Drop)]]。`disabled` にするとフォーカスが外れる | 実測のみ(両方のブラウザ) |
+| 10 | 並べ替えのあとにフォーカスを戻す処理は持たない | React DOM 19 がコミットのあとでフォーカスを戻す。生の `insertBefore` では外れる | 実測+公式ドキュメント([[gallery-widget-reorder-focus#React DOM がフォーカスを戻す]]) |
+| 11 | フォーカス: 削除は次の画像の見出し(最後なら前の画像、無くなればドロップゾーン)へ、値が描き直されてから移す。処理の開始はキャンセル、終了は追加ならドロップゾーン(押せなければ最後の見出し)、差し替えならその画像の代替テキスト、差し替えの失敗・キャンセルなら差し替えのボタン。開始と終了は、この widget の中で最後にフォーカスを受けた要素が消えた・無効になったときだけ移す | T27 の決めたこと 5 と同じ考え方。ほかのフィールドにフォーカスがあるときと、マウスでドロップしただけのときは奪わない | 実測のみ(jsdom と両方のブラウザ) |
+| 12 | 読み上げ: 並べ替え・削除・差し替え・値の直しは widget の `<output>`。同じ文が続いても読まれるよう、中身の要素をキーで作り直す。追加の進捗と完了は T22 の `UploadProgress` | 仕様書 11.1(`aria-live`) | 実測のみ(スクリーンリーダーでは確かめていない) |
+| 13 | 編集ロック中は、ファイルのドロップ・選択・差し替えを受け付けず、つまみのドラッグも始めない(`dragstart` を `preventDefault`)。判定は `root.closest("fieldset:disabled")`(祖先の fieldset の `disabled` を含む) | ボタンと入力欄は EmDash の `<fieldset disabled>` で無効になるが、枠へのドロップと `draggable` の `div` は止まらない。T27 の決めたこと 6 に、ドラッグを加えた | 実測+公式ドキュメント(fieldset を disabled にして両方のブラウザで確かめた。本物のロックは T27 が確かめた) |
+| 14 | プレビューの取得の失敗は、行ごとに「読み込めませんでした」の枠と、下に 1 つの `ErrorMessage` と「もう一度読み込む」。見つからない画像は、行に T22 の `ImageNotFound`(`small`・`removeLabel`)を出し、代替テキストと差し替えは出さない(↑↓ と削除は出す) | 取得の失敗は一時的なことが多い。見つからない画像は編集できないが、並びは変えられる | 実測のみ |
+| 15 | 開いたときに `fetchThumbnails` で `imageRefs` の記録を確かめない | T27 の決めたこと 3 と同じ。保存のときに hook ③ が理由を返し、トーストに出る | 実測+公式ドキュメント(完全削除した画像を参照したままの保存が 422 と「Failed to save」になった) |
+| 16 | 根に gap と余白のクラスを付けず、見えるものがあるときだけ上に `mt-2` を付ける | T27 の決めたこと 8 と同じ。はじめは空の領域 3 つに `gap-3` が付き、Gallery → Photos が 60px だった。直したあと 24px | 実測のみ(両方のブラウザ) |
+| 17 | props の `id`(`field-<slug>`)は、根ではなくドロップゾーンのボタンに付ける | `?field=gallery` で開くと、そのボタンにフォーカスが移った(T27 の fieldset では body のまま)。保存先の計算(`useUploadTarget(id)`)にも使う | 実測のみ(両方のブラウザ) |
+| 18 | `required`・`validation` は受け取るが使わない。`minimal` のときは、表示名と枚数を見た目から隠す(読み上げには残す) | 必須の確認は EmDash の保存の検証が行う。`minimal` はフィールドの並びからは渡らない(T27) | 公式ドキュメントのみ |
+| 19 | テスト用に `dependencies`(T23 の `UploadDependencies`)を props で受け取る。EmDash は渡さない | jsdom でデコードとエンコードを差し替えるため | 設計判断 |
+
+### T27 と揃えたこと・違うこと
+
+| 項目 | T28 | T27 との関係 |
+|---|---|---|
+| 編集ロック | ファイルを受け取っても処理せず、つまみのドラッグも始めない | 揃えた(ドラッグはギャラリーだけ) |
+| 正しくない値 | 値の全体(配列でない)と、要素ごと(参照の形でない・重複)に分けて出す | 考え方(勝手に直さず、外させる)を揃えた。ギャラリーは要素ごとに外せる |
+| `imageRefs` の確認 | しない | 揃えた |
+| 余白 | 見えるものがあるときだけ `mt-2` | 揃えた |
+| フォーカス | 最後にフォーカスを受けた要素が消えた・無効になったときだけ移す | 揃えた。移す先は、追加のあとはドロップゾーン(複数枚を足すので、1 枚の代替テキストへは移さない)、差し替えのあとは代替テキスト(T27 と同じ) |
+| 差し替えの代替テキスト | 空にする | 揃えた |
+| 登録の型 | `@ts-expect-error` のテスト | 揃えた |
+| 根の要素 | `div`。表示名は Kumo の `Label`、一覧は `aria-labelledby` で名前を付ける。`id` はドロップゾーンのボタン | 揃えていない(T27 は `fieldset` と `legend`、`id` は fieldset)。`?field=` でボタンにフォーカスできるため(決めたこと 17)。未解決 6 |
+| 処理中の表示 | 一覧とドロップゾーン(押せない)を出したまま、下に進捗を出す。処理中も並べ替え・削除・代替テキストができる | 違う(T27 は主な表示を消す)。1 枚ずつ値に加える(仕様書 11.3)ので、一覧を消さない |
+| 新規作成の保存で作り直される | 前提にした | 揃えた(未解決 2) |
+
+### テスト
+
+- `tests/admin/GalleryField.test.tsx`: 55 件。値の読み方、表示(空・保存済み・見つからない・プレビューの失敗・壊れた要素・重複・配列でない値・参照 1 つ・上限・`minimal`・英語)、代替テキスト、並べ替え(↑↓ のキーボード操作・端の `aria-disabled`・読み上げの作り直し・ドラッグの前後・動かない位置・一覧の外・ファイルやほかの widget のドラッグ・古いドラッグのあとのファイルのドラッグ・入力中のフォーカス)、削除(フォーカスの移り先・ボタンを作り直さないこと)、追加(1 枚ずつ・失敗・HEIC・上限・処理中の操作・外からの値の変化・キャンセル・フォーカスを奪わない・エラーを閉じたあとの移り先・前の処理のエラーと注意・保存先が無いとき・StrictMode)、差し替え(代替テキストを空にしてフォーカスを移す・失敗・HEIC・処理中の並べ替え・取り消し)、親の描き直しが遅れるとき、登録の型、編集ロック、使うクラスが管理画面の CSS にあること。
+- 本物の T23 のフック・T22 の部品・API クライアントを使い、偽物はデコード(`createImageBitmap`)・エンコーダー・`waitForPaint`・`fetch` だけ。テストのあとに `console.error` が出ていれば失敗にした。
+- 実装を 1 か所ずつ壊して、テストが失敗するかを確かめた(scratchpad の使い捨てのスクリプト。58 種類)。55 種類でテストが失敗した。根拠: 実測のみ
+  - 例: `undefined` を画像なしにしない / 参照 1 つを見分けない / 壊れた要素を画像とみなす / 重複の位置・キー / 移動先のずれ / 送った値を `valueRef` に入れない / 毎回 props で上書きする / 読み上げの要素を作り直さない / `prime` しない / 差し替えで代替テキストを残す / 差し替えのあとの移す先 / 追加した枚数を数えない / 値の描き直しを待たずにフォーカスを移す / 最後にフォーカスを受けた要素を覚えない / 必ずフォーカスを移す / ほかの要素・widget の外から奪う / 範囲外・動かない移動 / 差し替えの取り消し / 削除のあとの移り先 / エラーを消さない / 編集ロックの確認を外す(追加・差し替え・ドラッグの開始・落とす位置・判定) / 上限の数え方 / 値の直しのフォーカス / エラーを閉じたあとの移り先 / `setData`・`preventDefault` を外す / 前後の判定 / 一覧の中の移動で線を消す / 処理待ちを引かない / 処理中も追加できる / 上限ちょうどの表示 / 見つからない画像を見分けない / 先頭の ↑ を押せる / 判定の間は進捗を出さない / 落とす位置の計算 / 動かない位置の線 / ファイルのドラッグを受け付ける / 無効な要素へ移す
+  - テストが通ったもの(3 種類): 空の進捗・注意の領域にも `mt-2` を付ける(2 種。jsdom はレイアウトを計算しない。実際の管理画面で間隔を測った)、端の ↑↓ でも `onPress` を呼ぶ(`moveTo` の範囲の確認が同じ働きをする)。
+  - 1 回目(57 種類)で通った 13 種類のうち、10 種類はテストを足して失敗するようにした(親の描き直しが遅れるとき 3 件、差し替えの処理中の並べ替え、エラーを閉じたあとの移り先、古いドラッグのあとのファイルのドラッグ、フォーカスを奪わない 2 件)。同じ働きが重なっていた処理(並べ替えのあとにフォーカスを戻す・`limit <= 0` の確認・`completed` の条件・`findRow` の範囲の確認)は実装から外した。
+- `npm run verify`: build・lint・test が通った(テスト 24 ファイル・1,853 件。phase/4 を取り込んだあと)。
+
+### 実際の管理画面での確認
+
+手順・環境・表は [[gallery-widget-reorder-focus#6. 実際の管理画面での確認の結果]] と [[gallery-widget-reorder-focus#7. 環境と手順]]。`playground/` を `spikes/t28-gallery/site/`(git 管理外)に写し、ルートと hook を登録する定義(T29 の代わり)と、`fields = { gallery: GalleryField }` の管理画面の入口(T30 の代わり)を spike の中に置いた。seed の `posts` に `photos`(`maxItems: 3`)を足した。Playwright 1.63.0(ヘッドレス)で操作した。根拠: 実測のみ
+
+- 複数の追加(1 枚ずつ送る・進捗・キャンセルへのフォーカス・「3 images added.」・ドロップゾーンへ戻る)、↑↓(Enter・Space・端)とドラッグ(つまみ・縮小画像・線・動かない位置・ほかのギャラリー)、HEIC、上限(`photos` に 5 枚)、削除、差し替え、保存と読み込み直し、「画像が見つかりません」(ゴミ箱・完全削除・保存の 422)、キャンセル、`?field=gallery`、日本語、編集ロック(fieldset を disabled にした)、フィールドの間隔(24px)、マウスでのドロップ(フォーカスを動かさない)を、両方のブラウザで確かめた。
+- 処理中に「Save」を押すと、保存の要求のあいだに足した画像がフォームから外れた(EmDash の挙動。未解決 1)。
+- Firefox の幅 390px で、代替テキストの入力欄が行から 10px はみ出した(未解決 3)。
+
+### 仕様書の変更
+
+- 11.3 に加えた: ↑↓ の操作と `aria-disabled`、並べ替え・削除の読み上げ、削除のあとのフォーカス、ドラッグで受け付けるもの、差し替え(代替テキストは空)、上限に達したとき・超えているときの表示、値が正しくないとき(配列でない・参照の形でない要素・重複)、編集ロック中のドラッグ。
+- 11.1 は変えていない(編集ロックの項目は、リーダーの置き換えのとおり)。
+
+### 他のタスクへの影響
+
+1. [[T30-admin-entry|T30]]: 上の「T30 への登録のしかた」。`fields` に型の注釈を付けない。
+2. [[T22-widget-parts|T22]]: 部品は変えていない。`AltTextInput` の狭い画面での幅(未解決 3)。
+3. [[T31-e2e|T31]]: 並べ替えのドラッグは、Playwright の `page.mouse`(`down` → `move` を 2 回以上 → `up`)で両方のブラウザで動いた。落とす位置の線は行の `style.boxShadow` で確かめられる。処理中の保存は、`page.route` で手動の保存の応答を遅らせると再現できる。編集ロックは、widget を包む `fieldset` に `disabled` を付けても試せる。
+4. [[T27-image-widget|T27]]: 変える必要は無い。処理中の保存で値が戻ること(未解決 1)は、単一画像の widget でも、保存の要求のあいだにアップロードが終われば起こりうる(推測のみ)。
+
+### 未解決・サブタスクの候補
+
+1. 処理中に「Save」を押すと、保存の要求を送ってから応答が届くまでに足した画像が、フォームから外れる(EmDash は手動の保存の応答でフォームの値を置き換える。`ContentEditor.tsx:509-533`)。外れた画像のエントリは残る。候補: 処理中は保存しないよう案内を出す、または処理中に値が外から変わったら、そのあいだに足した画像を知らせて足し直せるようにする。根拠: 実測+公式ドキュメント([[gallery-widget-reorder-focus#4. 処理中に「Save」を押したとき(EmDash の挙動)]])
+2. 新規作成の画面で処理中に保存すると、widget が作り直されて残りの処理が止まるとみられる([[emdash-plugin-field-widget#3. 新規作成を保存すると widget は作り直される]])。ギャラリーでは確かめていない。根拠: 推測のみ
+3. Firefox 155 の幅 390px で、T22 の `AltTextInput`(Kumo の `Input`)が行から 10px はみ出す。入力欄に `min-width: 0` を付けると収まった。T22 で `Input` に `className="min-w-0"` を渡す案(`className` が入力欄に付くかは確かめていない)。根拠: 実測のみ
+4. 必須(`required`)のギャラリーは、画像を全部消した `[]` のまま保存できる(EmDash の必須の確認は、値なし・`null`・空文字だけを拒否する)。空を拒むなら、hook ③ か widget で扱う必要がある。仕様に無いので行っていない。根拠: 公式ドキュメントのみ
+5. OS からの本物のドラッグ(Playwright の合成でないもの)と、スクリーンリーダーでの読み上げは確かめていない。
+6. 根を `fieldset` と `legend` にする(T27 と揃える)かは決めていない。`id` をドロップゾーンのボタンに付けたままなら、`?field=` の振る舞いは変わらない。
+7. `docs/00-index.md` に [[gallery-widget-reorder-focus]] を登録する(リーダー)。

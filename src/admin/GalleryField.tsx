@@ -13,7 +13,8 @@
  *   並べ替えたら読み上げの領域(`<output>`)で伝える。フォーカスは押したボタンに残る(行の要素が動いて外れても、
  *   React DOM がコミットのあとで戻す)。端のボタンは `aria-disabled` にする(`disabled` だとフォーカスが外れる)。
  * - フォーカスは、この widget の中で最後にフォーカスを受けた要素が、表示の切り替えで消えた・無効になったときだけ移す
- *   (処理の開始はキャンセル、終了は処理を始めた場所、削除は次の画像の見出し)。ほかのフィールドからは奪わない。
+ *   (処理の開始はキャンセル。終了はドロップゾーン、差し替えはその画像の代替テキスト(失敗・キャンセルなら差し替えの
+ *   ボタン)。削除は次の画像の見出し)。ほかのフィールドからは奪わない。
  * - 1 枚ずつ: 代替テキスト・差し替え(代替テキストは空にする。T27 と同じ)・削除。削除したら、次の画像の見出しに
  *   フォーカスを移す。
  * - 編集ロック中(EmDash がフィールドを `<fieldset disabled>` で包む)は、ボタンと入力欄をブラウザが無効にする。
@@ -329,8 +330,12 @@ interface NoticeEntry {
 	readonly notices: readonly NoticeCode[];
 }
 
-/** 処理を始めた場所(処理が終わってキャンセルボタンが消えたとき、フォーカスを戻す先) */
-type FocusOrigin = { readonly kind: "zone" } | { readonly kind: "replace"; readonly index: number };
+/**
+ * 処理が終わってキャンセルボタンが消えたとき、フォーカスを移す先。追加はドロップゾーン、差し替えは差し替えのボタン。
+ * 差し替えが終わったら、その画像の代替テキスト(空になったので、入力を促す。T27 と同じ)
+ */
+type FocusOrigin =
+	{ readonly kind: "zone" } | { readonly kind: "replace" | "alt"; readonly index: number };
 
 /** 描画のあとでフォーカスを移す先 */
 type FocusTarget =
@@ -462,7 +467,7 @@ export function GalleryField({
 					const next = [...list.elements];
 					next[index] = { ...image.ref, alt: "" };
 					commit(next);
-					originRef.current = { kind: "replace", index };
+					originRef.current = { kind: "alt", index };
 					announce(latest.t.replaced(index + 1));
 					return;
 				}
@@ -550,11 +555,13 @@ export function GalleryField({
 			return;
 		}
 		const origin = originRef.current;
-		focusFirst([
-			origin.kind === "replace" ? document.getElementById(replaceIdOf(baseId, origin.index)) : null,
-			zoneButtonRef.current,
-			lastTitle(),
-		]);
+		let originElement: HTMLElement | null = null;
+		if (origin.kind === "replace") {
+			originElement = document.getElementById(replaceIdOf(baseId, origin.index));
+		} else if (origin.kind === "alt") {
+			originElement = altInputOf(rootRef.current, origin.index);
+		}
+		focusFirst([originElement, zoneButtonRef.current, lastTitle()]);
 	}, [busy, baseId, focusFirst, lastTitle]);
 
 	// ---- 値の変更(どれも最新の値 `valueRef` から作る) ----
@@ -708,7 +715,7 @@ export function GalleryField({
 			event.preventDefault();
 			return;
 		}
-		// Firefox は setData が無いとドラッグを始めない。種類で並べ替えのドラッグと分かるようにする
+		// 運ぶデータの種類で、並べ替えのドラッグと分かるようにする(ファイルや文字のドラッグと区別する)
 		event.dataTransfer.effectAllowed = "move";
 		event.dataTransfer.setData(GALLERY_DRAG_TYPE, key);
 		dragKeyRef.current = key;
@@ -1197,6 +1204,15 @@ function titleIdOf(baseId: string, index: number): string {
 /** 何枚目か(0 から)の差し替えボタンの id */
 function replaceIdOf(baseId: string, index: number): string {
 	return `${baseId}-replace-${index}`;
+}
+
+/**
+ * 何枚目か(0 から)の行の、代替テキストの入力欄。id では探さない(差し替えで作り直した行の Kumo の Input には、
+ * 渡した `id` がレイアウトの effect の時点でまだ付いていなかった。jsdom の実測)
+ */
+function altInputOf(root: HTMLElement | null, index: number): HTMLElement | null {
+	const row = root?.querySelectorAll<HTMLElement>("li[data-gallery-key]")[index];
+	return row?.querySelector<HTMLElement>('input:not([type="file"])') ?? null;
 }
 
 /** 受け付けたファイル(フックの項目のキー)ごとのエラーの領域の id */

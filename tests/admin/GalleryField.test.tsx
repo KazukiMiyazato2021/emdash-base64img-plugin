@@ -6,12 +6,14 @@
 // - act の外での状態の変化(React の警告)があれば、テストを失敗にする(console.error を見張る。
 //   docs/react-hook-testing-pitfalls.md、docs/react-effect-lint-and-vitest-hooks.md)。
 
+import type { PluginAdminModule } from "@emdash-cms/admin";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
 	createRef,
 	StrictMode,
 	useImperativeHandle,
+	useRef,
 	useState,
 	type ReactNode,
 	type Ref,
@@ -291,18 +293,34 @@ function testDependencies(gate?: (file: File) => Promise<void>): UploadDependenc
 interface HarnessHandle {
 	/** 親の状態として、値を外から変える(保存のあとに EmDash が値を入れ直すときなど) */
 	readonly setValue: (value: unknown) => void;
+	/** `deferRender` のとき、onChange で受け取った最後の値を反映する */
+	readonly flush: () => void;
 }
 
 interface HarnessProps extends Partial<Omit<GalleryFieldProps, "value" | "onChange">> {
 	readonly initial: unknown;
 	readonly onValue?: (value: unknown) => void;
 	readonly ref?: Ref<HarnessHandle>;
+	/** true なら、onChange の値をすぐには描き直さない(`flush` で反映する。親の描き直しが遅れるとき) */
+	readonly deferRender?: boolean;
 }
 
 /** EmDash の編集画面と同じく、onChange の値を親の状態に入れて描き直す */
-function Harness({ initial, onValue, ref, ...props }: HarnessProps) {
+function Harness({ initial, onValue, ref, deferRender = false, ...props }: HarnessProps) {
 	const [value, setValue] = useState<unknown>(initial);
-	useImperativeHandle(ref, () => ({ setValue }), []);
+	const pendingRef = useRef<{ readonly value: unknown } | null>(null);
+	useImperativeHandle(
+		ref,
+		() => ({
+			setValue,
+			flush: () => {
+				const pending = pendingRef.current;
+				pendingRef.current = null;
+				if (pending !== null) setValue(pending.value);
+			},
+		}),
+		[],
+	);
 	return (
 		<GalleryField
 			label="ギャラリー"
@@ -312,7 +330,8 @@ function Harness({ initial, onValue, ref, ...props }: HarnessProps) {
 			value={value}
 			onChange={(next) => {
 				onValue?.(next);
-				setValue(next);
+				if (deferRender) pendingRef.current = { value: next };
+				else setValue(next);
 			}}
 		/>
 	);
@@ -1080,6 +1099,10 @@ describe("並べ替え(ドラッグ)", () => {
 		dispatchDrag("drop", second, other, { clientY: 190 });
 		expect(second.style.boxShadow).toBe("");
 		expect(first.style.boxShadow).toBe("");
+		// 並べ替えのドラッグが dragend なしで終わったあと(ドラッグ中に行が消えたときなど)に来た、ファイルのドラッグ
+		dispatchDrag("dragstart", handleOf(first), dragTransfer());
+		expect(dispatchDrag("dragover", second, files, { clientY: 190 }).defaultPrevented).toBe(false);
+		expect(second.style.boxShadow).toBe("");
 		expect(onValue).not.toHaveBeenCalled();
 	});
 
@@ -1391,6 +1414,58 @@ describe("追加(アップロード)", () => {
 		expect(document.activeElement).toBe(zoneButton());
 	});
 
+	it("この widget にフォーカスが無いまま(マウスで)ドロップしたら、処理の開始と終了でフォーカスを動かさない", async () => {
+		const { server, uploads } = manualUploads();
+		renderGallery({ initial: null });
+
+		dropFiles([pngFile("a.png")]);
+		await waitFor(() => expect(server.uploads).toHaveLength(1));
+		expect(document.activeElement).toBe(document.body);
+		await uploads.release(0);
+		await waitFor(() => expect(zoneButton()).toBeEnabled());
+		expect(document.activeElement).toBe(document.body);
+	});
+
+	it("ほかのフィールドにフォーカスがあるときにドロップしたら、フォーカスを奪わない", async () => {
+		const { server, uploads } = manualUploads();
+		renderGallery({ initial: null }, (field) => (
+			<>
+				<input aria-label="タイトル" />
+				{field}
+			</>
+		));
+		// ドロップゾーンに一度フォーカスしてから、ほかのフィールドへ移る
+		zoneButton().focus();
+		const title = screen.getByRole("textbox", { name: "タイトル" });
+		title.focus();
+
+		dropFiles([pngFile("a.png")]);
+		await waitFor(() => expect(server.uploads).toHaveLength(1));
+		expect(document.activeElement).toBe(title);
+		await uploads.release(0);
+		await waitFor(() => expect(zoneButton()).toBeEnabled());
+		expect(document.activeElement).toBe(title);
+	});
+
+	it("エラーを閉じると、次のエラー(最後なら前のエラー、無くなればドロップゾーン)の閉じるボタンへ移す", async () => {
+		installServer({ previews: PREVIEWS });
+		renderGallery({ initial: null });
+		const user = userEvent.setup();
+		const dismissOf = (filename: string) =>
+			within(errorFor(filename)).getByRole("button", { name: "エラーを閉じる" });
+		zoneButton().focus();
+
+		dropFiles([heicFile("a.heic"), heicFile("b.heic"), heicFile("c.heic")]);
+		await waitFor(() => expect(alertTexts()).toHaveLength(3));
+		await user.click(dismissOf("b.heic"));
+		expect(document.activeElement).toBe(dismissOf("c.heic"));
+		await user.click(dismissOf("c.heic"));
+		expect(document.activeElement).toBe(dismissOf("a.heic"));
+		await user.click(dismissOf("a.heic"));
+		expect(alertTexts()).toEqual([]);
+		expect(document.activeElement).toBe(zoneButton());
+	});
+
 	it("処理中にほかの場所へフォーカスを移していたら、終わったときに動かさない", async () => {
 		const { server, uploads } = manualUploads();
 		renderGallery({ initial: [imageRef("img1")] });
@@ -1462,7 +1537,7 @@ describe("追加(アップロード)", () => {
 // ---------------------------------------------------------------------------
 
 describe("差し替え", () => {
-	it("その位置の参照を新しい画像にし(代替テキストは空にする)、差し替えボタンへフォーカスを戻す", async () => {
+	it("その位置の参照を新しい画像にし、代替テキストを空にして、その入力欄へフォーカスを移す", async () => {
 		const server = installServer({ previews: PREVIEWS });
 		const { container, lastValue } = renderGallery({
 			initial: [imageRef("img1"), imageRef("img2"), imageRef("img3")],
@@ -1486,14 +1561,35 @@ describe("差し替え", () => {
 		expect(galleryAnnouncer(container)).toHaveTextContent("2 番目の画像を差し替えました。");
 		// 差し替えは「追加しました」と読み上げない
 		expect(progressAnnouncer(container)).toHaveTextContent("");
-		expect(document.activeElement).toBe(screen.getByRole("button", { name: "画像 2 を差し替え" }));
+		// 空になった代替テキストの入力を促す(T27 と同じ)
+		expect(document.activeElement).toBe(
+			screen.getByRole("textbox", { name: "代替テキスト(画像 2)" }),
+		);
 		expect(container.querySelectorAll("img")[1]).toHaveAttribute(
 			"src",
 			server.uploads[0]?.request.dataUrl,
 		);
 	});
 
-	it("差し替えに失敗したら、値を変えずにエラーを出す", async () => {
+	it("差し替えに失敗したら、値を変えずにエラーを出し、差し替えのボタンへフォーカスを戻す", async () => {
+		const { uploads } = manualUploads();
+		const { onValue } = renderGallery({ initial: [imageRef("img1")] });
+		const replace = screen.getByRole("button", { name: "画像 1 を差し替え" });
+		replace.focus();
+
+		selectFiles(replaceInput(replace), [pngFile("new.png")]);
+		await waitFor(() =>
+			expect(document.activeElement).toBe(screen.getByRole("button", { name: "キャンセル" })),
+		);
+		await uploads.release(0, () => routeError("UPLOAD_FAILED", 500));
+		await waitFor(() =>
+			expect(errorFor("new.png")).toHaveTextContent(ERROR_MESSAGES.ja.UPLOAD_FAILED),
+		);
+		expect(onValue).not.toHaveBeenCalled();
+		expect(document.activeElement).toBe(replace);
+	});
+
+	it("HEIC の差し替えは、処理を待たずに失敗として出す", async () => {
 		installServer({ previews: PREVIEWS });
 		const { onValue } = renderGallery({ initial: [imageRef("img1")] });
 		const replace = screen.getByRole("button", { name: "画像 1 を差し替え" });
@@ -1504,6 +1600,35 @@ describe("差し替え", () => {
 			expect(errorFor("IMG_0002.HEIC")).toHaveTextContent(ERROR_MESSAGES.ja.INPUT_HEIC_REJECTED),
 		);
 		expect(onValue).not.toHaveBeenCalled();
+	});
+
+	it("処理中に行が動いても、終わったら差し替えた画像の代替テキストへフォーカスを移す", async () => {
+		const { uploads } = manualUploads();
+		const { lastValue } = renderGallery({
+			initial: [imageRef("img1"), imageRef("img2"), imageRef("img3")],
+		});
+		const replace = screen.getByRole("button", { name: "画像 2 を差し替え" });
+		replace.focus();
+		selectFiles(replaceInput(replace), [pngFile("new.png")]);
+		await waitFor(() =>
+			expect(document.activeElement).toBe(screen.getByRole("button", { name: "キャンセル" })),
+		);
+
+		// 処理中に、差し替える画像(2 枚目)をドラッグで先頭へ動かす
+		const [first, second] = layoutRows() as [HTMLElement, HTMLElement, HTMLElement];
+		const transfer = dragTransfer();
+		dispatchDrag("dragstart", handleOf(second), transfer);
+		dispatchDrag("dragover", first, transfer, { clientY: 10 });
+		dispatchDrag("drop", first, transfer, { clientY: 10 });
+		dispatchDrag("dragend", handleOf(second), transfer);
+		expect(idsOf(lastValue())).toEqual(["img2", "img1", "img3"]);
+
+		await uploads.release(0);
+		await waitFor(() => expect(screen.queryByRole("button", { name: "キャンセル" })).toBeNull());
+		expect(idsOf(lastValue())).toEqual(["new1", "img1", "img3"]);
+		expect(document.activeElement).toBe(
+			screen.getByRole("textbox", { name: "代替テキスト(画像 1)" }),
+		);
 	});
 
 	it("差し替えを待っている画像を削除すると、差し替えを取り消す", async () => {
@@ -1523,6 +1648,89 @@ describe("差し替え", () => {
 		expect(idsOf(lastValue())).toEqual(["img1", "img3"]);
 		expect(alertTexts()).toEqual([]);
 		expectFocusOnTitle("画像 2");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// 親の描き直しが遅れるとき(onChange のあと、新しい値が props に来るまでの間)
+// ---------------------------------------------------------------------------
+
+describe("親が値を描き直すのが遅れるとき", () => {
+	it("続けて届いた画像を失わない(送った値の後ろに足す)", async () => {
+		const { uploads } = manualUploads();
+		const harness = createRef<HarnessHandle>();
+		const { lastValue } = renderGallery({
+			initial: [imageRef("img1")],
+			ref: harness,
+			deferRender: true,
+		});
+
+		dropFiles([pngFile("a.png"), pngFile("b.png")]);
+		await uploads.release(0);
+		expect(idsOf(lastValue())).toEqual(["img1", "new1"]);
+		// 1 枚目を足した値は、まだ描き直されていない
+		expect(rowTitles()).toEqual(["画像 1"]);
+		await uploads.release(1);
+		expect(idsOf(lastValue())).toEqual(["img1", "new1", "new2"]);
+		act(() => harness.current?.flush());
+		expect(rowTitles()).toEqual(["画像 1", "画像 2", "画像 3"]);
+	});
+
+	it("描き直しの前に同じ行の ↓ をもう一度押しても、最新の値で末尾なら動かさない", async () => {
+		installServer({ previews: PREVIEWS });
+		const harness = createRef<HarnessHandle>();
+		const { container, onValue } = renderGallery({
+			initial: [imageRef("img1"), imageRef("img2")],
+			ref: harness,
+			deferRender: true,
+		});
+		const user = userEvent.setup();
+		const down = screen.getByRole("button", { name: "画像 1 を下へ移動" });
+
+		await user.click(down);
+		await user.click(down);
+		expect(onValue).toHaveBeenCalledTimes(1);
+		expect(idsOf(onValue.mock.lastCall?.[0])).toEqual(["img2", "img1"]);
+		expect(galleryAnnouncer(container)).toHaveTextContent(
+			"画像を 1 番目から 2 番目に移動しました(全 2 枚)。",
+		);
+		act(() => harness.current?.flush());
+		expect(document.activeElement).toBe(down);
+	});
+
+	it("削除のあとのフォーカスは、値が描き直されてから次の画像の見出しへ移す", async () => {
+		installServer({ previews: PREVIEWS });
+		const harness = createRef<HarnessHandle>();
+		renderGallery({
+			initial: [imageRef("img1"), imageRef("img2"), imageRef("img3")],
+			ref: harness,
+			deferRender: true,
+		});
+		const user = userEvent.setup();
+		const remove = screen.getByRole("button", { name: "画像 2 を削除" });
+
+		await user.click(remove);
+		// まだ描き直されていない(消した画像の行が残っている)ので、押したボタンにフォーカスを残す
+		expect(document.activeElement).toBe(remove);
+		act(() => harness.current?.flush());
+		expect(rowTitles()).toEqual(["画像 1", "画像 2"]);
+		expectFocusOnTitle("画像 2");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// 登録
+// ---------------------------------------------------------------------------
+
+describe("登録", () => {
+	it("管理画面の入口の fields に、型の注釈なしでそのまま入れる(PluginAdminModule の fields には代入できない)", () => {
+		const fields = { gallery: GalleryField };
+		// EmDash 0.39.1 の `PluginAdminModule["fields"]` は `Record<string, ComponentType>`(props なし)で、必須の props を
+		// 持つ widget は代入できない。T30 は型の注釈を付けずに export する(T27 と同じ)。
+		// EmDash が型を直したら、この行が型エラー(使われない @ts-expect-error)になる
+		// @ts-expect-error -- props のある部品は ComponentType<{}> に代入できない
+		const typed: NonNullable<PluginAdminModule["fields"]> = fields;
+		expect(typed["gallery"]).toBe(GalleryField);
 	});
 });
 
