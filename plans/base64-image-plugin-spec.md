@@ -8,7 +8,7 @@ tags:
   - plugin
   - spec
   - webp
-status: 合意済み
+status: 実装済み(v0.1.0)
 created: 2026-09-23
 updated: 2026-09-24
 emdash-version: 0.39.1
@@ -674,6 +674,7 @@ export default defineConfig({
 
 ## 14. 配布とバージョン
 
+- 最初の版は v0.1.0(タグ `v0.1.0`。2026-09-24。[[T34-release|T34]])。`package.json` の `version` と、プラグインの `version`(`src/server/plugin.ts` の `PLUGIN_VERSION`。descriptor と `definePlugin` が使う)を揃える。揃っていることはテストで確かめる(`tests/package-exports.test.ts`)。
 - **npm には公開しない。** git 依存として配布する(例: `"emdash-plugin-base64-image": "github:<owner>/emdash-base64img-plugin#v0.1.0"`)。
   - npm 12 は git 依存を既定で拒否する(`allow-git` の既定が `none` で、`EALLOWGIT` になる)。利用者のサイトの `.npmrc` に `allow-git=root` を書く。`npm ci` を実行する CI やビルドの環境でも要る。根拠: 実測+公式ドキュメント([[npm12-git-dependency-policy]])
 - 名前:
@@ -731,7 +732,7 @@ export default defineConfig({
   - サイト側のページ(投稿の一覧 `/posts/`、詳細 `/posts/<slug>/`)と、アップロードのルートでサンプルの投稿を作るスクリプト(`playground/scripts/create-sample-posts.ts`)がある。seed には画像と投稿を入れない(seed の画像は `imageRefs` に記録が無く、それを参照する投稿は保存できないため)([[T26-playground-pages|T26]])。
   - E2E の入力画像(形式ごとの画像・大きすぎる画像・壊れた画像)は `e2e/fixtures/make-images.ts` で作り、git に入れない(40MB を超えるファイルを含むため)。macOS の `sips` と Playwright の Chromium を使う([[T26-playground-pages|T26]]、[[e2e-input-image-fixtures]])。
 - E2E は `npm run test:e2e` で実行する(`npm run verify` には入れない)。playground の開発サーバーを空のデータベースで起動して動かし、終わったら止める。スクリーンリーダーでの読み上げ、OS からの本物のドラッグ、ヘッドレスでない Firefox での貼り付け、翻訳の切り替え、Safari の実機は手で確認する([[T31-e2e|T31]]、[[e2e-playwright-emdash-admin]])。
-- Cloudflare の本番環境(Workers Free)でクエリ数と CPU 時間を測るのは任意。利用者のアカウントに手動でデプロイして行う。T32 では行っていない(利用者の了承待ち。手順の案は [[T32-cloudflare-check#デプロイして測る(任意・利用者の了承待ち)|T32]])。
+- Cloudflare の本番環境(Workers Free)でクエリ数と CPU 時間を測るのは任意。利用者のアカウントに手動でデプロイして行う。T32 では行っていない(2026-09-25 の利用者の判断で、今は行わない。手順の案は [[T32-cloudflare-check#デプロイして測る(任意・利用者の了承待ち)|T32]])。
 
 ## 16. 実装前の検証(スパイク)
 
