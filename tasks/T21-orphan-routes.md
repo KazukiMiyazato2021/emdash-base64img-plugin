@@ -51,6 +51,12 @@ created: 2026-09-23
   - 参照元が多い画像(1 枚で予算を超えるもの)は、参照元をページ送りするか上限を設ける
 - [ ] 画像の状態(ゴミ箱に入っていない / ゴミ箱 / 無い)は、`get` と `getTrashedVersioned` で判定する。`getTrashedVersioned` は `get` が `null` のときだけ呼ぶ。capability `content:restore` を宣言するかを決める(復元の権限も含むため。[[T03-shared-contracts#結果|T03]])
 - [ ] `content:afterDelete` の `id` は URL に書いた値そのまま(slug のこともある)。`permanent === true` のときだけ `imageRefs` を消す([[T10-spike-after-save#結果|T10]])
+- [ ] `imageRefs` の記録の読み方([[T20-owner-tracking#T21 への注意(記録を読むとき)|T20]])
+  - `owners` は増えるだけ。削除されたエントリや、画像を外したエントリの要素も残る。同じエントリが cover とギャラリーのように 2 回並ぶことがある
+  - 記録は保存の応答のあとに書かれるので、保存の直後にはまだ入っていないことがある
+  - 壊れた要素がありうる。記録全体を 1 つのスキーマで読むと、壊れた要素 1 つで記録ごと読めなくなるので、要素ごとに読む
+  - 参照元のフィールドにまだ画像があるかは、`readReferencedImageIds(value, kind)`(`src/server/hooks/owners.ts`)で読むと、記録と同じ規則になる
+- [ ] `imageRefs` の記録を書き換えるときは、`getVersioned` → `compareAndSet`(版が変わっていたら読み直す)を使う。`put` で書き直すと、その間に足された参照元が消える。完全削除の `delete` は問題ない([[emdash-plugin-storage-conditional-writes]])
 - [ ] 複数の画像 ID の記録を `getMany` で読むときは、`getManyInBatches`(`src/server/image-refs.ts`。50 件ずつ)を使う([[T16-2-image-refs-batches|T16-2]])
 - [ ] ゴミ箱に入った画像を `imageRefs` に記録するかを決める([[T17-admin-data-routes#結果|T17]] の未解決)
   - 今の `thumbnails` ルートは、ゴミ箱に入った画像を区別できない(`imageRefs` は完全削除まで残る)。そのため、一覧の列([[T24-list-column|T24]])はゴミ箱の画像にもサムネイルを出す
