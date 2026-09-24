@@ -136,3 +136,6 @@ frontmatter の `files` のとおり。`tests/shared/schema.test.ts` は、作�
 
 1. 公開し直す操作(T25 が決める)。プラグインのルートにするなら、`src/server/routes/images-admin.ts` にルートを足すサブタスクになる(`getVersioned` → `publish`、44 クエリ、capability `content:publish` は宣言済み)。
 2. 戻して公開し直すたびに増えるリビジョンの大きさ(仕様書 5.4 の容量の目安への追記)を、仕様書の担当で扱うか。
+
+> [!note] 反映済み(リーダー、マージのとき)
+> 未解決の 2 は、仕様書 5.4 に書き足した。T25 のノートの作業内容に、新しい 2 項目の使い方と、公開し直す操作の材料を書いた。1 は T25 が決める。

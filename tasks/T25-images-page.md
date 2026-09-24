@@ -48,7 +48,8 @@ created: 2026-09-23
 - [ ] `owners` には、ロケールだけが違う同じエントリの参照元が並ぶことがある(widget が `target.locale` を省いたとき。[[T23-upload-hook|T23]] はエントリのロケールを送る)。参照元へのリンクを、そのまま並べるか、同じエントリをまとめるかを決める([[T18-upload-route#参照元の記録(T20)との関係|T18]])
 - [ ] 一覧は T14 の `listImages({ cursor })` で読む。応答は `{ items, nextCursor? }` で、並びは新しい順。1 ページの枚数は 0〜10 で変わる(10 枚を前提にしない)。**`items: []` で `nextCursor` があるときは、続けて次を読む**(参照元の多い画像を調べている途中で、一覧の終わりではない)。400 `INVALID_CURSOR` なら最初から読み直す([[T21-orphan-routes#T25 への引き継ぎ(応答の形とページ送り)|T21]]、[[image-management-routes#応答の形とページ送り(T25 向け)]])
 - [ ] ボタンは `entryStatus` で出し分ける。ゴミ箱は `active` の画像に出す(`usage: "in_use"` なら、確認で使用中であることを示す。`trashImage(id)`)。完全削除は `trashed` の画像にだけ出す(管理者。`deleteImagePermanently(id)`)。`missing`(記録だけが残った画像)には操作が無いので、そのことが分かる表示にする。ゴミ箱に移したら、その項目を `trashed` にする。完全削除したら、項目を画面から消す(記録は応答のあとの hook が消すので、すぐ読み直すと残って見えることがある)
-- [ ] 公開済みかどうか(復元した画像と、アップロードの途中で止まった画像は下書きで、サイトに出ない)と、参照元の全体の件数(`owners` は先頭から 20 件)は、サブタスク T21-2 で一覧の項目に足す。T25 は T21-2 のマージのあとに始め、その項目を使う
+- [ ] 一覧の項目の `entryPublication`(`published` / `draft` / `scheduled`。ゴミ箱・無い画像は null)で、サイトに出ない画像(`draft` / `scheduled`)を示す。戻した画像と、アップロードの途中で止まった画像は `draft`。`ownersTotal - owners.length` で、載せきれない参照元の「ほか N 件」を出す([[T21-2-list-publish-status#結果|T21-2]])
+- [ ] 上の「非公開の画像の扱い」の材料は [[T21-2-list-publish-status#公開し直す操作の材料(T25 向け)|T21-2]] にある。標準 API(`POST /_emdash/api/content/b64_images/{id}/publish`)は Editor 以上(プラグインが作った画像は作成者が空なので `content:publish_any`)で、編集ロックを確かめ、45〜47 クエリ。このプラグインのルートにするなら permission を決めて新しく作る(44 クエリ)。どちらでも、公開版の無い画像では本体を写したリビジョンが 1 件増える
 
 ## 完了条件
 
