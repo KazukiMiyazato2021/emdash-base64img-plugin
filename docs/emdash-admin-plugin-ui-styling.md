@@ -23,7 +23,7 @@ updated: 2026-09-24
 > - 管理画面の CSS は、層(`@layer`)の外に `* { border-color: var(--color-kumo-line) }` を持つ。層の外の規則は `@layer utilities` のクラスより常に強いので、**`border-kumo-brand` などの枠の色のクラスは当たらない**(EmDash 自身のドロップ先の、ドラッグ中の青い枠も出ていない)。枠の色は style で付ける。
 > - Kumo 2.6.0 の注意: `Loader` は `role="status"` と英語の `aria-label="Loading"` を持ち、`aria-hidden` を受け取らない。`Label`(`Input` の `label` も)は `required={false}` で英語の「(optional)」を出す。`Button` の `title` はツールチップで包む。`Banner` は role を持たない(HTML の属性は渡せる)。
 > - Kumo の props の多くは `x?: T` で、`| undefined` を含まない。利用者の厳しい設定(`exactOptionalPropertyTypes`)では、`undefined` になりうる値を渡すと型エラーになる。条件付きで展開する。
-> - このプラグインの部品(`src/admin/parts/`)は、使うクラスがすべて管理画面の CSS にあることを、テストで確かめている(`tests/admin/parts.test.tsx`)。
+> - このプラグインの部品(`src/admin/parts/`)は、使うクラスがすべて管理画面の CSS にあることを、テストで確かめている(`tests/admin/parts.test.tsx`)。確かめ方はテストの補助 `tests/admin/admin-css.ts` にまとめ、ほかの管理画面の部品のテストでも使う([[T22-1-admin-css-test-helper|T22-1]])。
 > - 関連: [[T22-widget-parts]]、[[base64-image-plugin-spec#11.1 共通方針|仕様書 11.1]]、[[admin-image-input-browser-behavior]]、[[emdash-dependency-versions]]、[[test-lint-setup]]
 
 ## 管理画面の CSS はビルド済みで、プラグインのファイルを読まない
@@ -41,31 +41,23 @@ updated: 2026-09-24
 
 ### 使うクラスが CSS にあるかを確かめるテスト
 
-部品を描画して DOM のクラスを集め、CSS のセレクタとして探す。Tailwind v4 の出力は、英数字・`-`・`_` 以外の文字の前に `\` を置く(`rounded-[10px]` → `.rounded-\[10px\]`)。根拠: 実測のみ
+部品を描画して DOM のクラスを集め、CSS のセレクタとして探す。Tailwind v4 の出力は、英数字・`-`・`_` 以外の文字の前に `\` を置く(`rounded-[10px]` → `.rounded-\[10px\]`、`hover:bg-kumo-tint` → `.hover\:bg-kumo-tint`、`gap-2.5` → `.gap-2\.5`)。長いクラスの先頭の一致は数えない(`.min-h-3` は `.min-h-32` の一部としてだけ現れる)。根拠: 実測のみ
 
-```ts
-const ADMIN_CSS = readFileSync(createRequire(import.meta.url).resolve("@emdash-cms/admin/styles.css"), "utf8");
+確かめ方は、テストの補助 `tests/admin/admin-css.ts` にある([[T22-1-admin-css-test-helper|T22-1]]。そのテストは `tests/admin/admin-css.test.ts`)。管理画面の部品のテストでは、次のように使う。
 
-function escapeClassName(name: string): string {
-	let escaped = "";
-	for (const [index, char] of Array.from(name).entries()) {
-		if (/[A-Za-z0-9_-]/.test(char)) escaped += index === 0 && /[0-9]/.test(char) ? `\\3${char} ` : char;
-		else escaped += `\\${char}`;
-	}
-	return escaped;
-}
+```tsx
+import { findMissingClasses, sourceTokens } from "./admin-css";
 
-function hasClassSelector(css: string, name: string): boolean {
-	const selector = `.${escapeClassName(name)}`;
-	for (let at = css.indexOf(selector); at !== -1; at = css.indexOf(selector, at + 1)) {
-		const next = css[at + selector.length];
-		if (next === undefined || !/[A-Za-z0-9_\\-]/.test(next)) return true;
-	}
-	return false;
-}
+const { container } = render(<ThumbnailColumn … />);
+// 引数はリポジトリのルートからのパス。ディレクトリなら直下のファイルをすべて読む
+const missing = findMissingClasses(container, sourceTokens("src/admin/ThumbnailColumn.tsx"));
+expect(missing.fromSource).toEqual([]); // 自分のソースに書いたクラスは、すべて CSS にある
+expect(missing.unknown).toEqual([]); // CSS に無い残りは、Kumo が自分で付けるクラスだけ
 ```
 
-- DOM には Kumo が自分で付けるクラスも入る。CSS に無いクラスのうち、部品のソースに書いた語だけを失敗にし、残りは Kumo の dist の JS に含まれることを確かめる(Kumo のクラスだと分かる)。
+- DOM には Kumo が自分で付けるクラスも入る。CSS に無いクラスのうち、部品のソースに書いた語(`sourceTokens`)は `fromSource` に入れて失敗にする。残りは、Kumo の dist の JS に含まれるなら除き(Kumo のクラスだと分かる)、含まれないものを `unknown` に入れる。
+- 状態によって付くクラス(ドラッグ中・エラー・無効など)も確かめるには、その状態にしてから集める。
+- ほかに `ADMIN_CSS`(CSS の本文)、`hasClassSelector(css, name)`、`escapeClassName(name)`、`collectClassNames(root)` を export している。
 - jsdom の環境では `URL` が jsdom のものになり、`fs` が `new URL(...)` を受け付けない(「The URL must be of scheme file」)。`fileURLToPath(import.meta.url)` と `node:path` でパスの文字列にする。根拠: 実測のみ
 
 ## 層の外の `*` の枠の色が、クラスより強い

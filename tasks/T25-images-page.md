@@ -41,6 +41,11 @@ created: 2026-09-23
 - [ ] 「参照されていない」は「消しても安全」ではない、という注意の表示
 - [ ] ゴミ箱への移動([[T06-decision-trash-permission|T06]] で決めた権限)と、完全削除(管理者のみ。確認ダイアログ付き)
 - [ ] 非公開の画像の扱いを決める。標準の編集画面で「Unpublish」した画像は、同じ画面からは公開し直せない(「Publish now」は保存を先に送り、保存 hook が拒否する)。標準の API の `POST /_emdash/api/content/b64_images/{id}/publish` なら公開できる。公開し直す操作をこのページに置くかを決める([[T19-image-entry-hook#未解決・サブタスクの候補|T19]])
+- [ ] 見た目のクラスは、管理画面の CSS にあるものだけを使う(管理画面の CSS はビルド済みで、プラグインのファイルを読まない)。無いクラスと枠の色は style で書く。テストでは `tests/admin/admin-css.ts` の `findMissingClasses(container, sourceTokens("<自分のソース>"))` で、使うクラスが CSS にあることを確かめる([[T22-1-admin-css-test-helper|T22-1]]、[[emdash-admin-plugin-ui-styling]])
+- [ ] T22 の部品を使える([[T22-widget-parts#部品と props(T27・T28 向け)|T22]]): エラーは `ErrorMessage`(常に描画し、`error` だけを変える。中断は出さない)、保存サイズの書式は `formatKilobytes`、寸法の表示は `ImageInfo`。アイコンは `src/admin/parts/icons.tsx` の `UploadIcon`・`ImageMissingIcon`・`WarningIcon` を使える(`@phosphor-icons/react` はこのプラグインの peerDependencies に無いので、自前の SVG。飾りとして `aria-hidden`)
+- [ ] Kumo 2.6.0 の注意([[emdash-admin-plugin-ui-styling#Kumo 2.6.0 の注意点|知見ノート]]): `Loader` は英語の `aria-label="Loading"` と `role="status"` を持つ(飾りなら `aria-hidden` の要素で包み、伝えるなら訳した `aria-label` を渡す)。`Button` の名前は `title` でなく `aria-label` で付ける(`title` はツールチップで包む)。`Label`(`Input` の `label`)に `required={false}` を渡すと英語の「(optional)」が出る。Kumo の省略できる props に `undefined` になりうる値を渡すと、利用者の厳しい型チェック(`exactOptionalPropertyTypes`)で型エラーになるので、値があるときだけ展開する。読み上げの領域は `role="status"` でなく `<output>`(oxlint の `jsx-a11y/prefer-tag-over-role`)
+- [ ] アップロードの途中で失敗した画像も一覧に出る([[T18-upload-route#失敗したときの後始末|T18]])。公開に失敗した画像は、ゴミ箱に入った下書き(参照元なし、または `target.entryId` の参照元)として出る。`imageRefs` の保存と公開の間で処理が止まった画像は、ゴミ箱に入っていない下書き(参照元なし)として出る。どちらも完全削除(管理者)の対象にする。非公開(下書き)を状態バッジで区別するかは、[[T21-orphan-routes|T21]] のルートが返す状態に合わせて決める
+- [ ] `owners` には、ロケールだけが違う同じエントリの参照元が並ぶことがある(widget が `target.locale` を省いたとき。[[T23-upload-hook|T23]] はエントリのロケールを送る)。参照元へのリンクを、そのまま並べるか、同じエントリをまとめるかを決める([[T18-upload-route#参照元の記録(T20)との関係|T18]])
 
 ## 完了条件
 
