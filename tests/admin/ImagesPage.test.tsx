@@ -1574,7 +1574,8 @@ describe("見た目のクラス", () => {
 // 本物の useCurrentUser
 // ---------------------------------------------------------------------------
 
-describe("ロールの取得(本物の useCurrentUser)", () => {
+// 本物の `@emdash-cms/admin` を読むので(約 1.5 秒)、負荷の高いマシンでも既定の 5 秒で失敗しないよう延ばす(T30-2)
+describe("ロールの取得(本物の useCurrentUser)", { timeout: 30_000 }, () => {
 	it("管理画面の React Query と同じ要求(GET /_emdash/api/auth/me)の role でボタンを出す", async () => {
 		// 本物の `@emdash-cms/admin` を読む(jsdom で数秒かかる)。管理画面と同じく、Lingui を有効にし、QueryClient の中に置く。
 		// `@tanstack/react-query` と `@lingui/core` は `@emdash-cms/admin` の依存で、このプラグインの package.json には無い
