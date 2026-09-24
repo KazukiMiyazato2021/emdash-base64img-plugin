@@ -473,6 +473,7 @@ flowchart LR
   - 処理中は、進捗の行の下に「処理が終わってから保存してください。」(英語は「Save after processing finishes.」)と出す。処理中に保存すると画像が外れるため(18 章の「処理中の保存」)。案内は `aria-live` の領域に入れず(段階が変わるたびに読まない)、キャンセルボタンの説明(`aria-describedby`)にする。ドロップゾーンのボタンから処理を始めると、widget はフォーカスをキャンセルボタンへ移すので、そのときに読まれる。根拠: 実測のみ(Chromium 153 の支援技術のツリーで、キャンセルボタンの説明になった。スクリーンリーダーでは確かめていない。[[T28-2-save-hint-alt-width#結果|T28-2]])
 - widget は、アップロードの保存先(`target`)を、管理画面の URL(`/_emdash/admin/content/<collection>/<エントリ ID か new>` と `?locale=`)と props の `id`(`field-<slug>`)から求める。plugin widget には、コレクション・エントリ ID・ロケールが渡らない。`entryId` と `locale` は組にして、URL から両方が分かるときだけ送る。`?locale=` の無い画面(ダッシュボードなどから開いた編集画面)では参照元を送らず、保存のときに記録する。根拠: 公式ドキュメントのみ([[emdash-admin-content-editor-url]]、[[T23-upload-hook#結果|T23]])
 - plugin widget には `readOnly` が渡されない(`packages/admin/src/components/ContentEditor.tsx:1833-1842`)。ただし、フィールドの並びは `<fieldset disabled={readOnly}>` の中にあり(`:1336`)、編集ロック中は widget の中のボタンと入力欄もブラウザが無効にする。`div` で受けるドロップだけは届くので、widget は自分の fieldset が `:disabled` のときにファイルを受け付けない。根拠: 実測+公式ドキュメント([[emdash-plugin-field-widget]]、[[T27-image-widget#決めたこと|T27]])
+- 部品は、管理画面の入口(`src/admin.tsx`。descriptor の `adminEntry`)の export で管理画面に渡す: `fields`(widget。キーは `WIDGET_KINDS` の名前 `image` / `gallery`)、`pages`(画像管理ページ。キーは `IMAGES_PAGE.path`)、`contentListColumns`(一覧の列)。入口は読み込み時に一覧の列のマニフェストを取り始める(11.4)。プラグイン定義の `admin.fieldWidgets` / `admin.pages` はマニフェストに載るだけで、入口に部品が無いと、widget は標準の入力(`json` は textarea)になり、サイドバーにページの項目が出ない(コマンドパレットの項目は 404 の画面を開く)。根拠: 実測+公式ドキュメント([[emdash-admin-entry-assembly]]、[[emdash-plugin-definition-registration]])
 
 ### 11.2 単一画像 widget(`base64-image:image`)
 
@@ -536,7 +537,7 @@ flowchart LR
 
 ### 11.5 画像管理ページ
 
-- `admin.pages` で登録する。パスは `/images`(`/_emdash/admin/plugins/base64-image/images`)、ラベルは管理画面の辞書にある「Images」の ID `an5hVd`、アイコンは `image`。部品は `src/admin/ImagesPage.tsx` の `ImagesPage`(props なし)。
+- `admin.pages` と、管理画面の入口の `pages`(11.1)で登録する。パスは `/images`(`/_emdash/admin/plugins/base64-image/images`)、ラベルは管理画面の辞書にある「Images」の ID `an5hVd`、アイコンは `image`。部品は `src/admin/ImagesPage.tsx` の `ImagesPage`(props なし)。
   - サイドバーとコマンドパレットは、ラベルを管理画面の Lingui で訳す(`i18n._(label)`)。辞書のキーは Lingui の ID なので、文字列の「Images」は訳されず(日本語の画面でも「Images」)、本番のビルドでは「Uncompiled message detected!」の警告が出る。ID なら日本語は「画像」、英語は「Images」になり、警告も出ない。根拠: 実測+公式ドキュメント([[T25-images-page#結果|T25]]、[[emdash-admin-plugin-pages]])
 - 一覧に出すもの: サムネイル、寸法、保存サイズ、参照元へのリンク、状態バッジ([[#9. 参照元の記録と未使用画像の検出]])、作成日時、公開の状態(下書きの画像はサイトに出ない)、参照元の全体の件数(載せきれない分は「ほか N 件」)。
   - 参照元は記録ごとに 1 行で並べ、フィールド・ロケール・状態を添える。リンク先は編集画面(`/_emdash/admin/content/<collection>/<エントリ ID>?locale=<ロケール>`)。削除された参照元はリンクにしない。
