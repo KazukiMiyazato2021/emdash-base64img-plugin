@@ -144,9 +144,9 @@ useLayoutEffect(() => {
 | 貼り付け(ボタンにフォーカスして ⌘V) | Chromium: 追加される(`image.png`、320×200)。Firefox(ヘッドレス): 「クリップボードの画像を読み取れませんでした。…」 | Chromium: 代替テキスト |
 | 画像エントリをゴミ箱に移してから開く | 「画像が見つかりません」。**参照したままでも保存できた(200)**。削除して保存すると `null` | 削除のあとはドロップゾーン |
 | 値が `{}` の投稿を開く | 「画像の値が正しくありません」と説明・削除のボタン。そのまま保存すると 422 `SAVE_REJECTED` で、「保存に失敗しました」のトーストに保存 hook の日英の文が出る。削除すると保存できる | 削除のあとはドロップゾーン |
-| 編集ロック中 | → [[#2. 編集ロック中の widget|2 章]] | フォーカスできない |
+| 編集ロック中 | → [[#2. 編集ロック中の widget\|2 章]] | フォーカスできない |
 | Tab の順(画像あり) | Title → 代替テキスト → 差し替え → 削除 → Gallery(`<input type="file">` には止まらない) | — |
-| `?field=cover` | → [[#4. ?field= の付いた URL で開いたとき|4 章]] | body |
+| `?field=cover` | → [[#4. ?field= の付いた URL で開いたとき\|4 章]] | body |
 | 英語(`emdash-locale=en`) | 「Replace」「Remove」「Alternative text」「Stored size 1.5 KB · Quality 0.92」「Drop or paste an image」「Select a file」 | — |
 | アクセシビリティツリー | `group "Cover"` の中に、ボタン・入力欄と `status`・`alert` の領域(中身が無いときは空) | — |
 | コンソールのエラー | Chromium は 422 の読み込みエラー 1 件(正しくない値の保存を拒否したもの)だけ。Firefox は無し | — |

@@ -159,3 +159,6 @@ export const fields = { image: ImageField /* , gallery: …(T28) */ };
 5. EmDash の編集ロックのダイアログと帯(「This entry is open somewhere else」「Read-only」)は、日本語の画面でも英語だった(EmDash 側)。
 6. `docs/00-index.md` に [[emdash-plugin-field-widget]] を登録する(リーダー)。
 7. EmDash 標準の画像フィールドは、`required` で画像が無いとき「This field is required」を赤で出す(`references/emdash/packages/admin/src/components/ImageFieldRenderer.tsx:596-598`)。単一画像の widget は `required` を使っておらず、この表示が無い(保存の検証は EmDash が行う)。揃えるなら、辞書に文言を足して空の表示の下に出す(仕様書に無いので行っていない)。
+
+> [!note] 反映済み(リーダー、マージのとき)
+> 知見ノートを索引に登録した。仕様書 11.1 の編集ロックの項目を、上の提案の文に置き換え、18 章の「編集ロック」の行も直した。[[emdash-dependency-versions#EmDash を上げるときに先に確かめること]] に、編集ロックの伝わり方と `fields` の型の 2 行を足した。T28 に揃えてほしい点(他のタスクへの影響 2)は、T28 の作業中に送った。「他のタスクへの影響」と「未解決・サブタスクの候補」は、後続タスクのノートに書く(サブタスク)。編集ロックのダイアログが日本語の画面でも英語だった件(未解決 5)は EmDash への報告の候補で、利用者の判断が要るので、今は行わない。
