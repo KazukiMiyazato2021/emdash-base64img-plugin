@@ -60,7 +60,7 @@ node_modules/playground -> ../playground                 ← workspace へのリ
 
 - workspaces では、playground の依存もルートの `package-lock.json` に記録される(上の `"playground": {…}`)。根拠: **実測のみ**
 - [[T01-scaffold]] では、[[T02-playground]] が `package-lock.json` を変更せずに済むように、playground の依存(`astro`、`@astrojs/node`、`@astrojs/react`、`emdash`、`react`、`react-dom`、このプラグイン)を先に入れた。T02 はスクリプト(`dev` / `build`)や `emdash.seed` を足すだけなら、ロックファイルは変わらない(`scripts` はロックファイルに記録されない)。
-- Cloudflare 用の依存(`@astrojs/cloudflare`、`@emdash-cms/cloudflare`、`wrangler`)はまだ入れていない。[[T32-cloudflare-check]] の前に、依存を追加する小さな変更が必要。
+- Cloudflare 用の依存(`@astrojs/cloudflare`、`@emdash-cms/cloudflare`、`wrangler`、`@cloudflare/workers-types`)は、[[T32-cloudflare-check]] の前に [[T32-1-cloudflare-deps|T32-1]] で playground に入れた(版と監査は [[emdash-dependency-versions#Cloudflare 用の依存(2026-09-24)]])。
 
 ## npm scripts と workspaces
 

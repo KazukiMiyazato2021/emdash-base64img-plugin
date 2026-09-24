@@ -9,9 +9,13 @@
  *   --posts <数>     作る投稿の数(既定 3)
  *   --gallery <数>   1 つの投稿のギャラリーの枚数(既定 3)
  *   --trash-cover    最後の投稿のカバー画像をゴミ箱に移す(サイトで「画像が見つかりません」を確かめるため)
+ *   --token <値>     開発用ログインの代わりに、API トークン(`ec_pat_…`。`admin` スコープが要る)で API を呼ぶ。
+ *                    環境変数 `EMDASH_TOKEN` でも渡せる(EmDash の CLI と同じ名前)。ビルドしたサイト
+ *                    (`wrangler dev`・`astro preview`)では開発用ログインが 403 なので、こちらを使う(T32)
  *
  * 流れ:
  * 1. 開発用ログイン(dev-bypass)で Cookie を得る。開発サーバー(`astro dev`)でだけ使える。
+ *    `--token` を渡したときは、ログインせずに `Authorization: Bearer` で送る。
  * 2. 画像(WebP の本体とサムネイル)を、Playwright の Chromium の canvas で作る。
  * 3. アップロードのルート(`POST /_emdash/api/plugins/base64-image/upload`)に 1 枚ずつ送り、参照を受け取る。
  *    画像エントリの作成・公開と `imageRefs` の記録はルートが行う。そのため、この画像を参照する投稿は、
@@ -19,7 +23,7 @@
  * 4. 標準の REST API で投稿を作り(`cover` と `gallery` に参照)、公開する。
  *
  * アップロードのルートは、プラグインの定義(`src/index.ts`、T29)が登録する。登録される前は 404 になる。
- * このファイルは Node が型の注釈を取り除いて実行する(`npm run typecheck` の対象外)。
+ * このファイルは Node が型の注釈を取り除いて実行する。型は `npm run typecheck` で検査する(T26-1)。
  */
 
 import { parseArgs } from "node:util";
@@ -70,6 +74,17 @@ interface ApiResponse<T> {
 	error?: { code: string; message: string };
 }
 
+/**
+ * API に送る認証。文字列は開発用ログインの Cookie(`login` の戻り値)、`{ token }` は API トークン
+ * (`Authorization: Bearer`。プラグインのルートには `admin` スコープが要る)。
+ */
+export type ApiAuth = string | { token: string };
+
+/** 認証のヘッダー */
+function authHeaders(auth: ApiAuth): Record<string, string> {
+	return typeof auth === "string" ? { Cookie: auth } : { Authorization: `Bearer ${auth.token}` };
+}
+
 /** 開発用ログインで、API に送る Cookie を得る */
 export async function login(base: string): Promise<string> {
 	const res = await fetch(`${base}/_emdash/api/setup/dev-bypass?redirect=/_emdash/admin`, {
@@ -81,7 +96,7 @@ export async function login(base: string): Promise<string> {
 		.join("; ");
 	if (!cookie) {
 		throw new Error(
-			`開発用ログインに失敗しました(HTTP ${res.status})。開発サーバー(astro dev)で動かしてください。`,
+			`開発用ログインに失敗しました(HTTP ${res.status})。開発サーバー(astro dev)で動かすか、ビルドしたサイトでは --token(または環境変数 EMDASH_TOKEN)で API トークンを渡してください。`,
 		);
 	}
 	return cookie;
@@ -158,7 +173,7 @@ export async function renderSampleImage(page: Page, spec: SampleImageSpec): Prom
 /** EmDash の API を JSON で呼ぶ。失敗したら、コードとメッセージを含む例外を投げる */
 async function callApi<T>(
 	base: string,
-	cookie: string,
+	auth: ApiAuth,
 	method: "POST" | "DELETE",
 	path: string,
 	body?: unknown,
@@ -166,7 +181,7 @@ async function callApi<T>(
 	const res = await fetch(`${base}${path}`, {
 		method,
 		headers: {
-			Cookie: cookie,
+			...authHeaders(auth),
 			"X-EmDash-Request": "1",
 			...(body === undefined ? {} : { "Content-Type": "application/json" }),
 		},
@@ -193,12 +208,12 @@ async function callApi<T>(
 /** アップロードのルートで画像エントリを作り、参照を受け取る */
 export async function uploadImage(
 	base: string,
-	cookie: string,
+	auth: ApiAuth,
 	image: SampleImage,
 	target: { collection: string; field: string },
 	filename: string,
 ): Promise<ImageRef> {
-	const data = await callApi<{ ref: ImageRef }>(base, cookie, "POST", UPLOAD_PATH, {
+	const data = await callApi<{ ref: ImageRef }>(base, auth, "POST", UPLOAD_PATH, {
 		dataUrl: image.dataUrl,
 		thumb: image.thumb,
 		width: image.width,
@@ -213,12 +228,12 @@ export async function uploadImage(
 /** 投稿を作って公開し、エントリ ID を返す */
 export async function createPublishedPost(
 	base: string,
-	cookie: string,
+	auth: ApiAuth,
 	post: { title: string; slug: string; cover: ImageRef | null; gallery: ImageRef[] },
 ): Promise<string> {
 	const created = await callApi<{ item: { id: string } }>(
 		base,
-		cookie,
+		auth,
 		"POST",
 		"/_emdash/api/content/posts",
 		{
@@ -227,20 +242,15 @@ export async function createPublishedPost(
 		},
 	);
 	const id = created.item.id;
-	await callApi(
-		base,
-		cookie,
-		"POST",
-		`/_emdash/api/content/posts/${encodeURIComponent(id)}/publish`,
-	);
+	await callApi(base, auth, "POST", `/_emdash/api/content/posts/${encodeURIComponent(id)}/publish`);
 	return id;
 }
 
 /** 画像エントリをゴミ箱に移す(標準の REST API の削除) */
-export async function trashImage(base: string, cookie: string, imageId: string): Promise<void> {
+export async function trashImage(base: string, auth: ApiAuth, imageId: string): Promise<void> {
 	await callApi(
 		base,
-		cookie,
+		auth,
 		"DELETE",
 		`/_emdash/api/content/b64_images/${encodeURIComponent(imageId)}`,
 	);
@@ -249,7 +259,7 @@ export async function trashImage(base: string, cookie: string, imageId: string):
 /** 投稿 1 件分の作業に使うもの */
 interface SampleContext {
 	base: string;
-	cookie: string;
+	auth: ApiAuth;
 	page: Page;
 	/** 実行ごとに違う値(同じタイトル・slug の投稿は 409 で作れないため) */
 	runId: string;
@@ -266,7 +276,7 @@ async function createImage(
 	const image = await renderSampleImage(context.page, spec);
 	const ref = await uploadImage(
 		context.base,
-		context.cookie,
+		context.auth,
 		image,
 		{ collection: "posts", field },
 		filename,
@@ -310,7 +320,7 @@ async function createSamplePost(
 			),
 		);
 	}
-	const id = await createPublishedPost(context.base, context.cookie, {
+	const id = await createPublishedPost(context.base, context.auth, {
 		title,
 		slug,
 		cover,
@@ -335,6 +345,7 @@ async function main(): Promise<void> {
 			posts: { type: "string" },
 			gallery: { type: "string" },
 			"trash-cover": { type: "boolean", default: false },
+			token: { type: "string" },
 		},
 	});
 	const base = values.base.replace(/\/+$/, "");
@@ -342,10 +353,12 @@ async function main(): Promise<void> {
 	const galleryCount = readCount(values.gallery, "--gallery", 3);
 	const runId = new Date().toISOString().replace(/[-:T]/g, "").replace(/\..*$/, "");
 
-	const cookie = await login(base);
+	// API トークンがあればそれを使い、無ければ開発用ログイン(開発サーバーだけ)で Cookie を得る
+	const token = values.token ?? process.env["EMDASH_TOKEN"];
+	const auth: ApiAuth = token ? { token } : await login(base);
 	const browser = await chromium.launch();
 	try {
-		const context: SampleContext = { base, cookie, page: await browser.newPage(), runId };
+		const context: SampleContext = { base, auth, page: await browser.newPage(), runId };
 		let lastCover: ImageRef | null = null;
 		for (let n = 1; n <= postCount; n++) {
 			// oxlint-disable-next-line no-await-in-loop -- 投稿は順に作って公開する(一覧の並び順を、作った順の逆にそろえる)
@@ -354,7 +367,7 @@ async function main(): Promise<void> {
 			console.log(`作成: ${post.title} → ${base}/posts/${post.slug}/(ID: ${post.id})`);
 		}
 		if (values["trash-cover"] && lastCover) {
-			await trashImage(base, cookie, lastCover.id);
+			await trashImage(base, auth, lastCover.id);
 			console.log(`ゴミ箱に移した画像: ${lastCover.id}(最後の投稿のカバー)`);
 		}
 	} finally {

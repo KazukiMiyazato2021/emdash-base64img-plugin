@@ -95,6 +95,8 @@ package: emdash-plugin-base64-image
 | Workers Free のリクエスト数 | 100,000 / 日 | 公式ドキュメントのみ |
 | Workers Free の CPU 時間 | 10ms / リクエスト | 公式ドキュメントのみ |
 | Workers のメモリ | 128MB | 公式ドキュメントのみ |
+| Workers のサイズ | 圧縮前 64 MiB(Free・Paid とも。2026-09-04 に圧縮後の上限(Free 3 MB)は無くなった)。playground の Worker は圧縮前 13,158 KiB(gzip で約 3,358 KiB)で収まる([[T32-cloudflare-check\|T32]]) | 実測+公式ドキュメント |
+| Workers の起動時間 | 1 秒(グローバルスコープの評価)。playground では測っていない(デプロイが要る。[[T32-cloudflare-check\|T32]]) | 公式ドキュメントのみ |
 | Workers Free のサブリクエスト | 外部(fetch)は 50 / 呼び出し、Cloudflare のサービス(D1 など)は 1,000 / 呼び出し。D1 のクエリは後者に入る([[cloudflare-workers-free-d1-limits]]) | 公式ドキュメントのみ |
 | D1 の 1 日の行の読み書き(Free) | 読み 500 万行 / 日、書き 10 万行 / 日。2026-09-01 からは、超えると UTC の 0 時までクエリが失敗する | 公式ドキュメントのみ |
 | D1 の DB サイズ(Free) | 500MB / DB、5GB / アカウント | 公式ドキュメントのみ |
@@ -115,7 +117,7 @@ package: emdash-plugin-base64-image
 > [!note] 「storage を指定しない」と「storage が無い」は違う(2026-09-24 に確認)
 > - EmDash 0.39.1 は、`storage` を省略すると `./.emdash/uploads` の local storage を既定にする(`packages/core/src/astro/integration/index.ts:71-75`、`:335` の `config.storage ?? DEFAULT_STORAGE`)。根拠: 公式ドキュメントのみ
 > - Node(playground)では、省略したままでも標準のメディアのアップロードが成功した。`NO_STORAGE` になったのは、型定義に無い `storage: false` を渡したときだけ。根拠: 実測+公式ドキュメント([[T02-playground#結果|T02]])
-> - Cloudflare Workers ではファイルシステムに書けないので、省略したときの local storage は動かない見込み(推測のみ)。上の機能が使えなくなることに変わりはない。実際のエラーの形は [[T32-cloudflare-check|T32]] で確かめる([[T02-1-prettier-storage-capacity|T02-1]])。
+> - workerd(`wrangler dev`)では、省略したときの local storage の `mkdir` が `EPERM` で失敗し、標準のメディアのアップロードは 500 `UPLOAD_ERROR`(`Upload failed`)になった。`NO_STORAGE` にはならないが、上の機能が使えなくなることに変わりはない。根拠: 実測+公式ドキュメント(`packages/core/src/storage/local.ts:80`・`:107`、`packages/core/src/astro/routes/api/media.ts:285`。本番の Workers は未確認。[[T32-cloudflare-check|T32]]、[[T02-1-prettier-storage-capacity|T02-1]])
 
 ### 2.4 バックアップ
 
@@ -725,10 +727,11 @@ export default defineConfig({
 
 - `@emdash-cms/plugin-test` は使わない。sandboxed プラグイン向け(workerd とマニフェストが前提)のため(`packages/plugin-test/package.json`)。
 - playground: 普段の開発は Node + SQLite で素早く確認し、`wrangler dev` + D1 でも動くことを確かめる。
+  - Cloudflare 用の設定は `playground/wrangler.jsonc`・`astro.config.cloudflare.mjs`・`src/worker.ts`(D1 だけ。R2 と cron は使わない)。`npm run build:cloudflare -w playground` のあと `npm run preview:cloudflare -w playground`(`wrangler dev`)で動かす。ビルドしたサイトでは開発用ログインが使えないので、サンプルの投稿のスクリプトに API トークン(`--token`)を渡す([[T32-cloudflare-check|T32]])。
   - サイト側のページ(投稿の一覧 `/posts/`、詳細 `/posts/<slug>/`)と、アップロードのルートでサンプルの投稿を作るスクリプト(`playground/scripts/create-sample-posts.ts`)がある。seed には画像と投稿を入れない(seed の画像は `imageRefs` に記録が無く、それを参照する投稿は保存できないため)([[T26-playground-pages|T26]])。
   - E2E の入力画像(形式ごとの画像・大きすぎる画像・壊れた画像)は `e2e/fixtures/make-images.ts` で作り、git に入れない(40MB を超えるファイルを含むため)。macOS の `sips` と Playwright の Chromium を使う([[T26-playground-pages|T26]]、[[e2e-input-image-fixtures]])。
 - E2E は `npm run test:e2e` で実行する(`npm run verify` には入れない)。playground の開発サーバーを空のデータベースで起動して動かし、終わったら止める。スクリーンリーダーでの読み上げ、OS からの本物のドラッグ、ヘッドレスでない Firefox での貼り付け、翻訳の切り替え、Safari の実機は手で確認する([[T31-e2e|T31]]、[[e2e-playwright-emdash-admin]])。
-- Cloudflare の本番環境(Workers Free)でクエリ数と CPU 時間を測るのは任意。利用者のアカウントに手動でデプロイして行う。
+- Cloudflare の本番環境(Workers Free)でクエリ数と CPU 時間を測るのは任意。利用者のアカウントに手動でデプロイして行う。T32 では行っていない(利用者の了承待ち。手順の案は [[T32-cloudflare-check#デプロイして測る(任意・利用者の了承待ち)|T32]])。
 
 ## 16. 実装前の検証(スパイク)
 
@@ -764,11 +767,11 @@ export default defineConfig({
 | 一覧の列の見出し | 列の見出しは、管理画面の辞書にある「Image」のメッセージ ID を使って、管理画面の言語で表示する。EmDash の版が変わって辞書から「Image」が消えると、見出しに ID(`hG89Ed`)がそのまま出る。インストールした `@emdash-cms/admin` の辞書に ID があることは、単体テストで確かめている([[T24-list-column#結果\|T24]]) |
 | 容量 | D1 の 500MB で約 2,500 枚(公開時にできるリビジョンを含む。[[#5.4 容量の目安\|5.4]])。使われなくなった画像は自動では消えず、プラグインからは完全削除もできない。使用量は Cloudflare のダッシュボードで監視する |
 | バックアップ | D1 Time Travel(直近7日)だけ |
-| D1 の 1 日の上限 | Free では、読み 500 万行・書き 10 万行 / 日を超えると、その日はクエリが失敗する(2026-09-01 から)。画像 1 枚のアップロードで書く行は、公開時の索引の更新を含めて数十行の見込み(推測のみ。[[T32-cloudflare-check\|T32]] で確かめる) |
+| D1 の 1 日の上限 | Free では、読み 500 万行・書き 10 万行 / 日を超えると、その日はクエリが失敗する(2026-09-01 から)。画像 1 枚のアップロードで、書き 93 行・読み 761 行(読みの 632 行は EmDash が書き込みの前に `sqlite_master` を全件読む分)。投稿の保存・公開は 1 回 38〜50 行を書く。書きの上限は、アップロードだけなら約 1,000 回 / 日にあたる。根拠: 実測+公式ドキュメント(wrangler dev のローカルの D1。本番の数え方が同じかは未確認。[[T32-cloudflare-check\|T32]]) |
 | ページの重さ | 画像は HTML にインラインで埋め込まれる。一覧ページ10件で最大約 1MB、カバー1枚+ギャラリー10枚のページで約 1.1MB。圧縮すれば転送量はほぼ WebP 本体の合計まで下がる見込み(推測のみ) |
 | 標準画面 | `b64_images` の標準の一覧画面・ゴミ箱画面は重い(1ページ100件 × 約 100KB)。標準の編集画面からは保存も公開もできない(保存 hook が `image` を送る更新を拒否する)。非公開にしたものは、標準の API の `POST …/publish` で公開し直す([[#10. 画像のライフサイクル\|10 章]]) |
 | スコープ外 | 本文中の画像と OGP 画像には対応しない |
-| 参照元の記録の同時書き込み | 同じ画像を参照するエントリを同時に保存・公開すると、参照元の記録の書き込みが重なる。版を確かめて書く(`compareAndSet`、最大 8 回)ので消えないが、8 回で書けなかった参照元は、そのエントリを次に保存・公開するまで記録されない。D1 での起きやすさは [[T32-cloudflare-check\|T32]] で確かめる([[#9. 参照元の記録と未使用画像の検出\|9 章]]) |
+| 参照元の記録の同時書き込み | 同じ画像を参照するエントリを同時に保存・公開すると、参照元の記録の書き込みが重なる。版を確かめて書く(`compareAndSet`、最大 8 回)ので消えないが、8 回で書けなかった参照元は、そのエントリを次に保存・公開するまで記録されない。wrangler dev のローカルの D1 では、同じ画像を参照する 8 件の同時作成を 4 回くり返して、書き直しは 0 回、参照元は消えなかった(実測のみ)。本番の D1 での起きやすさは未確認([[T32-cloudflare-check\|T32]]、[[#9. 参照元の記録と未使用画像の検出\|9 章]]) |
 | git 依存(npm 12) | 利用者のサイトの `.npmrc` に `allow-git=root` が要る([[npm12-git-dependency-policy]]) |
 | 利用者の型チェック | 利用者のサイトの `tsc` は、TS ソースのまま配布する `src` を利用者の設定で検査する。このリポジトリでは、緩い設定と厳しい設定の代わりの tsconfig で確かめている([[T04-1-consumer-typecheck\|T04-1]])。TypeScript 5.x の実物での確認は、T07 の時点のコードだけ |
 | マイグレーションのコマンド | `emdash migrate --from-config` は、Node が `node_modules` の中の `.ts` を読めないので失敗する。既定の `emdash migrate`(build のマニフェストを使う)は使える。EmDash は `--from-config` をローカルの調査用としている([[git-dependency-ts-source]]) |
@@ -787,7 +790,7 @@ export default defineConfig({
 - Safari 対応(EmDash 本体で、CSP に `'wasm-unsafe-eval'` を許可する変更が必要)
 - アニメーション WebP・APNG・AVIF のシーケンスにも、アニメーションが消える注意書きを出す。判定はファイルの先頭で行える(WebP の `VP8X` のフラグ、APNG の `acTL`、AVIF の `avis`)が、注意のコードと文言の追加が要る([[T12-input-decode#未解決・サブタスクの候補|T12]])
 - 既存の `b64_images`(seed や移行で作ったもの)を `imageRefs` に登録する機能。サムネイルはブラウザでしか作れないので、管理画面から行う必要がある([[T16-reference-hook#未解決・サブタスクの候補|T16]])。アップロードの途中(作成と `imageRefs` の保存の間)で処理が止まったときや、`imageRefs` の保存に失敗したときに残るエントリも、この機能で拾える([[T18-upload-route#未解決|T18]])
-- 画像管理ページに、ゴミ箱から戻す操作(編集者以上。標準 API の `POST /_emdash/api/content/b64_images/{id}/restore`)を置く。今は、標準 API で戻し(標準の画面は 1 ページ 100 件の base64 を読むので使わない)、戻した画像(下書き)を画像管理ページの「公開」で公開し直す([[T25-images-page#影響・サブタスクの候補|T25]])
+- 画像管理ページに、ゴミ箱から戻す操作(編集者以上。標準 API の `POST /_emdash/api/content/b64_images/{id}/restore`)を置く。今は、標準 API で戻し(標準の画面は 1 ページ 100 件の base64 を読むので使わない)、戻した画像(下書き)を画像管理ページの「公開」で公開し直す([[T25-images-page#影響・サブタスクの候補|T25]])。API トークンを作れるのは管理者だけなので、編集者は、管理者に頼むか、標準の画面のゴミ箱の「復元」で戻すことになる(標準の画面は、開くだけで一覧 100 件とゴミ箱 50 件の画像の本体を読み込む。[[readme-install-verification]])
 - 記録だけが残った画像(画像管理の一覧の `missing`。完全削除の hook の失敗などで、`b64_images` のエントリが無いのに `imageRefs` の記録がある)の記録を、画像管理ページから消す操作([[T21-orphan-routes#未解決・サブタスクの候補|T21]])
 - 必須(`required`)の画像フィールドで画像が無いときの表示。EmDash 標準の画像フィールドは「This field is required」を出すが、widget は出さない(必須の確認は EmDash の保存の検証が行う)。揃えるなら、辞書に文言を足して空の表示の下に出す([[T27-image-widget#未解決・サブタスクの候補|T27]])
 - サイトのビジュアル編集から `?field=<slug>` で開いたときに、単一画像の widget にフォーカスを移す。管理画面は `#field-<slug>` を `focus()` するが、単一画像の widget は `id` を根の fieldset に付けているのでフォーカスできず、body のままになる(スクロールはする)。fieldset に `tabIndex={-1}` を付ける案がある(推測のみ。[[emdash-plugin-field-widget]])。ギャラリーは `id` をドロップゾーンのボタンに付けていて、フォーカスが移る([[T28-gallery-widget#決めたこと|T28]])

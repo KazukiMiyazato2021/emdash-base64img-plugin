@@ -16,7 +16,7 @@ spec: "[[base64-image-plugin-spec]]"
 > - 依存関係から決まる「ウェーブ」は 0〜7 の 8 段。ウェーブ N を「フェーズ N」として、ブランチ `phase/N` で進める。同じウェーブのタスクは同時に進められる。
 > - 各タスクは、変更してよいファイルを分けてある。そのため、同じウェーブのタスクを別々のブランチで進めても衝突しにくい。
 > - 各タスクのノートの frontmatter に、依存(`depends_on`)・後続(`blocks`)・変更してよいファイル(`files`)・状態(`status`)を書いてある。
-> - 予定外の作業は、サブタスク `TNN-M` として追加する(現在 34 件: [[T01-1-workflow-docs-index|T01-1]]、[[T01-2-emdash-0-39|T01-2]]、[[T02-1-prettier-storage-capacity|T02-1]]、[[T04-1-consumer-typecheck|T04-1]]、[[T05-1-spec-browser-results|T05-1]]、[[T07-1-spec-distribution|T07-1]]、[[T08-1-spec-route-body|T08-1]]、[[T09-1-spec-locale-query-count|T09-1]]、[[T10-1-spec-d1-limits|T10-1]]、[[T11-1-handoff-server-results|T11-1]]、[[T12-1-handoff-input-decode|T12-1]]、[[T16-1-handoff-save-hook|T16-1]]、[[T16-2-image-refs-batches|T16-2]]、[[T17-1-preview-limit-reason|T17-1]]、[[T18-1-handoff-upload-route|T18-1]]、[[T18-2-invalid-target-message|T18-2]]、[[T19-1-handoff-image-entry-hook|T19-1]]、[[T20-1-handoff-owner-tracking|T20-1]]、[[T21-1-handoff-orphan-routes|T21-1]]、[[T21-2-list-publish-status|T21-2]]、[[T22-1-admin-css-test-helper|T22-1]]、[[T22-2-handoff-widget-parts|T22-2]]、[[T23-1-handoff-upload-hook|T23-1]]、[[T23-2-hooks-test-cleanup|T23-2]]、[[T24-1-handoff-list-column|T24-1]]、[[T25-1-handoff-images-page|T25-1]]、[[T25-2-page-registration-prep|T25-2]]、[[T26-1-typecheck-playground-scripts|T26-1]]、[[T26-2-handoff-playground-pages|T26-2]]、[[T27-1-handoff-image-widget|T27-1]]、[[T28-1-handoff-gallery-widget|T28-1]]、[[T28-2-save-hint-alt-width|T28-2]]、[[T29-1-handoff-plugin-definition|T29-1]]、[[T30-1-handoff-admin-entry|T30-1]])。
+> - 予定外の作業は、サブタスク `TNN-M` として追加する(現在 38 件: [[T01-1-workflow-docs-index|T01-1]]、[[T01-2-emdash-0-39|T01-2]]、[[T02-1-prettier-storage-capacity|T02-1]]、[[T04-1-consumer-typecheck|T04-1]]、[[T05-1-spec-browser-results|T05-1]]、[[T07-1-spec-distribution|T07-1]]、[[T08-1-spec-route-body|T08-1]]、[[T09-1-spec-locale-query-count|T09-1]]、[[T10-1-spec-d1-limits|T10-1]]、[[T11-1-handoff-server-results|T11-1]]、[[T12-1-handoff-input-decode|T12-1]]、[[T16-1-handoff-save-hook|T16-1]]、[[T16-2-image-refs-batches|T16-2]]、[[T17-1-preview-limit-reason|T17-1]]、[[T18-1-handoff-upload-route|T18-1]]、[[T18-2-invalid-target-message|T18-2]]、[[T19-1-handoff-image-entry-hook|T19-1]]、[[T20-1-handoff-owner-tracking|T20-1]]、[[T21-1-handoff-orphan-routes|T21-1]]、[[T21-2-list-publish-status|T21-2]]、[[T22-1-admin-css-test-helper|T22-1]]、[[T22-2-handoff-widget-parts|T22-2]]、[[T23-1-handoff-upload-hook|T23-1]]、[[T23-2-hooks-test-cleanup|T23-2]]、[[T24-1-handoff-list-column|T24-1]]、[[T25-1-handoff-images-page|T25-1]]、[[T25-2-page-registration-prep|T25-2]]、[[T26-1-typecheck-playground-scripts|T26-1]]、[[T26-2-handoff-playground-pages|T26-2]]、[[T27-1-handoff-image-widget|T27-1]]、[[T28-1-handoff-gallery-widget|T28-1]]、[[T28-2-save-hint-alt-width|T28-2]]、[[T29-1-handoff-plugin-definition|T29-1]]、[[T30-1-handoff-admin-entry|T30-1]]、[[T30-2-heavy-import-test-timeout|T30-2]]、[[T32-1-cloudflare-deps|T32-1]]、[[T32-2-handoff-cloudflare|T32-2]]、[[T33-1-handoff-readme|T33-1]])。
 > - 対象の EmDash は 0.39.1(peer は `^0.39.0`)。2026-09-24 に 0.38.0 から変更した([[T01-2-emdash-0-39|T01-2]])。
 > - 作業中に得た知見は [[docs/00-index|知見の索引]] から辿れる。
 
@@ -73,7 +73,7 @@ spec: "[[base64-image-plugin-spec]]"
 | 3 | 9 | [[T18-upload-route\|T18]] アップロードルート<br>[[T18-1-handoff-upload-route\|T18-1]] T18 の結果を後続タスクに反映(サブタスク)<br>[[T18-2-invalid-target-message\|T18-2]] INVALID_TARGET の文言(サブタスク)<br>[[T19-image-entry-hook\|T19]] b64_images の保存 hook<br>[[T19-1-handoff-image-entry-hook\|T19-1]] T19 の結果を後続タスクに反映(サブタスク)<br>[[T20-owner-tracking\|T20]] 参照元の記録<br>[[T20-1-handoff-owner-tracking\|T20-1]] T20 の結果を後続タスクに反映(サブタスク)<br>[[T21-orphan-routes\|T21]] 未使用判定・画像管理ルート<br>[[T21-1-handoff-orphan-routes\|T21-1]] T21 の結果を後続タスクに反映(サブタスク)<br>[[T21-2-list-publish-status\|T21-2]] 一覧に公開の状態と参照元の件数(サブタスク)<br>[[T22-widget-parts\|T22]] widget 共通部品<br>[[T22-1-admin-css-test-helper\|T22-1]] CSS のクラスを確かめるテストの補助(サブタスク)<br>[[T22-2-handoff-widget-parts\|T22-2]] T22 の結果を後続タスクに反映(サブタスク)<br>[[T23-upload-hook\|T23]] アップロード処理フック<br>[[T23-1-handoff-upload-hook\|T23-1]] T23 の結果を後続タスクに反映(サブタスク)<br>[[T23-2-hooks-test-cleanup\|T23-2]] フックのテストの後片付け(サブタスク)<br>[[T24-list-column\|T24]] 一覧サムネイル列<br>[[T24-1-handoff-list-column\|T24-1]] T24 の結果を後続タスクに反映(サブタスク)<br>[[T25-images-page\|T25]] 画像管理ページ<br>[[T25-1-handoff-images-page\|T25-1]] T25 の結果を後続タスクに反映(サブタスク)<br>[[T25-2-page-registration-prep\|T25-2]] 画像管理ページの登録の準備(サブタスク)<br>[[T26-playground-pages\|T26]] playground のページ<br>[[T26-1-typecheck-playground-scripts\|T26-1]] playground のスクリプトの型チェック(サブタスク)<br>[[T26-2-handoff-playground-pages\|T26-2]] T26 の結果を後続タスクに反映(サブタスク) |
 | 4 | 7 | [[T27-image-widget\|T27]] 単一画像 widget<br>[[T27-1-handoff-image-widget\|T27-1]] T27 の結果を後続タスクに反映(サブタスク)<br>[[T28-gallery-widget\|T28]] ギャラリー widget<br>[[T28-1-handoff-gallery-widget\|T28-1]] T28 の結果を後続タスクに反映(サブタスク)<br>[[T28-2-save-hint-alt-width\|T28-2]] 処理中の保存の案内と代替テキストの幅(サブタスク)<br>[[T29-plugin-definition\|T29]] プラグイン定義の組み立て<br>[[T29-1-handoff-plugin-definition\|T29-1]] T29 の結果を後続タスクに反映(サブタスク) |
 | 5 | 2 | [[T30-admin-entry\|T30]] 管理画面エントリの組み立て<br>[[T30-1-handoff-admin-entry\|T30-1]] T30 の結果を後続タスクに反映(サブタスク) |
-| 6 | 3 | [[T31-e2e\|T31]] E2E テスト<br>[[T32-cloudflare-check\|T32]] Cloudflare での確認<br>[[T33-readme\|T33]] README |
+| 6 | 7 | [[T30-2-heavy-import-test-timeout\|T30-2]] 本物の管理画面を読むテストのタイムアウト(サブタスク)<br>[[T31-e2e\|T31]] E2E テスト<br>[[T32-1-cloudflare-deps\|T32-1]] playground に Cloudflare 用の依存を入れる(サブタスク)<br>[[T32-cloudflare-check\|T32]] Cloudflare での確認<br>[[T32-2-handoff-cloudflare\|T32-2]] T32 の結果を README などに反映(サブタスク)<br>[[T33-readme\|T33]] README<br>[[T33-1-handoff-readme\|T33-1]] T33 の結果を後続タスクに反映(サブタスク) |
 | 7 | 1 | [[T34-release\|T34]] v0.1.0 リリース |
 
 **クリティカルパス**(最も長い依存の連なり、8 段): [[T01-scaffold|T01]] → [[T03-shared-contracts|T03]] → [[T12-input-decode|T12]] → [[T23-upload-hook|T23]] → [[T27-image-widget|T27]] → [[T30-admin-entry|T30]] → [[T31-e2e|T31]] → [[T34-release|T34]]
@@ -169,9 +169,13 @@ flowchart LR
     end
     subgraph W6["ウェーブ 6"]
         direction TB
+        T30_2["T30-2 テストのタイムアウト"]
         T31["T31 E2E テスト"]
+        T32_1["T32-1 Cloudflare 用の依存"]
         T32["T32 Cloudflare での確認"]
+        T32_2["T32-2 T32 の結果を反映"]
         T33["T33 README"]
+        T33_1["T33-1 T33 の結果を反映"]
     end
     subgraph W7["ウェーブ 7"]
         direction TB
@@ -256,6 +260,12 @@ flowchart LR
     T28 --> T28_2
     T29 --> T29_1
     T30 --> T30_1
+    T30 --> T30_2
+    T30 --> T32_1
+    T32_1 --> T32
+    T33 --> T33_1
+    T32 --> T32_2
+    T33 --> T32_2
     T22 --> T27
     T23 --> T27
     T22 --> T28
@@ -287,7 +297,7 @@ flowchart LR
     class T05,T07,T08,T09,T10 spike
     class T06 decision
     classDef subtask stroke-dasharray: 2 4
-    class T01_1,T01_2,T02_1,T04_1,T05_1,T07_1,T08_1,T09_1,T10_1,T11_1,T12_1,T16_1,T16_2,T17_1,T18_1,T18_2,T19_1,T20_1,T21_1,T21_2,T22_1,T22_2,T23_1,T23_2,T24_1,T25_1,T25_2,T26_1,T26_2,T27_1,T28_1,T28_2,T29_1,T30_1 subtask
+    class T01_1,T01_2,T02_1,T04_1,T05_1,T07_1,T08_1,T09_1,T10_1,T11_1,T12_1,T16_1,T16_2,T17_1,T18_1,T18_2,T19_1,T20_1,T21_1,T21_2,T22_1,T22_2,T23_1,T23_2,T24_1,T25_1,T25_2,T26_1,T26_2,T27_1,T28_1,T28_2,T29_1,T30_1,T30_2,T32_1,T32_2,T33_1 subtask
 ```
 
 - 実線の矢印: 完了を待ってから着手する依存
@@ -362,9 +372,13 @@ flowchart LR
 | [[T29-1-handoff-plugin-definition\|T29-1]] | T29 の結果(プラグイン定義)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 4 | [[T29-plugin-definition\|T29]] | `tasks/T30`・`T32`・`T33`<br>`plans/base64-image-plugin-spec.md`(18 章)<br>`docs/emdash-dependency-versions.md` |
 | [[T30-admin-entry\|T30]] | 管理画面のエントリ(src/admin.tsx)を組み立てる | 実装 | 5 | [[T24-list-column\|T24]]、[[T25-images-page\|T25]]、[[T27-image-widget\|T27]]、[[T28-gallery-widget\|T28]] | `src/admin.tsx` |
 | [[T30-1-handoff-admin-entry\|T30-1]] | T30 の結果(管理画面の入口)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 5 | [[T30-admin-entry\|T30]] | `tasks/T31`〜`T33` |
+| [[T30-2-heavy-import-test-timeout\|T30-2]] | 本物の管理画面のモジュールを読むテストのタイムアウトを延ばす(サブタスク) | テスト | 6 | [[T30-admin-entry\|T30]] | `tests/admin/admin-entry.test.tsx`<br>`tests/admin/ImagesPage.test.tsx` |
 | [[T31-e2e\|T31]] | E2E テストを作る | テスト | 6 | [[T26-playground-pages\|T26]]、[[T29-plugin-definition\|T29]]、[[T30-admin-entry\|T30]] | `e2e/**`<br>`playwright.config.ts` |
-| [[T32-cloudflare-check\|T32]] | Cloudflare(wrangler dev + D1)で動作を確認する | テスト | 6 | [[T26-playground-pages\|T26]]、[[T29-plugin-definition\|T29]]、[[T30-admin-entry\|T30]] | `playground/wrangler.jsonc`<br>`playground/astro.config.cloudflare.mjs`<br>このノートの「結果」 |
+| [[T32-1-cloudflare-deps\|T32-1]] | playground に Cloudflare 用の依存を入れる(サブタスク) | 環境 | 6 | [[T30-admin-entry\|T30]] | `playground/package.json`<br>`package-lock.json`<br>`docs/emdash-dependency-versions.md` ほか |
+| [[T32-cloudflare-check\|T32]] | Cloudflare(wrangler dev + D1)で動作を確認する | テスト | 6 | [[T26-playground-pages\|T26]]、[[T29-plugin-definition\|T29]]、[[T30-admin-entry\|T30]] | `playground/wrangler.jsonc`<br>`playground/astro.config.cloudflare.mjs`<br>`playground/src/worker.ts`<br>このノートの「結果」 |
+| [[T32-2-handoff-cloudflare\|T32-2]] | T32 の結果(Cloudflare)を README と既存の知見ノートに反映する(サブタスク) | ドキュメント | 6 | [[T32-cloudflare-check\|T32]]、[[T33-readme\|T33]] | `README.md`<br>`docs/cloudflare-workers-free-d1-limits.md`<br>`docs/emdash-after-save-payload.md` |
 | [[T33-readme\|T33]] | README と導入手順を書く | ドキュメント | 6 | [[T29-plugin-definition\|T29]]、[[T30-admin-entry\|T30]] | `README.md` |
+| [[T33-1-handoff-readme\|T33-1]] | T33 の結果(README)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 6 | [[T33-readme\|T33]] | `tasks/T34` |
 | [[T34-release\|T34]] | v0.1.0 をリリースする | リリース | 7 | [[T31-e2e\|T31]]、[[T32-cloudflare-check\|T32]]、[[T33-readme\|T33]] | `package.json`(version)<br>`plans/base64-image-plugin-spec.md`(status) |
 
 ## 状態の一覧(Dataview プラグインがある場合)
