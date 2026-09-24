@@ -36,8 +36,9 @@ const INPUT_PIXELS_LIMIT_MP = formatInteger(MAX_INPUT_PIXELS / 1_000_000);
 export const ERROR_MESSAGES = defineMessages<Record<KnownErrorCode, string>>({
 	ja: {
 		// サーバー(このプラグインのルート・保存 hook)
+		// INVALID_TARGET は、保存先のフィールドの誤りと、`target.locale` がサイトのロケールでないとき(T18)の両方で返る
 		INVALID_TARGET:
-			"保存先のフィールドが見つからないか、このプラグインの画像フィールドではありません。フィールドの設定を確認してください。",
+			"保存先が正しくありません。フィールドが見つからないか、このプラグインの画像フィールドではないか、編集中のエントリの言語がサイトに設定されていません。フィールドとサイトの言語の設定を確認してください。",
 		IMAGE_DATA_INVALID: "画像のデータが正しくありません。画像を選び直してください。",
 		IMAGE_TOO_LARGE: "画像の保存サイズが上限を超えています。",
 		IMAGE_DIMENSIONS_MISMATCH: "画像の寸法が画像のデータと一致しません。",
@@ -92,7 +93,7 @@ export const ERROR_MESSAGES = defineMessages<Record<KnownErrorCode, string>>({
 	},
 	en: {
 		INVALID_TARGET:
-			"The destination field does not exist or is not an image field of this plugin. Check the field settings.",
+			"The destination is invalid: the field does not exist, is not an image field of this plugin, or the entry's locale is not configured for the site. Check the field settings and the site's locales.",
 		IMAGE_DATA_INVALID: "The image data is invalid. Please select the image again.",
 		IMAGE_TOO_LARGE: "The image exceeds the maximum stored size.",
 		IMAGE_DIMENSIONS_MISMATCH: "The image dimensions do not match the image data.",
