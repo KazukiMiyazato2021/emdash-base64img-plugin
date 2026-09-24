@@ -1,5 +1,6 @@
 /**
- * 画像管理ページ(仕様書 11.5)。管理画面の `admin.pages` に登録する部品(登録は T30)。
+ * 画像管理ページ(仕様書 11.5)。管理画面の `admin.pages` に登録する部品。
+ * 登録は T29(`admin.pages`)と T30(`pages` のキー)で、どちらも `src/shared/constants.ts` の `IMAGES_PAGE` を使う(T25-2)。
  *
  * - 一覧: `listImages`(T14。プラグインのルート `images/list`。T21・T21-2)を、`nextCursor` を渡して読み進める。
  *   1 ページの枚数は 0〜10 で変わる。`items: []` で `nextCursor` があるときは、参照元の多い画像を調べている途中なので、
@@ -7,6 +8,7 @@
  * - 操作(ボタンは、利用者のロールと画像の状態で出し分ける。表示のためだけで、権限はサーバーが判定する。T06):
  *   - ゴミ箱に移動: `entryStatus: "active"` の画像。寄稿者以上(`trashImage`)。移動の前に必ず確認し、使用中ならそのことを示す。
  *   - 完全に削除: `entryStatus: "trashed"` の画像。管理者だけ(`deleteImagePermanently`。標準 API)。必ず確認する。
+ *     成功したら、コンテンツ一覧のサムネイル列(T24)の覚え書きを消す(`refreshThumbnailColumn`)。
  *   - 公開: `entryStatus: "active"` で `entryPublication: "draft"` の画像。編集者以上(`publishImage`。標準 API)。
  *     ゴミ箱から戻した画像と、アップロードの途中で止まった画像は下書きで、サイトに出ない。標準の編集画面からは公開し直せない(T19)。
  *   - `missing`(記録だけが残った画像)には操作が無い。
@@ -36,6 +38,9 @@ import type {
 	OwnerStatus,
 } from "../shared/types";
 import { ImageInfo, ImagePreview, isAbortError, WarningIcon } from "./parts";
+// 一覧の列のモジュールは、実行時に `@emdash-cms/admin` を読み込まない(型だけ。T24)。ここから読み込んでも変わらない
+// (tests/admin/ImagesPage.test.tsx で確かめる)
+import { clearThumbnailColumnCache, preloadThumbnailColumn } from "./ThumbnailColumn";
 
 // ---------------------------------------------------------------------------
 // 定数
@@ -400,6 +405,19 @@ function operationErrorText(
 /** 表示するエラーの文言。エラーが無い・中断のときは undefined */
 function visibleError(error: unknown, text: (error: unknown) => string): string | undefined {
 	return error === null || error === undefined || isAbortError(error) ? undefined : text(error);
+}
+
+/**
+ * コンテンツ一覧のサムネイル列(T24。`src/admin/ThumbnailColumn.tsx`)の覚え書きを消す。完全削除が成功したときだけ呼ぶ。
+ * - 列は、取得したサムネイルを 1 分覚えている。完全削除すると記録(`imageRefs`)が消え、列の表示が変わる
+ *   (サムネイル → 警告アイコン)ので、次に一覧を開いたときに取り直させる。
+ * - ゴミ箱への移動と公開では、記録も列の表示も変わらない(ゴミ箱の画像にもサムネイルを出す。仕様書 11.4)ので、呼ばない。
+ * - `clearThumbnailColumnCache()` はマニフェストの覚え書きも消す。消したままにすると、次に開いた一覧が、読み込みを待つ間に
+ *   このプラグインのフィールドの無いコレクションにも空の列を出す(T24)。そのため、すぐに `preloadThumbnailColumn()` で読み直す。
+ */
+function refreshThumbnailColumn(): void {
+	clearThumbnailColumnCache();
+	preloadThumbnailColumn();
 }
 
 // ---------------------------------------------------------------------------
@@ -786,6 +804,7 @@ export function ImagesPage() {
 				announce(tRef.current.trashed(name));
 			} else {
 				await deleteImagePermanently(item.id);
+				refreshThumbnailColumn();
 				// 記録は、応答のあとに完全削除の hook が消す。すぐに読み直すと残って見えることがあるので、画面から消すだけにする(T21)
 				const current = itemsRef.current;
 				const index = current.findIndex((entry) => entry.id === item.id);
