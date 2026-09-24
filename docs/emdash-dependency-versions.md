@@ -130,6 +130,7 @@ updated: 2026-09-24
 | config で登録した native プラグインで、起動時に lifecycle hook が呼ばれないこと(`b64_images` の確認の方式の前提) | [[emdash-native-plugin-lifecycle-hooks]] | [[T29-plugin-definition\|T29]] |
 | 編集ロックが、フィールドを包む `<fieldset disabled={readOnly}>` で widget に伝わること(plugin widget に `readOnly` は渡らない。`ContentEditor.tsx:1336`) | 実際の管理画面(単体テストは包みの fieldset を自分で作るので、EmDash の変更では失敗しない)、[[emdash-plugin-field-widget]] | [[T27-image-widget\|T27]] |
 | 管理画面の入口の型 `PluginAdminModule["fields"]` が props 無しの `Record<string, React.ComponentType>` であること(`fields` に型の注釈を付けない理由)。EmDash が型を直すと、使われない `@ts-expect-error` で型チェックが失敗する | `tests/admin/ImageField.test.tsx` | [[T27-image-widget\|T27]] |
+| 管理画面の入口の `pages`・`contentListColumns` の型と、管理画面がページを探す方法(`usePluginPage`) | `tests/admin/admin-entry.test.tsx`(`satisfies` の型チェックと、本物の `usePluginPage`) | [[T30-admin-entry\|T30]] |
 | 編集画面が、手動の保存の応答でフォームの値を置き換えること(処理中の保存で画像が外れる理由。仕様書 18 章の「処理中の保存」)。EmDash が自動保存と同じく置き換えないようにしたら、その行と対策を見直す | 実際の管理画面(`references/emdash/packages/admin/src/components/ContentEditor.tsx:509-533`)、[[gallery-widget-reorder-focus#4. 処理中に「Save」を押したとき(EmDash の挙動)]] | [[T28-gallery-widget\|T28]] |
 
 ## 利用者の npm 設定(`~/.npmrc`)
