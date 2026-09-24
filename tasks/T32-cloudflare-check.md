@@ -48,6 +48,7 @@ Node + SQLite だけでなく、workerd + D1 でも動くことを確かめる�
   - `preview` 10 件 × 500,000 バイトの JS の処理は、Node で 3.5〜5.6ms([[emdash-plugin-preview-thumbnail-routes]])。Workers でも 10ms に収まるかを測る
 - [ ] D1 で、アップロード 1 回のクエリ数を確かめる(SQLite では 75、i18n のサイトで 77。SQLite の `begin` / `commit` の 4 本は D1 では出ない見込み)。workerd でも `getI18nConfig()` がサイトの i18n の設定を返し、`target.locale` の確認が Node と同じになることを確かめる([[T18-upload-route#クエリ数|T18]]、[[emdash-plugin-upload-route]])
 - [ ] playground のページ(`/posts/`・`/posts/<slug>/`)は `wrangler dev` でもそのまま使える見込み。サンプルの投稿を作るスクリプトは開発用ログイン(`astro dev` だけ)を使うので、`wrangler dev` では使えない(API トークンでのログインには対応していない)。データの作り方を決める([[T26-playground-pages#他のタスクへの影響|T26]])
+- [ ] D1 で、画像管理の一覧のクエリ数(予算は 1 リクエスト 100。SQLite の実測は 1 ページ 42〜90)と、ゴミ箱のルートのクエリ数(9)を確かめる。一覧を並行に投げたときの応答時間と、消されたコレクションの `get` の例外の形(SQLite は `ERR_SQLITE_ERROR` の no such table。そのクエリは `db.count` に数えられない)も確かめる([[image-management-routes]]、[[T21-orphan-routes#仕様書・他のタスクへの影響|T21]])
 
 ## 完了条件
 
