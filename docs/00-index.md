@@ -24,6 +24,7 @@ updated: 2026-09-24
 |---|---|---|---|
 | [[npm-workspaces-nested-worktree\|npm 12 の workspaces と入れ子の worktree]] | `docs/npm-workspaces-nested-worktree.md` | playground が `file:..` でルートを参照する構成。ロックファイルはルートの 1 つだけ。入れ子の worktree で上位の `node_modules` が解決される問題 | [[T01-scaffold\|T01]] |
 | [[test-lint-setup\|テスト・lint・E2E の設定]] | `docs/test-lint-setup.md` | vitest の projects(node / jsdom)、`cleanup()` の明示、oxlint と prettier の対象、Playwright のブラウザ | [[T01-scaffold\|T01]] |
+| [[e2e-playwright-emdash-admin\|E2E(Playwright)の組み立てと、EmDash 0.39.1 の管理画面を自動で操作して分かったこと]] | `docs/e2e-playwright-emdash-admin.md` | `npm run test:e2e` の組み立て(空のデータベースでの起動、ロールごとのログイン、テストごとの目印でデータを分ける)。Playwright で EmDash の管理画面を操作するときの注意(`toBeDisabled` と fieldset、`mod+k` が Ctrl になる UA、一覧は 20 件ずつ)。処理中の保存と新規作成の保存の実測。手で確かめる項目 | [[T31-e2e\|T31]] |
 | [[claude-code-worktree-isolation\|worktree で隔離したチームの運用]] | `docs/claude-code-worktree-isolation.md` | isolation: worktree の worktree は `main` から作られる。分岐元の確認、片付け、共有される stash | [[T01-1-workflow-docs-index\|T01-1]] |
 | [[astro-dev-background-for-agents\|エージェントから実行した astro dev はバックグラウンドで起動する]] | `docs/astro-dev-background-for-agents.md` | Astro 7.3.3 は環境変数 `CLAUDECODE` を見て `astro dev` / `astro preview` を自動でバックグラウンドにする。止めるのは `npm run dev -w playground -- stop` | [[T02-playground\|T02]] |
 | [[vite-watch-scope-playground\|playground の開発サーバーが監視する範囲]] | `docs/vite-watch-scope-playground.md` | 監視は playground の中と、読み込まれたプラグインのソースだけ。ルート自身へのリンク・`spikes/`・`.claude/` はたどらない(除外の設定は不要) | [[T02-playground\|T02]] |

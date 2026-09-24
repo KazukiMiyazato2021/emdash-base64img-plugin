@@ -164,7 +164,7 @@ E2E では確かめられない、または確かめないことにした項目�
 | ヘッドレスでない Firefox での画像の貼り付け | Firefox 155 のヘッドレスは、クリップボードの画像を読めず、合成の `ClipboardEvent` の中身も空になる([[admin-image-input-browser-behavior]])。ヘッドレスでない Firefox で自動にすると、利用者のクリップボードを書き換える | 画像をコピーし、ドロップゾーンのボタンにフォーカスして ⌘V。もう 1 つの画像のフィールドや、ほかの入力欄にフォーカスがあるときに入らないことも見る |
 | 翻訳の切り替え(i18n を設定したサイト)での widget の作り直しと `?locale=` | playground に i18n の設定が無い(playground の変更が要る) | i18n を設定したサイトで、翻訳を作り、切り替えてからアップロードし、`target` の `locale` と参照元のロケールを見る |
 | Safari(WebKit)の実機 | E2E は Chromium と Firefox だけ。Safari 相当は、canvas の `toBlob` が PNG を返すモックで確かめた | Safari でファイルを選び、「このブラウザは非対応です…」が出てアップロードしないことを見る |
-| 本番のビルド(`astro preview`)・`wrangler dev` での E2E | 開発用ログインが 403 になる([[emdash-admin-entry-assembly]])。`wrangler dev` の中継の問題もある([[T32-cloudflare-check|T32]]) | 開発サーバーで保存した `storageState` を使う([[emdash-admin-content-list-columns#再現手順]]) |
+| 本番のビルド(`astro preview`)・`wrangler dev` での E2E | 開発用ログインが 403 になる([[emdash-admin-entry-assembly]])。`wrangler dev` の中継の問題もある([[T32-cloudflare-check\|T32]]) | 開発サーバーで保存した `storageState` を使う([[emdash-admin-content-list-columns#再現手順]]) |
 
 ## 8. 安定性(繰り返しの結果)
 

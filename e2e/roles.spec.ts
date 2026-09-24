@@ -54,11 +54,16 @@ for (const role of ["admin", "editor", "author", "contributor"] as const) {
 		}) => {
 			const ids = await createImagesInEachState(api);
 			await openImagesPage(page);
+			// 操作のボタンは、ロール(`GET /_emdash/api/auth/me`)が届いてから出る(届くまではロール 0 として扱う)。
+			// 一覧が先に届くと、行はボタン無しで出る。最初に確かめる公開済みの行は、どのロールでも「ゴミ箱に移動」が
+			// 出るので、その行で待てば、ロールが届いてから残りの行を確かめられる(ボタンが無いはずの行を待つと、すぐに通ってしまう)。
 			for (const state of ["published", "draft", "trashed"] as const) {
 				// oxlint-disable-next-line no-await-in-loop -- 行ごとに確かめる
 				const row = await findImageRow(page, ids[state]);
 				// oxlint-disable-next-line no-await-in-loop -- 同上
-				expect(await actionsOf(row), `${role} / ${state}`).toEqual(EXPECTED[role][state]);
+				await expect
+					.poll(() => actionsOf(row), { message: `${role} / ${state}` })
+					.toEqual(EXPECTED[role][state]);
 			}
 		});
 	});
