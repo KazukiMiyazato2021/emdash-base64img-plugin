@@ -353,7 +353,7 @@ flowchart LR
   "height": 853,
   "quality": 0.77,   // 圧縮時の画質。画像エントリの meta.quality に保存する
   "filename": "IMG_0001.jpg",
-  "target": { "collection": "posts", "field": "cover", "entryId": "01J…", "locale": "ja" }  // entryId・locale は分かるときだけ送る(新規エントリには entryId が無い)
+  "target": { "collection": "posts", "field": "cover", "entryId": "01J…", "locale": "ja" }  // entryId と locale は組にして、管理画面の URL から両方が分かるときだけ送る(新規作成の画面と、URL に ?locale= の無い編集画面では送らない。T23)
 }
 ```
 
