@@ -2,7 +2,7 @@
 id: T33
 title: "README と導入手順を書く"
 type: ドキュメント
-status: todo
+status: doing
 wave: 6
 depends_on:
   - "[[T29-plugin-definition]]"
