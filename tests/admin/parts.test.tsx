@@ -1,8 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRef, useState } from "react";
@@ -31,6 +26,7 @@ import {
 } from "../../src/admin/parts";
 import { MAX_ALT_LENGTH } from "../../src/shared/constants";
 import { Base64ImageError } from "../../src/shared/errors";
+import { ADMIN_CSS, collectClassNames, findMissingClasses, sourceTokens } from "./admin-css";
 
 // ---------------------------------------------------------------------------
 // 共通の道具
@@ -1096,75 +1092,10 @@ describe("UploadNotices", () => {
 // 管理画面の CSS
 // ---------------------------------------------------------------------------
 
-/**
- * EmDash の管理画面の CSS はビルド済みで(`@emdash-cms/admin/dist/styles.css`)、プラグインのファイルは Tailwind の
- * 対象にならない。部品が使うクラスが、その CSS にあることを確かめる。
- */
-const ADMIN_CSS = readFileSync(
-	createRequire(import.meta.url).resolve("@emdash-cms/admin/styles.css"),
-	"utf8",
-);
-
-// jsdom の環境では URL が jsdom のものになり、fs が受け付けないので、パスの文字列で扱う
-const TEST_DIR = dirname(fileURLToPath(import.meta.url));
-
-/** 部品のソース(src/admin/parts)に書いた語。DOM のクラスのうち、部品が付けたものを見分けるのに使う */
-const PARTS_DIR = join(TEST_DIR, "../../src/admin/parts");
-const PARTS_TOKENS = new Set(
-	readdirSync(PARTS_DIR).flatMap((file) =>
-		readFileSync(join(PARTS_DIR, file), "utf8").split(/[\s"'`{}(),;]+/),
-	),
-);
-
-/** Kumo のビルド済みの JS。CSS に無いクラスが、Kumo 自身の付けるものかを確かめるのに使う */
-const KUMO_CHUNKS_DIR = join(TEST_DIR, "../../node_modules/@cloudflare/kumo/dist/chunks");
-const KUMO_DIST_JS = readdirSync(KUMO_CHUNKS_DIR)
-	.filter((file) => file.endsWith(".js"))
-	.map((file) => readFileSync(join(KUMO_CHUNKS_DIR, file), "utf8"))
-	.join("\n");
-
-/** クラス名を CSS のセレクタの書き方にする(Tailwind v4 の出力と同じく、英数字・`-`・`_` 以外の前に `\`) */
-function escapeClassName(name: string): string {
-	let escaped = "";
-	for (const [index, char] of Array.from(name).entries()) {
-		if (/[A-Za-z0-9_-]/.test(char)) {
-			escaped += index === 0 && /[0-9]/.test(char) ? `\\3${char} ` : char;
-		} else {
-			escaped += `\\${char}`;
-		}
-	}
-	return escaped;
-}
-
-function hasClassSelector(css: string, name: string): boolean {
-	const selector = `.${escapeClassName(name)}`;
-	for (let at = css.indexOf(selector); at !== -1; at = css.indexOf(selector, at + 1)) {
-		const next = css[at + selector.length];
-		if (next === undefined || !/[A-Za-z0-9_\\-]/.test(next)) return true;
-	}
-	return false;
-}
-
-function collectClassNames(root: Element): string[] {
-	const names = new Set<string>();
-	for (const element of [root, ...Array.from(root.querySelectorAll("[class]"))]) {
-		for (const name of (element.getAttribute("class") ?? "").split(/\s+/)) {
-			if (name !== "") names.add(name);
-		}
-	}
-	return [...names];
-}
+// EmDash の管理画面の CSS はビルド済みで、プラグインのファイルは Tailwind の対象にならない。部品が使うクラスが、
+// その CSS にあることを確かめる(確かめ方は tests/admin/admin-css.ts。そのテストは admin-css.test.ts)。
 
 describe("管理画面の CSS", () => {
-	it("クラスの有無の判定が正しい(確かめ方の確認)", () => {
-		expect(hasClassSelector(ADMIN_CSS, "sr-only")).toBe(true);
-		expect(hasClassSelector(ADMIN_CSS, "border-kumo-brand")).toBe(true);
-		expect(hasClassSelector(ADMIN_CSS, "min-h-32")).toBe(true);
-		expect(hasClassSelector(ADMIN_CSS, "rounded-[10px]")).toBe(true);
-		expect(hasClassSelector(ADMIN_CSS, "bg-red-517")).toBe(false);
-		expect(hasClassSelector(ADMIN_CSS, "max-h-24")).toBe(false);
-	});
-
 	it("枠の色は、層(@layer)の外の `*` の規則が決める(ドラッグ中の枠の色を style で付ける理由)", () => {
 		const rule = "*{border-color:var(--color-kumo-line)}";
 		const at = ADMIN_CSS.indexOf(rule);
@@ -1224,11 +1155,11 @@ describe("管理画面の CSS", () => {
 		expect(names).toEqual(
 			expect.arrayContaining(["bg-kumo-tint", "emdash-media-transparency-grid", "sr-only"]),
 		);
-		const missing = names.filter((name) => !hasClassSelector(ADMIN_CSS, name));
+		const missing = findMissingClasses(container, sourceTokens("src/admin/parts"));
 		// 部品のソースに書いたクラスは、すべて管理画面の CSS にある
-		expect(missing.filter((name) => PARTS_TOKENS.has(name))).toEqual([]);
+		expect(missing.fromSource).toEqual([]);
 		// CSS に無い残りは、Kumo が自分で付けるクラスだけ(Kumo 2.6.0 の Input の `disabled:text-kumo-disabled` は、
 		// テーマに `kumo-disabled` の色が無く、CSS が作られない。管理画面の Input も同じ)
-		expect(missing.filter((name) => !KUMO_DIST_JS.includes(name))).toEqual([]);
+		expect(missing.unknown).toEqual([]);
 	});
 });
