@@ -128,6 +128,8 @@ updated: 2026-09-24
 | プラグインストレージの `getMany` が ID を分けずに 1 つのクエリに入れること(ID を D1 のバインド変数の上限に収まるよう分けて渡している理由) | `tests/server/image-refs.test.ts`、`tests/server/admin-data.test.ts` | [[T16-2-image-refs-batches\|T16-2]]、[[T17-admin-data-routes\|T17]] |
 | テストが直接読む推移的な依存(`@tanstack/react-query`・`@lingui/core`・`@emdash-cms/blocks/server`)が、ルートの `node_modules` に巻き上げられていること | `tests/admin/ImagesPage.test.tsx`、[[test-lint-setup#vitest(4.1.11)]] | [[T25-1-handoff-images-page\|T25-1]] |
 | config で登録した native プラグインで、起動時に lifecycle hook が呼ばれないこと(`b64_images` の確認の方式の前提) | [[emdash-native-plugin-lifecycle-hooks]] | [[T29-plugin-definition\|T29]] |
+| 編集ロックが、フィールドを包む `<fieldset disabled={readOnly}>` で widget に伝わること(plugin widget に `readOnly` は渡らない。`ContentEditor.tsx:1336`) | 実際の管理画面(単体テストは包みの fieldset を自分で作るので、EmDash の変更では失敗しない)、[[emdash-plugin-field-widget]] | [[T27-image-widget\|T27]] |
+| 管理画面の入口の型 `PluginAdminModule["fields"]` が props 無しの `Record<string, React.ComponentType>` であること(`fields` に型の注釈を付けない理由)。EmDash が型を直すと、使われない `@ts-expect-error` で型チェックが失敗する | `tests/admin/ImageField.test.tsx` | [[T27-image-widget\|T27]] |
 
 ## 利用者の npm 設定(`~/.npmrc`)
 

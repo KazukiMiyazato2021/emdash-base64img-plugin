@@ -471,7 +471,7 @@ flowchart LR
   - 貼り付けのイベントが届く要素はブラウザで違う(Chromium 153 はフォーカスのあるボタン、Firefox 155 は body)。`document` で受け、イベントの対象かフォーカスのある要素がドロップゾーンの中のときだけ扱う。根拠: 実測のみ([[admin-image-input-browser-behavior]])
   - 進捗の読み上げは、段階(読み込み・圧縮・サムネイルの作成・アップロード)と何枚目かが変わったときだけにする。画質を探すたびには読み上げない。
 - widget は、アップロードの保存先(`target`)を、管理画面の URL(`/_emdash/admin/content/<collection>/<エントリ ID か new>` と `?locale=`)と props の `id`(`field-<slug>`)から求める。plugin widget には、コレクション・エントリ ID・ロケールが渡らない。`entryId` と `locale` は組にして、URL から両方が分かるときだけ送る。`?locale=` の無い画面(ダッシュボードなどから開いた編集画面)では参照元を送らず、保存のときに記録する。根拠: 公式ドキュメントのみ([[emdash-admin-content-editor-url]]、[[T23-upload-hook#結果|T23]])
-- plugin widget には `readOnly` が渡されない(`packages/admin/src/components/ContentEditor.tsx:1833`)。そのため、編集ロック中でも widget は操作できてしまう。これは EmDash 側の制約。
+- plugin widget には `readOnly` が渡されない(`packages/admin/src/components/ContentEditor.tsx:1833-1842`)。ただし、フィールドの並びは `<fieldset disabled={readOnly}>` の中にあり(`:1336`)、編集ロック中は widget の中のボタンと入力欄もブラウザが無効にする。`div` で受けるドロップだけは届くので、widget は自分の fieldset が `:disabled` のときにファイルを受け付けない。根拠: 実測+公式ドキュメント([[emdash-plugin-field-widget]]、[[T27-image-widget#決めたこと|T27]])
 
 ### 11.2 単一画像 widget(`base64-image:image`)
 
@@ -493,8 +493,13 @@ flowchart LR
   - 追加したばかりの画像は、手元にある data URL をそのまま表示する。
   - 保存済みの画像は、編集画面を開いたときに、プラグインのルート(`preview`)からまとめて取得する。1 回の要求は 10 件(`PREVIEW_MAX_IDS`)までで、超える分は分けて並行に送る(20 枚のギャラリーは 2 回)。1 件は最大 500,000 バイトで、20 件をまとめると応答は最大 10MB、JS の処理は約 7〜10.5ms になり、Workers Free の CPU 時間(10ms)に届くため。10 件なら最大 5MB・約 3.5〜5.6ms で、クエリは 21。根拠: 実測のみ(Node + SQLite。Workers では未実測。[[T17-admin-data-routes#結果|T17]])
 - 代替テキストは任意入力。空欄のときは「装飾画像として扱われます」と注意を表示する。
+  - 差し替えた画像の代替テキストは空にする(前の画像の説明を新しい画像に残さない。EmDash 標準の画像フィールドも、選び直すと新しいメディアの代替テキストになる。`packages/admin/src/components/ImageFieldRenderer.tsx:224-227`)([[T27-image-widget#結果|T27]])。
 - 参照先の画像が見つからないときは、「画像が見つかりません」と表示し、削除ボタンを出す。
   - `preview` は、サイトに表示されない画像(ゴミ箱に入った・削除された・公開されていない・値が不正)の `image` を `null` で返す。ゴミ箱と削除は区別しない(区別には capability `content:restore` が要り、表示も変えないため。[[T17-admin-data-routes#結果|T17]])。
+- 値が参照の形でないとき(seed や手での書き換え。`null` / `undefined` は画像なし)は、「画像の値が正しくありません」と説明を表示し、削除ボタンだけを出す。このままでは保存 hook(8 章③)が拒否するため。
+- 保存済みの画像が `imageRefs` に記録されているか(保存できるか)は、開いたときには確かめない。記録の無い画像は seed で作ったものなどに限られ(13.1)、保存のときに hook ③ が理由と直し方を返すため([[T27-image-widget#結果|T27]])。
+- フォーカス: 押したボタンが表示の切り替えで消えたら、今の表示の主な要素へ移す(処理を始めたらキャンセル、追加したら代替テキスト、キャンセル・失敗のあとは差し替え、画像を外したらドロップゾーン)。
+- 編集ロック中は、EmDash がフィールドを `<fieldset disabled>` で包むので、ボタンと入力欄は無効になる。枠(`div`)へのドロップは届くので、widget が受け付けない。根拠: 実測+公式ドキュメント([[emdash-plugin-field-widget]])
 
 ### 11.3 ギャラリー widget(`base64-image:gallery`)
 
@@ -738,7 +743,7 @@ export default defineConfig({
 | 入力形式 | HEIC / HEIF は非対応 |
 | アニメーション | GIF・アニメーション WebP・APNG は、最初のフレームの静止画になる。アニメーションが消える注意書きは GIF だけに出す([[#6.5 入力形式と上限(Q8)\|6.5]]) |
 | Firefox でのデコード | Firefox 155 は、デコードの間(6,400 万画素の JPEG で 78〜92ms)画面を止め、その間の中断はデコードが終わってから届く。途中で切れた JPEG・PNG は、欠けた部分を白・透明にしてデコードする(検出しない)。libheif で作ったグリッドの AVIF はデコードできない(`INPUT_DECODE_FAILED`)([[T12-input-decode#結果\|T12]]) |
-| 編集ロック | 編集ロック中でも widget を操作できる(EmDash 側の制約) |
+| 編集ロック | plugin widget には `readOnly` が渡らない(EmDash 側の制約)。編集ロックは、EmDash がフィールドを包む `<fieldset disabled>` に頼っている(ボタンと入力欄はブラウザが無効にし、枠へのドロップは widget が受け付けない。[[#11.1 共通方針\|11.1]])。EmDash の版が変わったら、実際の管理画面で確かめ直す。根拠: 実測+公式ドキュメント([[emdash-plugin-field-widget]]) |
 | 画像管理ページの表示 | サイドバーのプラグインのページの項目は、ロールで絞られない(閲覧者にも出る)。閲覧者が開くと、一覧は 403 になり、ページは「寄稿者以上」と示す。根拠: 実測+公式ドキュメント([[emdash-admin-plugin-pages]]) |
 | コマンドパレット | 管理画面のコマンドパレットで「Images」などと入力すると、非表示のコレクション `b64_images` も候補に出る。選ぶと、使わないとした標準の一覧(`/_emdash/admin/content/b64_images`。1 ページ 100 件の base64 を読む。[[#10. 画像のライフサイクル\|10 章]])に移る。根拠: 実測(候補に出ることと、移る先。[[T25-images-page#影響・サブタスクの候補\|T25]]、[[T29-plugin-definition#他のタスクへの影響・サブタスクの候補\|T29]])、推測のみ(一覧の重さは測っていない) |
 | 一覧の列の見出し | 列の見出しは、管理画面の辞書にある「Image」のメッセージ ID を使って、管理画面の言語で表示する。EmDash の版が変わって辞書から「Image」が消えると、見出しに ID(`hG89Ed`)がそのまま出る。インストールした `@emdash-cms/admin` の辞書に ID があることは、単体テストで確かめている([[T24-list-column#結果\|T24]]) |
