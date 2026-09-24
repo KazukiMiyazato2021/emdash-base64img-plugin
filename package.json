@@ -1,6 +1,6 @@
 {
 	"name": "emdash-plugin-base64-image",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"private": true,
 	"description": "EmDash native plugin that stores images as base64 WebP data URLs without object storage",
 	"type": "module",

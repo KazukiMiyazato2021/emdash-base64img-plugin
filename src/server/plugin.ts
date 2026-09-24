@@ -44,8 +44,8 @@ import { uploadRoute } from "./routes/upload";
 // 名前と版
 // ---------------------------------------------------------------------------
 
-/** プラグインの版(semver)。descriptor(`src/index.ts`)と `definePlugin` で同じ値を使う */
-export const PLUGIN_VERSION = "0.0.0";
+/** プラグインの版(semver)。descriptor(`src/index.ts`)と `definePlugin` で同じ値を使う。`package.json` の `version` と揃える(tests/package-exports.test.ts) */
+export const PLUGIN_VERSION = "0.1.0";
 
 /** パッケージ名(`package.json` の `name`)。descriptor の `entrypoint` になる */
 export const PACKAGE_NAME = "emdash-plugin-base64-image";

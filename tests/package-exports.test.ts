@@ -7,6 +7,7 @@ import * as siteEntry from "emdash-plugin-base64-image/astro";
 
 interface PackageJson {
 	name: string;
+	version: string;
 	exports: Record<string, string>;
 	files: string[];
 }
@@ -26,6 +27,11 @@ describe("package.json の exports", () => {
 });
 
 describe("プラグインの descriptor", () => {
+	it("descriptor と createPlugin() の version は、package.json の version と同じ(リリースのときに揃える)", () => {
+		expect(base64ImagePlugin().version).toBe(pkg.version);
+		expect(createPlugin().version).toBe(pkg.version);
+	});
+
 	it("entrypoint と adminEntry が、パッケージ名と exports の入口を指す", () => {
 		const descriptor = base64ImagePlugin();
 
