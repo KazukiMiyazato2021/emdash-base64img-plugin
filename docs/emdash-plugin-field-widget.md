@@ -73,7 +73,7 @@ widget の確認(`isInsideDisabledFieldset`)を一時的に外し、同じ手順
 - 実測(両方のブラウザで同じ): 新規作成の画面で画像を追加し、`#field-cover` に目印の属性を付けてから「保存」を押した。根拠: 実測のみ
   - `POST /_emdash/api/content/posts` が 201 を返し、URL は `/_emdash/admin/content/posts/<ID>?locale=en` になった。
   - 目印は消えていた(fieldset が作り直された)。プレビューの取得(`preview`)が 1 回送られた(`prime` で入れた手元の data URL が残っていない)。代替テキストは保存した値(「赤い花」)で表示された。
-  - 作り直しで部品の state は初めに戻るので、「画像を追加しました。」の読み上げの文や GIF の注意も残らない(推測のみ。読み上げの領域の中身は、保存のあとには見ていない)。
+  - 作り直しで部品の state は初めに戻るので、「画像を追加しました。」の読み上げの文や GIF の注意も残らない。E2E で、保存のあとに読み上げの領域が空に戻ることを確かめた(両方のブラウザ。[[e2e-playwright-emdash-admin#6. テストで確かめた挙動]])。根拠: 実測のみ
 - widget への影響: アップロードの結果や、`prime` で入れた手元の data URL は、新規作成の保存を越えて残らない。保存した値から表示し直すので、表示は変わらない。保存後の URL には `?locale=` が付くので、そのあとのアップロードは `target` に `entryId` と `locale` を含む(一覧から開いた画面で `{ collection: "posts", field: "cover", entryId: "<ID>", locale: "en" }` を確かめた)。
 
 ## 4. ?field= の付いた URL で開いたとき

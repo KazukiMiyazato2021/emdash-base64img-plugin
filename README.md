@@ -537,4 +537,8 @@ curl -X POST "$SITE/_emdash/api/content/b64_images/<画像の ID>/restore" \
 npm ci
 npm run verify                              # 型チェック・playground のビルド・lint・単体テスト
 npm run dev -w playground -- --port 4321    # 動作確認用のサイト(使い方は playground/README.md)
+npm run test:e2e                            # E2E(Playwright。Chromium と Firefox)
 ```
+
+- E2E は、playground の開発サーバー(ポート 4431)を空のデータベースで起動して動かし、終わったら止める。playground のデータベースがあれば、日時の付いた名前で残してから空にする。
+- E2E の入力画像は macOS の `sips` で作るので、E2E は macOS でだけ動く。Playwright のブラウザ(Chromium・Firefox)を先に入れておく。詳しくは [docs/e2e-playwright-emdash-admin.md](docs/e2e-playwright-emdash-admin.md)。
