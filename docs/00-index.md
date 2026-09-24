@@ -54,6 +54,7 @@ updated: 2026-09-24
 | [[emdash-plugin-content-api-constraints\|EmDash 0.39.1 のプラグイン API で、データの形に関わる制約]] | `docs/emdash-plugin-content-api-constraints.md` | エントリ ID は作成まで決まらない。seed の ID はそのまま使われる。`getTrashedVersioned` でゴミ箱を判定できる。`get` は 1 件 2 クエリ。widget に collection / entryId / locale は渡らない | [[T03-shared-contracts\|T03]] |
 | [[emdash-admin-api-requests\|EmDash 0.39.1 の API を管理画面の部品から呼ぶときの送り方とエラーの形]] | `docs/emdash-admin-api-requests.md` | 同じオリジンの `/_emdash/api/...` を `X-EmDash-Request: 1` 付きの `fetch` で呼ぶ。未ログインはプラグインのルートが `UNAUTHORIZED`、標準 API が `NOT_AUTHENTICATED`。外部の認証の失敗は `text/plain`。`src/client/api.ts` のコードの決め方 | [[T14-admin-i18n-api\|T14]] |
 | [[emdash-admin-locale-lang\|EmDash 0.39.1 の管理画面の言語と html の lang 属性]] | `docs/emdash-admin-locale-lang.md` | `<html lang>` は cookie `emdash-locale` → `Accept-Language` → `en` で決まる。設定画面で言語を変えると再読み込みせずに書き換わるので、`MutationObserver` で追随する | [[T14-admin-i18n-api\|T14]] |
+| [[emdash-admin-plugin-ui-styling\|EmDash 0.39.1 の管理画面で、プラグインの部品に Kumo と CSS のクラスを使うときの注意]] | `docs/emdash-admin-plugin-ui-styling.md` | 管理画面の CSS はビルド済みでプラグインのファイルを読まないので、CSS にあるクラスだけが当たる(テストで確かめる)。層の外の `*` の `border-color` が枠の色のクラスより強い。Kumo 2.6.0 の `Loader`・`Label`・`Button`・`Banner` の注意。厳しい型チェックでは、Kumo の省略できる props に `undefined` を渡せない | [[T22-widget-parts\|T22]] |
 
 ## ライブラリ
 
@@ -71,6 +72,7 @@ updated: 2026-09-24
 | [[compress-image-browser-check\|圧縮処理(compressImage・createThumbnail)を Chromium・Firefox で動かした結果]] | `docs/compress-image-browser-check.md` | 写真 5 枚の結果は T05 の表と長辺・画質・エンコード回数まで一致した。中断は 0.4ms 以内に reject。透過は保持される。乱数ノイズの画像は Chromium の GPU 描画だけ上限を超えた | [[T13-encode-search\|T13]] |
 | [[jsdom-browser-api-gaps\|jsdom でブラウザ側の画像処理をテストするときの注意]] | `docs/jsdom-browser-api-gaps.md` | jsdom 30.1.0 には `createImageBitmap`・`OffscreenCanvas` が無く、canvas の `getContext` は `null`。canvas の部分は差し替えられるように作り、偽物でテストする。`abort()` の `reason` は Node の `DOMException` | [[T13-encode-search\|T13]] |
 | [[input-image-decode\|入力画像の形式の判定とデコード]] | `docs/input-image-decode.md` | `File.type` は拡張子だけで決まり、`createImageBitmap` は中身で形式を決める(ICO もデコードする)ので、形式は先頭のバイトで判定する。デコードは 1 画素約 4 バイトのメモリを使うので、画素数はヘッダーで確かめる。Firefox はデコードの間、画面を止める | [[T12-input-decode\|T12]] |
+| [[admin-image-input-browser-behavior\|画像の入力(ファイルの選択・ドロップ・貼り付け)のブラウザでの挙動]] | `docs/admin-image-input-browser-behavior.md` | 貼り付けのイベントが届く要素は、Chromium 153 がフォーカスのあるボタン、Firefox 155 が body なので、`document` で受けて判定する。Firefox のヘッドレスはクリップボードの画像を読めず、合成した `ClipboardEvent` は空になる(貼り付けの E2E は Chromium で行う)。ドロップは両方で試せる | [[T22-widget-parts\|T22]] |
 
 ## Cloudflare
 

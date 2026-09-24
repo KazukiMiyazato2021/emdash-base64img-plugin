@@ -316,7 +316,7 @@ return (
 | 14 | アイコンは自前の SVG | `@phosphor-icons/react` はこのプラグインの peerDependencies に無い(Kumo と管理画面の依存にはある) | 公式ドキュメントのみ |
 | 15 | 使うクラスは管理画面の CSS にあるものだけにし、テストで確かめる | 管理画面の CSS はビルド済みで、プラグインのファイルを読まない | 実測+公式ドキュメント |
 | 16 | 読み上げの領域は `<output>` | oxlint の `jsx-a11y/prefer-tag-over-role` が `role="status"` を拒む。`<output>` の暗黙の role は `status` | 実測のみ |
-| 17 | 文言は T14 に合わせ、日本語は「です・ます」、括弧は半角にした | 管理画面の文言を揃える([[T14-admin-i18n-api#結果|T14]] の決定 12) | — |
+| 17 | 文言は T14 に合わせ、日本語は「です・ます」、括弧は半角にした | 管理画面の文言を揃える([[T14-admin-i18n-api#結果\|T14]] の決定 12) | — |
 
 ### テスト
 
@@ -354,3 +354,6 @@ return (
 5. アイコンを Phosphor に揃えたいなら、`@phosphor-icons/react` を peerDependencies に足す必要がある(`package.json` の変更。サブタスクの候補。今は不要)。
 6. EmDash の `ImageDropTarget` のドラッグ中の枠の色(`border-kumo-brand`)は、同じ理由で出ていないとみられる(推測のみ。EmDash 側の不具合の候補)。
 7. `docs/00-index.md` に [[emdash-admin-plugin-ui-styling]] と [[admin-image-input-browser-behavior]] を登録する(リーダー)。
+
+> [!note] 反映済み(リーダー、マージのとき)
+> 7 の知見ノート 2 つを索引に登録した。1〜3 は、後続タスクのノートに書く(サブタスク)。
