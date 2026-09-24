@@ -40,6 +40,8 @@ created: 2026-09-23
 ## 作業内容
 
 - [ ] `fields`(`image` / `gallery`)、`pages`、`contentListColumns` を export する
+- [ ] 一覧の列は `src/admin/ThumbnailColumn.tsx` の `thumbnailColumn` を `contentListColumns` に入れ、入口の読み込み時に `preloadThumbnailColumn()` を呼ぶ(マニフェストの先読み。呼ばないと、最初に SPA で開いた一覧で、このプラグインのフィールドの無いコレクションにも空の列が出る)。`thumbnailColumn` の項目(`label` など)は上書きしない。`label` は管理画面の辞書の ID で、文字列にすると訳されない([[T24-list-column#T30 が登録するもの|T24]]、[[emdash-admin-content-list-columns]])
+- [ ] 入口を読み込むテストでは、先読みが `fetch`(`GET /_emdash/api/manifest`)を呼ぶ。`fetch` を差し替えておく(差し替えなくても例外は外に出ないが、失敗の要求が 1 回出る)([[T24-list-column#T30 が登録するもの|T24]])
 
 ## 完了条件
 
