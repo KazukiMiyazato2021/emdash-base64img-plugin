@@ -482,6 +482,7 @@ flowchart LR
                 │  [ファイルを選択]                 │
                 └──────────────────────────────┘
 処理中          圧縮中… 1280px / 画質 0.74   [キャンセル]
+                処理が終わってから保存してください。
 設定済みのとき   <img width height>(プレビュー)
                 1280×853 · 保存サイズ 98.2KB · 画質 0.77
                 代替テキスト [______________]   [差し替え] [削除]
@@ -786,7 +787,7 @@ export default defineConfig({
 - 画像管理ページに、ゴミ箱から戻す操作(編集者以上。標準 API の `POST /_emdash/api/content/b64_images/{id}/restore`)を置く。今は、標準 API で戻し(標準の画面は 1 ページ 100 件の base64 を読むので使わない)、戻した画像(下書き)を画像管理ページの「公開」で公開し直す([[T25-images-page#影響・サブタスクの候補|T25]])
 - 記録だけが残った画像(画像管理の一覧の `missing`。完全削除の hook の失敗などで、`b64_images` のエントリが無いのに `imageRefs` の記録がある)の記録を、画像管理ページから消す操作([[T21-orphan-routes#未解決・サブタスクの候補|T21]])
 - 必須(`required`)の画像フィールドで画像が無いときの表示。EmDash 標準の画像フィールドは「This field is required」を出すが、widget は出さない(必須の確認は EmDash の保存の検証が行う)。揃えるなら、辞書に文言を足して空の表示の下に出す([[T27-image-widget#未解決・サブタスクの候補|T27]])
-- サイトのビジュアル編集から `?field=<slug>` で開いたときに、単一画像の widget にフォーカスを移す。管理画面は `#field-<slug>` を `focus()` するが、単一画像の widget は `id` を根の fieldset に付けているのでフォーカスできず、body のままになる(スクロールはする)。fieldset に `tabIndex={-1}` を付ける案がある(推測のみ。[[emdash-plugin-field-widget]])。ギャラリーは `id` をドロップゾーンのボタンに付けていて、フォーカスが移る([[T28-gallery-widget#決めたこと\|T28]])
+- サイトのビジュアル編集から `?field=<slug>` で開いたときに、単一画像の widget にフォーカスを移す。管理画面は `#field-<slug>` を `focus()` するが、単一画像の widget は `id` を根の fieldset に付けているのでフォーカスできず、body のままになる(スクロールはする)。fieldset に `tabIndex={-1}` を付ける案がある(推測のみ。[[emdash-plugin-field-widget]])。ギャラリーは `id` をドロップゾーンのボタンに付けていて、フォーカスが移る([[T28-gallery-widget#決めたこと|T28]])
 
 ## 20. 決定ログ
 
