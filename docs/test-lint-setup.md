@@ -49,6 +49,7 @@ updated: 2026-09-24
 - `describe` / `it` / `expect` / `vi` は `vitest` から import する(globals は使わない)。
 - `@vitejs/plugin-react` を入れなくても、TSX(`jsx: "react-jsx"`)のテストは動いた。根拠: **実測のみ**
 - vitest の node 環境で `emdash` のメインの入口(`definePlugin`)を import できた。根拠: **実測のみ**
+- テストは、`package.json` に無い推移的な依存を 3 つ直接読む: `@tanstack/react-query` と `@lingui/core`(`tests/admin/ImagesPage.test.tsx` で本物の `useCurrentUser` を動かすため)、`@emdash-cms/blocks/server`(ページのパスの検査)。どれも `@emdash-cms/admin` / `emdash` の依存として、ルートの `node_modules` に巻き上げられている。devDependencies には入れていない。`@tanstack/react-query` と `@lingui/core` は、`@emdash-cms/admin` と同じ実体を使う必要があり(React の context を共有するため)、版の違う devDependency を足すと別の実体が入りうるため。根拠: **実測のみ**(今の巻き上げで読めること)、**推測のみ**(別の実体が入ること)。EmDash を上げて読めなくなったら、そのときに見直す([[T25-images-page|T25]]、[[T25-1-handoff-images-page|T25-1]])
 
 ### Testing Library の後片付け
 
