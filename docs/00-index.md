@@ -62,6 +62,7 @@ updated: 2026-09-24
 |---|---|---|---|
 | [[webp-data-url-validation\|WebP の data URL の検証]] | `docs/webp-data-url-validation.md` | `atob` / `fromBase64` は空白を読み飛ばす。O(1) の検査で不正な base64 を拒否する方法。WebP ヘッダーの検査(libwebp との比較)。Chromium の canvas は `VP8X` + `ICCP` で 482 バイト増える。約 100KB で 0.009〜0.15ms。テスト用の WebP は `tests/fixtures/webp/README.md` | [[T04-webp-utils\|T04]] |
 | [[canvas-webp-encoding\|canvas の WebP エンコード(Chromium・Firefox と cwebp の比較)]] | `docs/canvas-webp-encoding.md` | 同じ画素ならエンコーダーの差は小さい。ずれの主因は縮小の方法(Firefox は `imageSmoothingQuality` が無い)。`createImageBitmap` の `resizeQuality: "high"` で縮小し、`minQuality` から探索する。時間・可逆になる画質・全データと再現のコード | [[T05-spike-canvas-webp\|T05]] |
+| [[server-image-validation\|サーバー側の画像の検証(アップロードと画像エントリ)]] | `docs/server-image-validation.md` | 保存先は widget と `json` 型の両方で判定する。長さはデコードする前に確かめる。サムネイルは長辺 96px まで(小さなデータで大きな寸法を作れる)。画像エントリは固定上限。境界値の WebP の作り方。検証全体は 0.40ms / 0.93ms | [[T11-server-validation\|T11]] |
 | [[compress-image-browser-check\|圧縮処理(compressImage・createThumbnail)を Chromium・Firefox で動かした結果]] | `docs/compress-image-browser-check.md` | 写真 5 枚の結果は T05 の表と長辺・画質・エンコード回数まで一致した。中断は 0.4ms 以内に reject。透過は保持される。乱数ノイズの画像は Chromium の GPU 描画だけ上限を超えた | [[T13-encode-search\|T13]] |
 | [[jsdom-browser-api-gaps\|jsdom でブラウザ側の画像処理をテストするときの注意]] | `docs/jsdom-browser-api-gaps.md` | jsdom 30.1.0 には `createImageBitmap`・`OffscreenCanvas` が無く、canvas の `getContext` は `null`。canvas の部分は差し替えられるように作り、偽物でテストする。`abort()` の `reason` は Node の `DOMException` | [[T13-encode-search\|T13]] |
 
