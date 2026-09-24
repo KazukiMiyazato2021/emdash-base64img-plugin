@@ -14,6 +14,8 @@ blocks:
 files:
   - "playground/wrangler.jsonc"
   - "playground/astro.config.cloudflare.mjs"
+  - "playground/src/worker.ts"
+  - "playground/package.json(scripts だけ)"
   - "このノートの「結果」"
 spec:
   - "[[base64-image-plugin-spec#2. 動作環境と制約]]"
@@ -38,7 +40,7 @@ Node + SQLite だけでなく、workerd + D1 でも動くことを確かめる�
 
 ## 作業内容
 
-- [ ] playground に wrangler の設定を追加する(D1 のみ、R2 なし)
+- [ ] playground に wrangler の設定を追加する(D1 のみ、R2 なし)。依存(`@astrojs/cloudflare` 14.3.2・`@emdash-cms/cloudflare` 0.39.1・`wrangler` 4.135.0・`@cloudflare/workers-types` 5.20260921.1)は [[T32-1-cloudflare-deps|T32-1]] で入れた。設定と `src/worker.ts` は、T07 の spike の形([[git-dependency-ts-source#再現の手順]])を playground に合わせて作る
 - [ ] `wrangler dev` で主なシナリオを確認する(手動、または E2E の一部)
 - [ ] workerd でも、プラグインのルートの body の上限(`maxBytes`)とエラー(413 `INVALID_PLUGIN_REQUEST`・400 `VALIDATION_ERROR`)が Node と同じになるかを確かめる([[T08-spike-route-body#仕様書とほかのタスクへの影響|T08]]、[[T08-1-spec-route-body|T08-1]])
 - [ ] D1 で、参照元の記録の hook のクエリ数(0 / 3 / 新しい参照元 1 枚につき +2)と、並行公開・同時作成で参照元が消えないことを確かめる([[T20-owner-tracking|T20]]、[[emdash-plugin-storage-conditional-writes]])
@@ -60,6 +62,8 @@ Node + SQLite だけでなく、workerd + D1 でも動くことを確かめる�
 
 - `playground/wrangler.jsonc`
 - `playground/astro.config.cloudflare.mjs`
+- `playground/src/worker.ts`([[T32-1-cloudflare-deps|T32-1]] のときに追加)
+- `playground/package.json`(scripts だけ。依存は [[T32-1-cloudflare-deps|T32-1]] で入れた)
 - このノートの「結果」
 
 > [!note] ここに挙げたファイル以外を変更する必要が出てきたら、そのファイルを担当するタスクと調整する(並列作業での衝突を避けるため)。
