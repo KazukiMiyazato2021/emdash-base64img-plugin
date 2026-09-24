@@ -176,3 +176,6 @@ T32 では行っていない(`wrangler login` をせず、Cloudflare のアカ�
 - wrangler は、`send_metrics: false` でも利用者のグローバルの設定ディレクトリ(`~/Library/Preferences/.wrangler/`)にログ(T32 の実行で 12 個)を書き、`metrics.json` の `bannerLastShown` を書き換える。消していない。
 - EmDash 側の動き(プラグインでは直せない): 書き込みのたびに `sqlite_master` を全件読む(アップロード 1 回で 632 行)。匿名の HTML のリクエストのレイアウトの先読み(+5 クエリ)。どちらも D1 の読んだ行と呼び出しの数を増やす。
 - `.gitignore` に足すものは無い(`playground/.wrangler/` はルートの `.gitignore` の `.wrangler/` で除外されている)。
+
+> [!note] 反映済み(リーダー、マージのとき)
+> 知見ノート 2 つを索引に登録した。デプロイしての測定は、利用者の了承待ちのまま。「影響・予定外の作業・未解決」は後続のサブタスクで扱う(README の Cloudflare の構成と制約、T32 で確かめると書いてあった既存の知見ノートの更新)。T31 には、`--token` と wrangler dev だけの 500 を作業中に知らせた。
