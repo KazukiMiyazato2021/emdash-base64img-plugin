@@ -38,6 +38,7 @@ export type ThumbnailsResponse = z.infer<typeof schema.thumbnailsResponseSchema>
 export type OwnerStatus = z.infer<typeof schema.ownerStatusSchema>;
 export type ImageUsage = z.infer<typeof schema.imageUsageSchema>;
 export type ImageEntryStatus = z.infer<typeof schema.imageEntryStatusSchema>;
+export type ImageEntryPublication = z.infer<typeof schema.imageEntryPublicationSchema>;
 export type ImagesListRequest = z.infer<typeof schema.imagesListRequestSchema>;
 export type ImageListOwner = z.infer<typeof schema.imageListOwnerSchema>;
 export type ImageListItem = z.infer<typeof schema.imageListItemSchema>;

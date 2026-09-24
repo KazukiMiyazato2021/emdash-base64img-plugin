@@ -339,13 +339,15 @@ class FakeWorld {
 			createdAt?: string;
 			owners?: readonly unknown[];
 			entry?: "active" | "trashed" | "missing";
+			/** 画像エントリの `status`(EmDash の値。既定は `published`) */
+			status?: string;
 			record?: Record<string, unknown>;
 		} = {},
 	): void {
 		if (options.entry !== "missing") {
 			this.entries.set(`${B64}/${id}`, {
 				data: { image: { src: "data:image/webp;base64,AAAA" } },
-				status: "published",
+				status: options.status ?? "published",
 				draftRevisionId: null,
 				trashed: options.entry === "trashed",
 			});
@@ -420,6 +422,11 @@ async function list(world: FakeWorld, cursor?: string): Promise<ListResult> {
 	const queries = LIST_QUERY_COSTS.route + world.queries - before;
 	expect(imagesListResponseSchema.safeParse(response).success).toBe(true);
 	expect(queries).toBeLessThanOrEqual(IMAGES_LIST_QUERY_BUDGET);
+	for (const item of response.items) {
+		// 公開の状態は active のときだけ。全体の件数は、載せた参照元の件数以上
+		expect(item.entryPublication === null).toBe(item.entryStatus !== "active");
+		expect(item.ownersTotal).toBeGreaterThanOrEqual(item.owners.length);
+	}
 	// 次のカーソルは、画面がそのまま送り返せる(リクエストのスキーマに合う)
 	expect(imagesListRequestSchema.safeParse({ cursor: response.nextCursor }).success).toBe(true);
 	return { response, queries, warn };
@@ -514,8 +521,10 @@ describe("判定: 参照元ごとの状態と usage", () => {
 				bytes: 74_668,
 				createdAt: at(1),
 				entryStatus: "active",
+				entryPublication: "published",
 				usage: "in_use",
 				owners: [{ ...owner(postId(1)), status: "in_use" }],
+				ownersTotal: 1,
 			},
 		]);
 		expect(response.nextCursor).toBeUndefined();
@@ -728,6 +737,85 @@ describe("判定: 画像エントリの状態", () => {
 			entryStatus: "trashed",
 			usage: "no_owner",
 		});
+	});
+});
+
+describe("判定: 画像エントリの公開の状態(T21-2)", () => {
+	it("get の status から決める。published / draft / scheduled はそのまま、知らない値は draft。クエリは増えない", async () => {
+		const world = new FakeWorld();
+		world.addImage(imageId(4), { status: "published" });
+		world.addImage(imageId(3), { status: "draft" });
+		world.addImage(imageId(2), { status: "scheduled" });
+		world.addImage(imageId(1), { status: "archived" });
+		const { response, queries } = await list(world);
+		expect(response.items.map((item) => [item.id, item.entryPublication])).toEqual([
+			[imageId(4), "published"],
+			[imageId(3), "draft"],
+			[imageId(2), "scheduled"],
+			[imageId(1), "draft"],
+		]);
+		expect(world.calls.getTrashedVersioned).toEqual([]);
+		// 固定費 1 + query 1 + get 2 × 4(公開の状態のために読むものは無い)
+		expect(queries).toBe(2 + 4 * 2);
+	});
+
+	it("ゴミ箱・無い画像は null(ゴミ箱に入る前に公開していても)", async () => {
+		const world = new FakeWorld();
+		world.addImage(imageId(2), { entry: "trashed", status: "published" });
+		world.addImage(imageId(1), { entry: "missing" });
+		const { response } = await list(world);
+		expect(response.items.map((item) => [item.entryStatus, item.entryPublication])).toEqual([
+			["trashed", null],
+			["missing", null],
+		]);
+	});
+});
+
+describe("参照元の全体の件数(T21-2)", () => {
+	it(`載せるのは先頭の ${IMAGES_LIST_MAX_OWNERS} 件、ownersTotal は全体の件数`, async () => {
+		const world = new FakeWorld();
+		// 1 件の投稿の 25 個のフィールド(エントリは 1 件なので、1 リクエストで調べられる)
+		const fields = Array.from({ length: 25 }, (_, index) => `f${index + 1}`);
+		world.addImage(imageId(1), { owners: fields.map((field) => owner(postId(1), field)) });
+		world.addEntry(postId(1), { f25: ref(imageId(1)) });
+		const { response } = await list(world);
+		const item = itemOf(response, imageId(1));
+		expect(item.owners).toHaveLength(IMAGES_LIST_MAX_OWNERS);
+		expect(item.ownersTotal).toBe(25);
+		expect(item.usage).toBe("in_use");
+	});
+
+	it("4 つのキーが同じものは 1 件。壊れた要素と、locale だけが壊れた要素は数えない", async () => {
+		const world = new FakeWorld();
+		world.addImage(imageId(1), {
+			owners: [
+				owner(postId(1)),
+				owner(postId(1)),
+				owner(postId(1), "gallery"),
+				owner(postId(1), "cover", { locale: "en" }),
+				null,
+				{ collection: "posts", entryId: postId(2), field: "cover" },
+				owner(postId(3), "cover", { locale: "" }),
+			],
+		});
+		world.addEntry(postId(1), { cover: ref(imageId(1)) });
+		world.addEntry(postId(2), { cover: null });
+		world.addEntry(postId(3), { cover: null });
+		const { response } = await list(world);
+		const item = itemOf(response, imageId(1));
+		expect(item.owners.map((listed) => [listed.field, listed.locale])).toEqual([
+			["cover", "ja"],
+			["gallery", "ja"],
+			["cover", "en"],
+		]);
+		expect(item.ownersTotal).toBe(3);
+	});
+
+	it("参照元が無ければ 0", async () => {
+		const world = new FakeWorld();
+		world.addImage(imageId(1));
+		const { response } = await list(world);
+		expect(itemOf(response, imageId(1))).toMatchObject({ owners: [], ownersTotal: 0 });
 	});
 });
 
@@ -1078,6 +1166,24 @@ describe("参照元の多い画像(1 枚で予算を超える)", () => {
 		expect(world.calls.getTrashedVersioned).toEqual([`${B64}/${imageId(5)}`]);
 	});
 
+	it("公開の状態も最初のリクエストで調べ、カーソルに持つ(途中で変わっても読み直さない)", async () => {
+		const world = heavyWorld(40, () => ({ cover: null }));
+		world.entries.get(`${B64}/${imageId(5)}`)!.status = "draft";
+		const first = await list(world);
+		expect(first.response.items).toEqual([]);
+		world.entries.get(`${B64}/${imageId(5)}`)!.status = "published";
+		const { items } = await listAllFrom(world, first.response.nextCursor);
+		expect(items[0]).toMatchObject({ entryStatus: "active", entryPublication: "draft" });
+		expect(world.calls.get.filter((call) => call.startsWith(`${B64}/`))).toHaveLength(1);
+	});
+
+	it("全体の件数は、調べ終えた項目に入る(40 件)", async () => {
+		const world = heavyWorld(40, () => ({ cover: null }));
+		const { items } = await listAll(world);
+		expect(items[0]?.owners).toHaveLength(IMAGES_LIST_MAX_OWNERS);
+		expect(items[0]?.ownersTotal).toBe(40);
+	});
+
 	it("途中で参照元が足されたら、最初から調べ直す", async () => {
 		const world = heavyWorld(40, () => ({ cover: null }));
 		const first = await list(world);
@@ -1157,13 +1263,26 @@ describe("カーソル", () => {
 				checkedEntries: 15,
 				listed: "uxd.................",
 				rest: "d",
-				entryStatus: "trashed",
+				entry: { entryStatus: "trashed", entryPublication: null },
 			},
 		};
 		const encoded = encodeImagesListCursor(cursor);
 		expect(encoded).toMatch(/^[A-Za-z0-9_-]+$/);
 		expect(decodeImagesListCursor(encoded)).toEqual({ ok: true, cursor });
 		expect(decodeImagesListCursor(undefined)).toEqual({ ok: true, cursor: null });
+	});
+
+	it.each([
+		{ entryStatus: "active", entryPublication: "published" },
+		{ entryStatus: "active", entryPublication: "draft" },
+		{ entryStatus: "active", entryPublication: "scheduled" },
+		{ entryStatus: "trashed", entryPublication: null },
+		{ entryStatus: "missing", entryPublication: null },
+	] as const)("途中の状態の画像エントリ($entryStatus / $entryPublication)を読み戻せる", (entry) => {
+		const cursor: ImagesListCursor = {
+			heavy: { id: imageId(2), ownerCount: 1, checkedEntries: 0, listed: ".", rest: "", entry },
+		};
+		expect(decodeImagesListCursor(encodeImagesListCursor(cursor))).toEqual({ ok: true, cursor });
 	});
 
 	it("ASCII 以外の値も読み戻せる", () => {
@@ -1173,7 +1292,7 @@ describe("カーソル", () => {
 
 	it("正しい形の値は読める(下の不正な値の比較の基準)", () => {
 		expect(
-			decodeImagesListCursor(b64url(JSON.stringify({ v: 1, a: [at(0), imageId(1)] }))),
+			decodeImagesListCursor(b64url(JSON.stringify({ v: 2, a: [at(0), imageId(1)] }))),
 		).toEqual({
 			ok: true,
 			cursor: { after: { createdAt: at(0), id: imageId(1) } },
@@ -1184,17 +1303,22 @@ describe("カーソル", () => {
 		["使えない文字", "abc$"],
 		["base64 でない", "A"],
 		["JSON でない", b64url("not json")],
-		["版が違う", b64url(JSON.stringify({ v: 2, a: [at(0), imageId(1)] }))],
-		["知らないキー", b64url(JSON.stringify({ v: 1, a: [at(0), imageId(1)], x: 1 }))],
-		["位置も途中の状態も無い", b64url(JSON.stringify({ v: 1 }))],
-		["位置の createdAt が数字で始まらない", b64url(JSON.stringify({ v: 1, a: ["x", imageId(1)] }))],
+		["前の版(1)", b64url(JSON.stringify({ v: 1, a: [at(0), imageId(1)] }))],
+		["知らない版(3)", b64url(JSON.stringify({ v: 3, a: [at(0), imageId(1)] }))],
+		["知らないキー", b64url(JSON.stringify({ v: 2, a: [at(0), imageId(1)], x: 1 }))],
+		["位置も途中の状態も無い", b64url(JSON.stringify({ v: 2 }))],
+		["位置の createdAt が数字で始まらない", b64url(JSON.stringify({ v: 2, a: ["x", imageId(1)] }))],
 		[
 			"途中の状態の文字が不正",
-			b64url(JSON.stringify({ v: 1, h: [imageId(1), 1, 0, "?", "", "a"] })),
+			b64url(JSON.stringify({ v: 2, h: [imageId(1), 1, 0, "?", "", "p"] })),
 		],
 		[
 			"途中の状態が長すぎる",
-			b64url(JSON.stringify({ v: 1, h: [imageId(1), 1, 0, ".".repeat(21), "", "a"] })),
+			b64url(JSON.stringify({ v: 2, h: [imageId(1), 1, 0, ".".repeat(21), "", "p"] })),
+		],
+		[
+			"途中の状態の画像エントリの状態が前の版の文字(a)",
+			b64url(JSON.stringify({ v: 2, h: [imageId(1), 1, 0, ".", "", "a"] })),
 		],
 		["長すぎる", "A".repeat(IMAGES_LIST_CURSOR_MAX_LENGTH + 1)],
 	])("%s なら 400 INVALID_CURSOR", async (_label, cursor) => {

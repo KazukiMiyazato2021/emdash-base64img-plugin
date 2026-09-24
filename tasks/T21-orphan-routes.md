@@ -171,7 +171,9 @@ definePlugin({
 ### 未解決・サブタスクの候補
 
 1. 一覧の項目に、画像エントリが公開済みかどうかが無い(復元した画像、T18 で公開の前に止まった画像は下書き)。`get` の `status` で追加のクエリなしに分かる。画面で「未公開」や「公開し直す」を出すなら、T03 の `imageListItemSchema` に項目を足し、T21 で埋める(途中の状態のカーソルにも入れる)。
+   - → [[T21-2-list-publish-status|T21-2]] で扱った。項目 `entryPublication`(`published` / `draft` / `scheduled`、ゴミ箱・無い画像は null)を足し、カーソルの途中の状態に入れた(カーソルの版は 2)。公開し直す操作の材料(標準 API は Editor 以上など)も調べた。操作を置くかは T25 が決める。
 2. 参照元の全体の件数(20 件を超えた分)が応答に無い。画面で「ほか N 件」を出すなら、T03 に項目を足す。
+   - → [[T21-2-list-publish-status|T21-2]] で扱った。項目 `ownersTotal`(`owners` と同じ数え方の全体の件数)を足した。
 3. `missing`(記録だけが残った画像)を片付けるルートが無い。起きるのは完全削除の hook の失敗などに限られる。
 4. ゴミ箱の状態の記録(決定 7 で見送り)。やるなら T03・T17・T21・T24・T29 の変更になる。
 5. 開発用ログイン(dev-bypass)は、seed にあるコレクションを消したあと 500(`COLLECTION_EXISTS`)になる(EmDash の動き。[[image-management-routes#再現手順]])。playground の README に書くかはリーダーの判断。
