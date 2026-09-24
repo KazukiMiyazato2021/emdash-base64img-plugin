@@ -509,8 +509,10 @@ flowchart LR
   - バイラインとタクソノミーは、本体のクエリに畳み込まれる(`packages/core/src/loader.ts:124`)。そのため、50 件までの 1 回の呼び出しは 1 クエリ。サイトにバイラインが 1 件でもあると、バイラインの補完のクエリが加わる。このプラグインで作った画像(authorId なし)では、リクエストあたり +1、バイラインのカスタムフィールドもあれば呼び出しごとにさらに +1 で、1 ページ(1 ロケール・50 件まで)は 1〜3 クエリ。標準の REST API や管理画面で作った画像(authorId あり)では、最悪で呼び出しごとに 4 クエリとリクエストあたり +2 になる。根拠: 実測+公式ドキュメント([[T09-spike-query-count#結果|T09]]、[[emdash-query-count-b64-images]])
 - 描画は `emdash/ui` の `Image` を使う。data URL は responsive 変換の対象外なので、`<img src="data:…" width height loading="lazy" decoding="async">` がそのまま出力される(`packages/core/src/components/EmDashImage.astro`、`packages/core/src/media/responsive.ts:127`)。
 - LCP の対象になる画像には `priority` を付ける。
+  - 対象の画像が見つからない(`get` が `undefined`)と、どの画像にも付かないことがある。playground の一覧(`/posts/`)は描画できる最初のカバーに付け、詳細(`/posts/<slug>/`)はカバーに付ける(カバーの無い投稿はギャラリーの最初の画像。見つからないカバーは代わりの枠が上部を占めるので、ほかの画像には付けない)。Chromium 153 で LCP の要素がその画像になり、Layout Shift は 0 回だった。根拠: 実測のみ([[T26-playground-pages#結果|T26]])
 - 画像が見つからないとき(ゴミ箱に入った・削除された)、値が不正なとき(seed や手での書き換え)、取得に失敗したときは、`get` が `undefined` を返し、警告ログを出す。例外は投げない(画像のためにページの描画を止めない)。
 - 一覧ページ(カード表示)でもメイン画像を使う(Q12 は (a) を選択)。表示中のエントリの参照をまとめて1回で解決する。10件並べると HTML は最大約 1MB になる。
+  - playground の一覧(10 件)と詳細(カバーとギャラリー 10 枚)は、どちらもページのクエリが 2 本(投稿 1、画像 1)だった。プロセスで最初の画像の取得だけ、`where` のためにタクソノミーの定義の読み出しが 1 本増える(`packages/core/src/loader.ts:1273`、結果はプロセスの中に持つ)。根拠: 実測+公式ドキュメント([[T26-playground-pages#結果|T26]]、[[playground-site-pages]])
 
 ```astro
 ---
@@ -671,6 +673,8 @@ export default defineConfig({
 
 - `@emdash-cms/plugin-test` は使わない。sandboxed プラグイン向け(workerd とマニフェストが前提)のため(`packages/plugin-test/package.json`)。
 - playground: 普段の開発は Node + SQLite で素早く確認し、`wrangler dev` + D1 でも動くことを確かめる。
+  - サイト側のページ(投稿の一覧 `/posts/`、詳細 `/posts/<slug>/`)と、アップロードのルートでサンプルの投稿を作るスクリプト(`playground/scripts/create-sample-posts.ts`)がある。seed には画像と投稿を入れない(seed の画像は `imageRefs` に記録が無く、それを参照する投稿は保存できないため)([[T26-playground-pages|T26]])。
+  - E2E の入力画像(形式ごとの画像・大きすぎる画像・壊れた画像)は `e2e/fixtures/make-images.ts` で作り、git に入れない(40MB を超えるファイルを含むため)。macOS の `sips` と Playwright の Chromium を使う([[T26-playground-pages|T26]]、[[e2e-input-image-fixtures]])。
 - Cloudflare の本番環境(Workers Free)でクエリ数と CPU 時間を測るのは任意。利用者のアカウントに手動でデプロイして行う。
 
 ## 16. 実装前の検証(スパイク)

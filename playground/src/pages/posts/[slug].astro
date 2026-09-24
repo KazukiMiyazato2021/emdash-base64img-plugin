@@ -1,0 +1,105 @@
+---
+/**
+ * 投稿の詳細(カバーとギャラリー。仕様書 12 章)。
+ *
+ * - URL の値は slug か エントリ ID(`getEmDashEntry` はどちらでも引ける)。
+ * - カバーとギャラリーの参照を集め、`resolveBase64Images` を 1 回だけ呼んでまとめて解決する。
+ * - LCP の対象(カバー。カバーの無い投稿ではギャラリーの最初の画像)を `priority` にする。ほかは遅延読み込み。
+ * - ギャラリーは 1 枚ずつ参照の形を確かめ、形の正しいものだけを並べる。
+ */
+
+import { decodeSlug, getEmDashEntry } from "emdash";
+import { isBase64ImageRef, resolveBase64Images } from "emdash-plugin-base64-image/astro";
+
+import Layout from "../_components/Layout.astro";
+import PostImage from "../_components/PostImage.astro";
+
+const slug = decodeSlug(Astro.params.slug);
+const { entry: post, error } = slug
+	? await getEmDashEntry("posts", slug)
+	: { entry: null, error: undefined };
+
+const cover = post && isBase64ImageRef(post.data.cover) ? post.data.cover : undefined;
+const gallery =
+	post && Array.isArray(post.data.gallery) ? post.data.gallery.filter(isBase64ImageRef) : [];
+const images = await resolveBase64Images(cover ? [cover, ...gallery] : gallery);
+// LCP の対象: カバー。カバーの無い投稿では、描画できる最初のギャラリーの画像。
+// カバーの画像が見つからないときは、代わりの枠がカバーの場所を占め、ギャラリーは画面の下になるので、どれにも付けない
+const lcpRef = cover ?? gallery.find((ref) => images.get(ref) !== undefined);
+
+// 見つからないときも `error`(Astro の LiveEntryNotFoundError)が返るので、それ以外の失敗だけを 500 にする
+const failed = !post && error !== undefined && error.name !== "LiveEntryNotFoundError";
+if (!post) Astro.response.status = failed ? 500 : 404;
+---
+
+<Layout title={post ? post.data.title : "投稿が見つかりません"}>
+	{
+		post ? (
+			<article data-testid="post" data-post-id={post.data.id}>
+				<h1>{post.data.title}</h1>
+				{cover ? (
+					<figure class="cover">
+						<PostImage imageRef={cover} images={images} field="cover" priority={cover === lcpRef} />
+						<figcaption>{cover.alt || "(代替テキストなし)"}</figcaption>
+					</figure>
+				) : (
+					<p>カバー画像はありません。</p>
+				)}
+				{gallery.length > 0 && (
+					<section>
+						<h2>ギャラリー({gallery.length} 枚)</h2>
+						<ul class="gallery">
+							{gallery.map((imageRef) => (
+								<li>
+									<figure>
+										<PostImage
+											imageRef={imageRef}
+											images={images}
+											field="gallery"
+											priority={imageRef === lcpRef}
+										/>
+										<figcaption>{imageRef.alt || "(代替テキストなし)"}</figcaption>
+									</figure>
+								</li>
+							))}
+						</ul>
+					</section>
+				)}
+			</article>
+		) : (
+			<>
+				<h1>投稿が見つかりません</h1>
+				<p>
+					{failed
+						? "投稿を読み込めませんでした。"
+						: "公開されている投稿の中に、この URL のものはありません。"}
+				</p>
+				<p>
+					<a href="/posts/">投稿の一覧へ</a>
+				</p>
+			</>
+		)
+	}
+</Layout>
+
+<style>
+	figure {
+		margin: 0;
+	}
+	figcaption {
+		margin-top: 0.25rem;
+		color: #57606a;
+		font-size: 0.875rem;
+	}
+	.cover {
+		margin-bottom: 2rem;
+	}
+	.gallery {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+		gap: 1rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+</style>
