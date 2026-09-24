@@ -253,7 +253,8 @@ flowchart LR
 ```
 
 - インデックス: `createdAt`
-- `owners` には追記だけを行い、保存時に削除はしない([[#9. 参照元の記録と未使用画像の検出]])。
+- `owners` には追記だけを行い、保存時に削除はしない([[#9. 参照元の記録と未使用画像の検出]])。4 つのキーがすべて同じ参照元は重複させない。
+- 参照元の記録(afterSave / afterPublish)は記録を作らない(記録を作るのはアップロード用ルート)。既存の記録を書き換えるときは、版(`revision`)を確かめて書く(`compareAndSet`)。無条件の `put` / `putMany` で書き直すと、その間に足された参照元が消える([[emdash-plugin-storage-conditional-writes]])。
 
 ### 5.4 容量の目安
 
@@ -389,13 +390,17 @@ flowchart LR
 **記録(追記のみ)**
 - アップロード時: `target.entryId` があれば、最初の参照元として記録する。アップロード用ルートの `ctx.content.create` では、このプラグイン自身の `content:afterSave` は呼ばれない(呼んだプラグインは除外される。`packages/core/src/emdash-runtime.ts:2147`)。根拠: 実測+公式ドキュメント([[T10-spike-after-save#結果|T10]])
 - 保存時: 参照を持つコレクションの `content:afterSave` で、エントリの中の参照を読み取り、`imageRefs.owners` に追記する。
+  - 参照元は `{ collection: event.collection, entryId: event.content.id, locale: event.content.locale, field }`(afterPublish も同じ)。参照として扱うのは、このプラグインの widget を使う `json` フィールドの値のうち、参照の形(`isBase64ImageRef`)に合うものだけ(ギャラリーは 1 枚ずつ)。根拠: 実測+公式ドキュメント([[T20-owner-tracking#結果|T20]])
   - 読むのは `event.content.data`(保存した下書き。公開版ではない)と、更新のときにある `event.content.liveData`(content テーブルの列の値。公開済みなら公開版)。下の判定で見る範囲と揃える。根拠: 実測+公式ドキュメント([[T10-spike-after-save#結果|T10]])
   - afterSave が呼ばれるのは、作成(`isNew: true`)と更新(保存・自動保存・メタデータだけの更新。`isNew: false`)だけ。管理画面の「公開」は保存してから公開するので、保存の側で呼ばれる。`b64_images` の保存でも呼ばれるので、参照を持たないコレクションは読み飛ばす。根拠: 実測+公式ドキュメント
   - 公開(`content:afterPublish`)でも同じ処理をする。API だけで公開したとき(一覧の一括公開など)は afterSave が呼ばれないため。afterPublish の `event.content.data` は公開したデータ。根拠: 実測+公式ドキュメント
-  - クエリ数は `getMany` の 1 と、参照元が増えた画像の数(`putMany` は 1 件 1 クエリ)。どちらも保存のリクエストと同じ呼び出しのクエリ数に入る。根拠: 実測+公式ドキュメント([[emdash-plugin-content-query-counts]])
-  - afterSave は `after()` で実行され、保存の応答を待たせない(Workers では waitUntil。`packages/core/src/emdash-runtime.ts:5560`)。例外を投げると、後に続くプラグインの afterSave が呼ばれなくなる(既定の `errorPolicy` は `"abort"`)。例外は hook の中で受け止めてログに出し、`errorPolicy: "continue"` を指定する。根拠: 実測+公式ドキュメント([[emdash-after-save-payload]])
+  - クエリ数は、参照の形の値が無ければ 0(`b64_images` や、画像が空のエントリの保存も 0)。あれば、フィールド定義の 2(`ctx.schema.getCollection`)と `getMany` の 1(50 件ずつ)。参照元が増える画像 1 枚につき、さらに 2(`getVersioned` と `compareAndSet`)。記録済みなら書かないので、ふつうの保存・自動保存・公開は 3。どれも保存のリクエストと同じ呼び出しのクエリ数に入る。根拠: 実測+公式ドキュメント([[T20-owner-tracking#結果|T20]]、[[image-owner-tracking-hooks]])
+  - 同時の保存: 「`getMany` → 追記 → `putMany`」では、同じ画像を参照するエントリを同時に保存・公開すると、あとの書き込みが先の追記を消す(プラグインが使えるトランザクションは無い)。書くときは `getVersioned` で読んだ版(`revision`)を `compareAndSet` に渡し、版が変わっていたら読み直す(最大 8 回)。ストレージの呼び出しに 20ms の待ちを入れた実測で、前者は 8 件の同時作成で 6 件の追記が消え、後者は消えなかった。根拠: 実測+公式ドキュメント([[emdash-plugin-storage-conditional-writes]])
+  - 記録が無い画像(seed で作った画像、完全削除された画像)には記録を作らない(サムネイルなど、サーバーで作れない値が要るため)。記録が `imageRefsRecordSchema` に合わなくても、`owners` が配列なら追記する(ほかのキーはそのまま)。`owners` が配列でない記録には書かない。どれもログに出す([[T20-owner-tracking#決めたこと|T20]] の決定)。
+  - afterSave は `after()` で実行され、保存の応答を待たせない(Workers では waitUntil。`packages/core/src/emdash-runtime.ts:5560`)。例外を投げると、後に続くプラグインの afterSave が呼ばれなくなる(既定の `errorPolicy` は `"abort"`)。例外は hook の中で受け止めてログに出し、`errorPolicy: "continue"` を指定する(`"continue"` の hook の例外は、EmDash がログに出さない)。`priority` は 50 にして、既定(100)のほかのプラグインの例外で飛ばされないようにする。根拠: 実測+公式ドキュメント([[emdash-after-save-payload]]、[[image-owner-tracking-hooks]])
 - 保存時に参照元を削除しない理由: 下書きと公開版の二重管理や、hook が失敗したときのずれを扱わずに済むため。
 - 複製はどの hook も呼ばない。複製先は元の公開版の値を持つ下書きになり、保存か公開をするまで参照元として記録されない。記録されると、1枚の画像の `owners` に複数並ぶ。根拠: 実測+公式ドキュメント
+- i18n を有効にしたサイトで、画像フィールドを「翻訳しない」(`translatable: false`)にすると、EmDash は公開などのときに、同じ翻訳グループのほかのロケールのエントリへ値を写す。写された側の hook は呼ばれないので、その側を保存・公開するまで参照元として記録されない(写した元は記録される)。根拠: 公式ドキュメントのみ(`packages/core/src/database/repositories/content.ts:1341`)
 
 **判定(画像管理ページを開いたときに行う)**
 - 参照元ごとに `ctx.content.get` でエントリを取得する。`null` なら「参照元が削除された」(ゴミ箱と完全削除のどちらも)。
@@ -689,6 +694,7 @@ export default defineConfig({
 | ページの重さ | 画像は HTML にインラインで埋め込まれる。一覧ページ10件で最大約 1MB、カバー1枚+ギャラリー10枚のページで約 1.1MB。圧縮すれば転送量はほぼ WebP 本体の合計まで下がる見込み(推測のみ) |
 | 標準画面 | `b64_images` の標準の一覧画面・ゴミ箱画面は重い(1ページ100件 × 約 100KB)。標準の編集画面からは保存も公開もできない(保存 hook が `image` を送る更新を拒否する)。非公開にしたものは、標準の API の `POST …/publish` で公開し直す([[#10. 画像のライフサイクル\|10 章]]) |
 | スコープ外 | 本文中の画像と OGP 画像には対応しない |
+| 参照元の記録の同時書き込み | 同じ画像を参照するエントリを同時に保存・公開すると、参照元の記録の書き込みが重なる。版を確かめて書く(`compareAndSet`、最大 8 回)ので消えないが、8 回で書けなかった参照元は、そのエントリを次に保存・公開するまで記録されない。D1 での起きやすさは [[T32-cloudflare-check\|T32]] で確かめる([[#9. 参照元の記録と未使用画像の検出\|9 章]]) |
 | git 依存(npm 12) | 利用者のサイトの `.npmrc` に `allow-git=root` が要る([[npm12-git-dependency-policy]]) |
 | 利用者の型チェック | 利用者のサイトの `tsc` は、TS ソースのまま配布する `src` を利用者の設定で検査する。このリポジトリでは、緩い設定と厳しい設定の代わりの tsconfig で確かめている([[T04-1-consumer-typecheck\|T04-1]])。TypeScript 5.x の実物での確認は、T07 の時点のコードだけ |
 | マイグレーションのコマンド | `emdash migrate --from-config` は、Node が `node_modules` の中の `.ts` を読めないので失敗する。既定の `emdash migrate`(build のマニフェストを使う)は使える。EmDash は `--from-config` をローカルの調査用としている([[git-dependency-ts-source]]) |
@@ -830,6 +836,10 @@ export default defineConfig({
 | `packages/core/src/emdash-runtime.ts:2151` | プラグインの `ctx.content.create` は、保存 hook の拒否を通常の `Error`(`code: "SAVE_REJECTED"`)にする |
 | `packages/core/src/emdash-runtime.ts:3632` | `supports` に `revisions` の無いコレクションの更新は、公開中の値を書き換える |
 | `packages/core/src/astro/middleware/auth.ts:270` | MCP は Bearer のトークンでしか呼べない |
+| `packages/core/src/database/repositories/plugin-storage.ts:174` | プラグインストレージの条件付きの書き込み(`getVersioned` / `compareAndSet`) |
+| `packages/core/src/database/migrations/077_plugin_storage_revisions.ts` | プラグインストレージの版(`revision`)を、書き込みのたびに変える |
+| `packages/core/src/plugins/hooks.ts:630` | hook の `errorPolicy`(`"continue"` の hook の例外はログに出ない) |
+| `packages/core/src/database/instrumentation.ts:83` | 開発サーバーのクエリログ(応答のあとに実行された hook のクエリは出ない) |
 | `packages/core/src/emdash-runtime.ts:3516` / `:5560` | 下書きはリビジョンに保存される、afterSave は遅れて実行される |
 | `packages/auth/src/rbac.ts:19` | 権限(content:create / delete_own / publish_own) |
 
