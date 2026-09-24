@@ -55,7 +55,7 @@ npm install "github:KazukiMiyazato2021/emdash-base64img-plugin#v0.1.0"
 
 #### 非公開のリポジトリから入れるとき
 
-リポジトリが非公開なら、インストールする環境ごとに、リポジトリを読む権限が要る。
+このリポジトリは公開しているので、通常は要らない。フォークを非公開にしたときなど、リポジトリが非公開なら、インストールする環境ごとに、リポジトリを読む権限が要る。この節の方法は、npm 12 のソースを読んで書いたもので、実際には確かめていない。
 
 - 手元の PC: GitHub に登録した SSH の鍵で読めるなら、上と同じコマンドで入る(npm は、HTTPS で読めなければ SSH で読む)。
 - CI やビルドの環境: リポジトリを読めるトークン(GitHub の fine-grained personal access token で、このリポジトリの Contents を Read-only)を秘密の環境変数に入れ、`npm ci` より前に、git が HTTPS の URL にトークンを付けるよう設定する。
