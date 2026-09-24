@@ -695,6 +695,7 @@ export default defineConfig({
 - 未使用画像の自動検出・自動削除(cron)
 - npm での公開
 - Safari 対応(EmDash 本体で、CSP に `'wasm-unsafe-eval'` を許可する変更が必要)
+- 既存の `b64_images`(seed や移行で作ったもの)を `imageRefs` に登録する機能。サムネイルはブラウザでしか作れないので、管理画面から行う必要がある([[T16-reference-hook#未解決・サブタスクの候補|T16]])
 
 ## 20. 決定ログ
 
