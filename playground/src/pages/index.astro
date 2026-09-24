@@ -1,24 +1,21 @@
 ---
-// playground のトップページ。E2E 用のページは T26 で追加する。
+// playground のトップページ。ページの説明と、データの作り方は playground/README.md にある。
+import Layout from "./_components/Layout.astro";
 ---
 
-<!doctype html>
-<html lang="ja">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>base64-image playground</title>
-	</head>
-	<body>
-		<main>
-			<h1>base64-image playground</h1>
-			<p>EmDash のプラグイン「base64-image」の動作確認用サイト(storage なし)。</p>
-			<ul>
-				<li>
-					<a href="/_emdash/api/setup/dev-bypass?redirect=/_emdash/admin">開発用ログイン</a>
-				</li>
-				<li><a href="/_emdash/admin">管理画面</a></li>
-			</ul>
-		</main>
-	</body>
-</html>
+<Layout title="トップ">
+	<h1>base64-image playground</h1>
+	<p>EmDash のプラグイン「base64-image」の動作確認用サイト(storage なし)。</p>
+	<h2>ページ</h2>
+	<ul>
+		<li><a href="/posts/">投稿の一覧</a>(カード表示。カバー画像をまとめて解決する)</li>
+		<li>投稿の詳細: <code>/posts/&lt;slug か ID&gt;/</code>(カバーとギャラリー)</li>
+	</ul>
+	<h2>管理画面</h2>
+	<ul>
+		<li>
+			<a href="/_emdash/api/setup/dev-bypass?redirect=/_emdash/admin">開発用ログイン</a>
+		</li>
+		<li><a href="/_emdash/admin">管理画面</a></li>
+	</ul>
+</Layout>

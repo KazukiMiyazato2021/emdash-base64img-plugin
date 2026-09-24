@@ -45,7 +45,7 @@ created: 2026-09-23
 
 ## 作業内容
 
-- [ ] capability: `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read`
+- [ ] capability: `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read` / `content:restore`(`content:restore` は画像管理の一覧が `getTrashedVersioned` に使う。[[T21-orphan-routes#T29 への引き継ぎ|T21]])
 - [ ] ストレージ `imageRefs`(インデックス `createdAt`)
 - [ ] ルート(アップロード・プレビュー・サムネイル・画像管理)と hook(beforeSave ×2、afterSave、afterDelete)を登録する
 - [ ] `admin`(`entry`、`fieldWidgets`、`pages`)
@@ -54,9 +54,13 @@ created: 2026-09-23
 - [ ] [[T07-spike-git-dependency|T07]] の結果に合わせた配布形態(TS ソースのまま。T07 で、Node と Cloudflare の両アダプターで読み込めることを確かめた。ビルドは入れない)
 - [ ] ルートは、各タスク([[T17-admin-data-routes|T17]]・[[T18-upload-route|T18]]・[[T21-orphan-routes|T21]])が export する `PluginRoute<Input>` の定義を、`routes: { [ROUTES.x]: xRoute }` の形で登録する。`definePluginRoute` は json の入力の型が `unknown` になるので使わない。`input` を書き忘れても型エラーにならないので、各ルートの単体テストで確かめる([[T08-spike-route-body#T18 で使うルートの宣言|T08]])
 - [ ] `content:beforeSave` は 1 つのプラグインに 1 つだけ。[[T19-image-entry-hook|T19]](`b64_images`)と [[T16-reference-hook|T16]](それ以外、`validateReferencesBeforeSave`)を 1 つの handler で振り分ける。登録には capability `content:write` が要る(無いと警告だけ出して黙って飛ばす)。**beforeSave に `errorPolicy: "continue"` を付けない**(拒否の例外が捨てられ、保存が通る。afterSave の T20 と混同しない)。雛形は [[T16-reference-hook#T29 への引き継ぎ(登録のしかた)|T16]]
+- [ ] T20 の hook は、`imageOwnerHooks`(`src/server/hooks/owners.ts`。afterSave と afterPublish、`priority: 50`、`errorPolicy: "continue"`)をそのまま `hooks` に入れる。`errorPolicy` と `priority` を上書きしない。handler を包むときも例外を投げない。after* の hook の登録には capability `content:read` が要る(無いと警告だけで登録されない)。`schema:read` とストレージ `imageRefs` の宣言が無いと、エラーのログが出て記録されない([[T20-owner-tracking#T29 への引き継ぎ(登録のしかた)|T20]])
 - [ ] T17 のルート(`src/server/routes/admin-data.ts`)は `routes: { [ROUTES.preview]: previewRoute, [ROUTES.thumbnails]: thumbnailsRoute }` で登録する。capability `content:read` と、ストレージ `imageRefs` の宣言が無いと 500 になる。`content:restore` は要らない([[T17-admin-data-routes#結果|T17]])
 - [ ] widget の `fieldTypes` は `["json"]` にする。T11 の検証は、このプラグインの widget を使う `json` フィールドだけを保存先として受け付ける([[T11-server-validation#結果|T11]])
 - [ ] `src/index.ts` 以下は、利用者のサイトの `tsc` でも検査される(`astro.config.mjs` から辿られる)。`npm run typecheck` の 3 つの設定を通す([[T04-1-consumer-typecheck|T04-1]]、[[T07-1-spec-distribution|T07-1]])
+- [ ] アップロードのルートは `uploadRoute`(`src/server/routes/upload.ts`)を `routes: { [ROUTES.upload]: uploadRoute }` で登録する。使う capability は `schema:read` / `content:write` / `content:publish`(`content:read` は補われる)、ストレージは `imageRefs`。ハンドラーは、EmDash の i18n の設定(`getI18nConfig()`)をリクエストのたびに読む([[T18-upload-route#T29 がルートを登録する方法|T18]])
+- [ ] 完了の確認に、playground のサンプルの投稿を作るスクリプトを使える。開発サーバーを起動して `node playground/scripts/create-sample-posts.ts --base http://localhost:<ポート>` を実行すると、アップロードのルート・保存 hook(T16・T19)・参照元の記録(T20)をまとめて動かせる。そのあと `/posts/` で表示を確かめる。ルートが無いとスクリプトは 404 で止まる。T26 は、同じ登録を一時的に入れた使い捨てのサイトで確かめた([[playground-site-pages#再現手順]]、[[T26-playground-pages#他のタスクへの影響|T26]])
+- [ ] 画像管理のルートと hook(`src/server/routes/images-admin.ts`・`src/server/hooks/image-deleted.ts`)は `routes: { [ROUTES.imagesList]: imagesListRoute, [ROUTES.imagesTrash]: imagesTrashRoute }` と `hooks: { ...imageOwnerHooks, ...imageDeletedHooks }` で登録する。`imageDeletedHooks`(afterDelete。`priority: 50`・`errorPolicy: "continue"`)は上書きしない。使う capability は `schema:read`(消されたコレクションの確認)・`content:read`(`get`。afterDelete の登録にも要る)・`content:write`(ゴミ箱への移動)・`content:revisions:read`(`getRevision`)・`content:restore`(`getTrashedVersioned`。`content:read` は含まない)。宣言が足りないと、ルートは capability の名前を書いた `Error`(500)を投げ、`content:read` が無いと afterDelete は登録されない(警告だけ)([[T21-orphan-routes#T29 への引き継ぎ|T21]])
 
 ## 完了条件
 
