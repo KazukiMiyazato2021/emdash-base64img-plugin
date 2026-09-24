@@ -6,7 +6,10 @@
 	"scripts": {
 		"dev": "astro dev",
 		"build": "astro build",
-		"preview": "astro preview"
+		"preview": "astro preview",
+		"dev:cloudflare": "astro dev --config astro.config.cloudflare.mjs",
+		"build:cloudflare": "astro build --config astro.config.cloudflare.mjs",
+		"preview:cloudflare": "wrangler dev"
 	},
 	"dependencies": {
 		"@astrojs/cloudflare": "^14.3.2",

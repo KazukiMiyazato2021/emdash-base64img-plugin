@@ -96,3 +96,5 @@ updated: 2026-09-24
 | ノート | パス | 内容 | 元のタスク |
 |---|---|---|---|
 | [[cloudflare-workers-free-d1-limits\|Workers Free で D1 に送れるクエリ数と、1 日の上限]] | `docs/cloudflare-workers-free-d1-limits.md` | Free はサブリクエストが外部 50・Cloudflare のサービス 1,000 / 呼び出し(D1 は後者)。D1 のページの「50」と食い違う。D1 Free の 1 日の上限(読み 500 万・書き 10 万行)は 2026-09-01 から厳密に適用 | [[T10-1-spec-d1-limits\|T10-1]] |
+| [[workerd-d1-plugin-behavior\|workerd + D1(wrangler dev)でのプラグインの動きと、Node + SQLite との違い]] | `docs/workerd-d1-plugin-behavior.md` | アップロード・body の上限・保存 hook・参照元の記録・画像管理のルート・i18n・管理画面の入口は Node と同じ。クエリ数は `begin` / `commit` の分だけ少ない(アップロード 71)。アップロード 1 回で D1 は 761 行を読み 93 行を書く(Free の書きの上限はアップロードだけで約 1,000 回 / 日)。`storage` を省略すると標準のメディアのアップロードは 500 `UPLOAD_ERROR` | [[T32-cloudflare-check\|T32]] |
+| [[wrangler-dev-local-measurement\|wrangler dev(ローカルの D1)で playground を動かし、測る方法と注意点]] | `docs/wrangler-dev-local-measurement.md` | Cloudflare 用の設定とビルドの流れ、ローカルの状態(`.wrangler/state/v3`)を開発サーバーと共有してログインとトークンを使う方法、Local Explorer で D1 の呼び出しを数える方法。body を読まずに返した応答の直後の大きい body が 500 になる wrangler dev だけの不具合。wrangler がグローバルの設定ディレクトリにログを書くこと | [[T32-cloudflare-check\|T32]] |
