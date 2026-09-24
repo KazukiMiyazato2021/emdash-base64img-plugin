@@ -43,18 +43,21 @@ allow-git=root
 npm install "github:KazukiMiyazato2021/emdash-base64img-plugin#v0.1.0"
 ```
 
-- `package.json` の `dependencies` に `"emdash-plugin-base64-image": "github:KazukiMiyazato2021/emdash-base64img-plugin#v0.1.0"` が入る。
+- `package.json` の `dependencies` に、この git 依存が入る(パッケージ名は `emdash-plugin-base64-image`)。
 - プラグインは TypeScript のソースのまま配布している(ビルドの手順も install スクリプトも無い)。サイトの Vite がソースを変換する。
 - peer dependency は `emdash`(`^0.39.0`)、`@emdash-cms/admin`(`^0.39.0`)、`@cloudflare/kumo`(`2.6.0`)、`react`(`^18.0.0 || ^19.0.0`)。EmDash 0.39 のサイトなら、どれも `emdash` と一緒に入っている。
 
 > [!NOTE]
-> npm の `min-release-age`(公開から指定した日数がたっていない版を入れない設定)を使っている場合: EmDash 0.39 系の公開から、その日数がまだたっていないときは、このコマンドも `ERESOLVE`(`Found: emdash@undefined`)で止まる。プラグインの peer の `emdash` を解決するときに、npm が EmDash の版を選び直すため。EmDash を入れたときと同じく、このコマンドにも `--min-release-age=0` を付ける。公開日時は `npm view emdash time --json` で確かめられる。日数がたっていれば、付けなくてよい。
+> npm の `min-release-age`(公開から指定した日数がたっていない版を入れない設定)を使っている場合:
+> - サイトの EmDash の版の公開から、その日数がまだたっていないときは、このコマンドが `ERESOLVE`(`Found: emdash@undefined`)で止まる。プラグインの peer の `emdash` を解決するときに、npm が EmDash の版を選び直すため。
+> - EmDash を入れたときと同じく、このコマンドにも `--min-release-age=0` を付ける。`min-release-age` を緩めたくなければ、代わりに `--force`(peer の食い違いを無視する)でも入る。確かめたときは、どちらでも、増えたのはプラグインだけだった。
+> - 公開日時は `npm view emdash "time[0.39.1]"` で確かめられる(版はサイトの `package.json` の `emdash` に合わせる)。日数がたっていれば、どちらも付けなくてよい。
 
 #### 非公開のリポジトリから入れるとき
 
 リポジトリが非公開なら、インストールする環境ごとに、リポジトリを読む権限が要る。
 
-- 手元の PC: GitHub に登録した SSH の鍵で読めるなら、上と同じコマンドで入る。npm は、公開の tarball、HTTPS の `git clone`、SSH の `git clone` の順に試す。
+- 手元の PC: GitHub に登録した SSH の鍵で読めるなら、上と同じコマンドで入る(npm は、HTTPS で読めなければ SSH で読む)。
 - CI やビルドの環境: リポジトリを読めるトークン(GitHub の fine-grained personal access token で、このリポジトリの Contents を Read-only)を秘密の環境変数に入れ、`npm ci` より前に、git が HTTPS の URL にトークンを付けるよう設定する。
 
 ```sh
@@ -180,23 +183,29 @@ export default defineConfig({
 
 #### すでにデータベースがあるとき(API)
 
-EmDash の REST API の `POST /_emdash/api/schema/collections` と `POST /_emdash/api/schema/collections/{コレクション}/fields` で作る。管理者のロールが要る。
+EmDash の REST API(`POST /_emdash/api/schema/collections` と `POST /_emdash/api/schema/collections/{コレクション}/fields`)で作る。管理者のロールが要る。
 
-API トークンは、管理者が管理画面の「設定」の「API Tokens」(`/_emdash/admin/settings/api-tokens`)で作る(スコープ `schema:write`)。
+API トークンは、管理者が管理画面の「設定」の「API Tokens」(`/_emdash/admin/settings/api-tokens`)で作る。トークンを作れるのは管理者だけ。
 
 ```sh
 SITE=https://example.com       # サイトの URL
-TOKEN=ec_pat_...               # API トークン(スコープ schema:write)
+TOKEN=ec_pat_...               # 管理者の API トークン(スコープ schema:write)
+```
 
-# 画像の本体を置くコレクション b64_images
+画像の本体を置くコレクション `b64_images`:
+
+```sh
 curl -X POST "$SITE/_emdash/api/schema/collections" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   --data '{"slug":"b64_images","label":"Base64 Images","hidden":true,"routable":false,"supports":[]}'
 curl -X POST "$SITE/_emdash/api/schema/collections/b64_images/fields" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   --data '{"slug":"image","label":"Image","type":"json","required":true}'
+```
 
-# posts に単一画像のフィールド cover と、ギャラリーのフィールド gallery を足す
+`posts` に、単一画像のフィールド `cover` と、ギャラリーのフィールド `gallery` を足す:
+
+```sh
 curl -X POST "$SITE/_emdash/api/schema/collections/posts/fields" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   --data '{"slug":"cover","label":"Cover","type":"json","widget":"base64-image:image","options":{"maxStoredBytes":100000}}'
@@ -205,7 +214,8 @@ curl -X POST "$SITE/_emdash/api/schema/collections/posts/fields" \
   --data '{"slug":"gallery","label":"Gallery","type":"json","widget":"base64-image:gallery","options":{"maxStoredBytes":100000,"maxItems":10}}'
 ```
 
-- 開発サーバー(`astro dev`)では、トークンの代わりに開発用ログインの Cookie も使える。`curl -c cookies.txt "$SITE/_emdash/api/setup/dev-bypass?redirect=/_emdash/admin"` で Cookie を保存し、`-b cookies.txt -H "X-EmDash-Request: 1"` を付けて送る。
+- どれも、作れたら `201` と、作ったものの JSON が返る。すでにあれば `409` になる。
+- 開発サーバー(`astro dev`)では、トークンの代わりに開発用ログインの Cookie も使える。`curl -c cookies.txt "$SITE/_emdash/api/setup/dev-bypass?redirect=/_emdash/admin"` で Cookie を保存し、`-H "Authorization: …"` の代わりに `-b cookies.txt -H "X-EmDash-Request: 1"` を付けて送る。
 - 新しい環境でも同じ構成になるよう、seed にも同じ定義を書いておく。
 - MCP の `schema_create_collection` / `schema_create_field` でも作れる。
 
@@ -281,25 +291,33 @@ const images = await resolveBase64Images(covers);
 const lcpCover = covers.find((ref) => images.get(ref) !== undefined);
 ---
 
-<h1>投稿</h1>
-{error && <p>投稿を読み込めませんでした。</p>}
-<ul>
-	{
-		entries.map((entry) => {
-			const cover = entry.data.cover;
-			return (
-				<li>
-					<a href={`/posts/${encodeURIComponent(entry.id)}/`}>
-						{isBase64ImageRef(cover) && (
-							<Base64Image imageRef={cover} images={images} priority={cover === lcpCover} />
-						)}
-						{entry.data.title}
-					</a>
-				</li>
-			);
-		})
-	}
-</ul>
+<html lang="ja">
+	<head>
+		<meta charset="utf-8" />
+		<title>投稿</title>
+	</head>
+	<body>
+		<h1>投稿</h1>
+		{error && <p>投稿を読み込めませんでした。</p>}
+		<ul>
+			{
+				entries.map((entry) => {
+					const cover = entry.data.cover;
+					return (
+						<li>
+							<a href={`/posts/${encodeURIComponent(entry.id)}/`}>
+								{isBase64ImageRef(cover) && (
+									<Base64Image imageRef={cover} images={images} priority={cover === lcpCover} />
+								)}
+								{entry.data.title}
+							</a>
+						</li>
+					);
+				})
+			}
+		</ul>
+	</body>
+</html>
 ```
 
 詳細のページ(`src/pages/posts/[slug].astro`)。カバーとギャラリーを 1 回で解決する。
@@ -330,35 +348,44 @@ const images = await resolveBase64Images(cover ? [cover, ...gallery] : gallery);
 const lcpRef = cover ?? gallery.find((ref) => images.get(ref) !== undefined);
 ---
 
-{
-	post ? (
-		<article>
-			<h1>{post.data.title}</h1>
-			{cover && <Base64Image imageRef={cover} images={images} priority={cover === lcpRef} />}
-			<ul>
-				{gallery.map((ref) => (
-					<li>
-						<Base64Image imageRef={ref} images={images} priority={ref === lcpRef} />
-					</li>
-				))}
-			</ul>
-		</article>
-	) : (
-		<h1>投稿が見つかりません</h1>
-	)
-}
+<html lang="ja">
+	<head>
+		<meta charset="utf-8" />
+		<title>{post ? post.data.title : "投稿が見つかりません"}</title>
+	</head>
+	<body>
+		{
+			post ? (
+				<article>
+					<h1>{post.data.title}</h1>
+					{cover && <Base64Image imageRef={cover} images={images} priority={cover === lcpRef} />}
+					<ul>
+						{gallery.map((ref) => (
+							<li>
+								<Base64Image imageRef={ref} images={images} priority={ref === lcpRef} />
+							</li>
+						))}
+					</ul>
+				</article>
+			) : (
+				<h1>投稿が見つかりません</h1>
+			)
+		}
+	</body>
+</html>
 ```
 
 - `getEmDashEntry` は、エントリが見つからないときも `error`(Astro の `LiveEntryNotFoundError`)を返す。`error` があるだけで 500 にすると、存在しない URL が 500 になる。
 - `priority` は、LCP(最も大きく描かれる要素)になる画像 1 枚だけに付ける。対象を「1 件目のカバー」のように決め打ちすると、その画像が見つからないときに、どの画像にも付かない。描画できる最初の画像を選ぶ。
 - 詳細のページでカバーが見つからないときは、代わりの枠がカバーの場所を占めるので、ほかの画像には付けない。
+- 例では、`<html>` と `<meta charset="utf-8" />` をページに直接書いた。サイトにレイアウトがあれば、それで包む。`<meta charset>` が無いと、日本語が文字化けする(Astro の応答の `Content-Type` は `text/html` で、charset を含まない)。
 - このリポジトリの `playground/src/pages/` に、同じ形のページ(レイアウトとスタイル付き)がある。
 
 ### 6. 確かめる
 
 1. 開発サーバーを起動し、管理画面(`/_emdash/admin`)を開く。
 2. 投稿の編集画面で、`cover` と `gallery` が「画像をドロップ / 貼り付け」の枠になっていることを確かめる(JSON の入力欄のままなら、手順 3・4 を見直す)。
-3. 画像を追加して保存・公開し、サイトのページ(上の例では `/posts/`)に画像が出ることを確かめる。
+3. 画像を追加して保存・公開し、サイトのページ(上の例では `/posts/`)に画像が出ることを確かめる。公開は、編集画面の右上の「Publish now」(EmDash 0.39.1 では日本語の画面でも英語のまま)を押し、確認のダイアログでもう一度「Publish now」を押す。
 
 ### 型チェックとマイグレーション
 
@@ -420,20 +447,24 @@ seed や手での書き換えで、フィールドの値が参照の形になっ
 
 ### ゴミ箱から戻す
 
-画像管理ページには、ゴミ箱から戻す操作が無い。EmDash の REST API で戻す(編集者以上。API トークンならスコープ `content:write`)。
+画像管理ページには、ゴミ箱から戻す操作が無い。EmDash の REST API で戻す。戻せるのは編集者以上で、API トークンを作れるのは管理者だけなので、トークンで戻すのは管理者になる(編集者は、下の標準の画面の「復元」を使うか、管理者に頼む)。
 
 ```sh
-curl -X POST "$SITE/_emdash/api/content/b64_images/<画像の ID>/restore" -H "Authorization: Bearer $TOKEN"
+SITE=https://example.com       # サイトの URL
+TOKEN=ec_pat_...               # 管理者の API トークン(スコープ content:write)
+curl -X POST "$SITE/_emdash/api/content/b64_images/<画像の ID>/restore" \
+  -H "Authorization: Bearer $TOKEN" -o /dev/null -w "%{http_code}\n"
 ```
 
-- 画像の ID は、画像管理ページの各行に出ている。
+- 画像の ID は、画像管理ページの各行に出ている。`200` が出れば戻っている(応答の本文には画像の本体が入るので、`-o /dev/null` で捨てている)。
 - 戻した画像は下書きになり、サイトには表示されない。画像管理ページの「公開」で公開し直す。
+- EmDash 標準の `b64_images` の画面(`/_emdash/admin/content/b64_images`)の「ゴミ箱」のタブの「復元」でも戻せる。ただし、その画面は開くだけで、一覧の最大 100 件とゴミ箱の最大 50 件の画像の本体を読み込む(下の「使わない画面」)。
 
 ### 使わない画面
 
 `b64_images` の EmDash 標準の画面は使わない。
 
-- 標準の一覧・ゴミ箱の画面(`/_emdash/admin/content/b64_images`)は、1 ページで最大 100 件の画像の本体(1 件最大約 100KB の base64)を読み込み、重い。
+- 標準の一覧・ゴミ箱の画面(`/_emdash/admin/content/b64_images`)は、開くだけで、一覧の最大 100 件とゴミ箱の最大 50 件の画像の本体(既定で 1 件最大 100,000 バイトの base64)を読み込み、重い。
 - 標準の編集画面からは、保存も公開もできない(保存 hook が拒否する)。画像を差し替えるときは、投稿のフィールドで新しくアップロードする。
 - 標準の新規作成の画面・REST API・seed で作った画像は、プラグインの記録に無く、投稿から参照すると保存が拒否される。画像は widget からアップロードする。
 - 管理画面のコマンドパレットで「Images」などと入力すると、非表示の `b64_images`(「Base64 Images」)も候補に出る。選ぶと標準の一覧に移るので、選ばない(画像管理ページは「画像」)。
@@ -471,19 +502,20 @@ curl -X POST "$SITE/_emdash/api/content/b64_images/<画像の ID>/restore" -H "A
 
 ### b64_images が無いとき
 
-編集者の画面には、画像を選んだあとに「画像を保存するコレクション b64_images がありません。サイトの設定を確認してください。」が出るだけで、値は変わらない(画像なしの投稿は保存できる)。サーバーのログには、次のエラーが出る(アップロードは 500 `IMAGE_COLLECTION_MISSING`)。
+編集者の画面には、画像を選んだあとに「画像を保存するコレクション b64_images がありません。サイトの設定を確認してください。」が出るだけで、値は変わらない(画像なしの投稿は保存できる)。直し方はサーバーのログにだけ出る。
+
+- アップロードのたびに `[plugin:base64-image] Failed to create the image entry`(`Collection 'b64_images' not found`)が出る。アップロードは 500 `IMAGE_COLLECTION_MISSING`。
+- プロセス(Workers では isolate)ごとの最初の保存と、管理画面でプラグインを有効に戻したときに、次のエラーが出る。
 
 ```text
-The "b64_images" collection does not exist, so images cannot be uploaded (the upload route returns IMAGE_COLLECTION_MISSING). This plugin cannot create collections: add it to the site's seed, or create it with the schema API (hidden: true, routable: false, supports: [], and a required "image" field of type json).
+[plugin:base64-image] The "b64_images" collection does not exist, so images cannot be uploaded (the upload route returns IMAGE_COLLECTION_MISSING). This plugin cannot create collections: add it to the site's seed, or create it with the schema API (hidden: true, routable: false, supports: [], and a required "image" field of type json).
 ```
 
 直し方:
 
 1. 動いているサイトのデータベースに、手順 4 の「すでにデータベースがあるとき(API)」で `b64_images` を作る(seed に足すだけでは、すでにあるデータベースには入らない)。
 2. 新しい環境のために、seed にも `b64_images` を足す。
-3. もう一度、画像を追加する。
-
-このログは、プロセス(Workers では isolate)ごとの最初の保存と、管理画面でプラグインを有効に戻したときに出る。
+3. もう一度、画像を追加する。サーバーの再起動は要らない。
 
 ## 資料
 
@@ -492,6 +524,7 @@ The "b64_images" collection does not exist, so images cannot be uploaded (the up
 - [docs/npm12-git-dependency-policy.md](docs/npm12-git-dependency-policy.md): npm 12 の git 依存と `min-release-age`
 - [docs/git-dependency-ts-source.md](docs/git-dependency-ts-source.md): TypeScript のソースのまま配布したプラグインの読み込み・型チェック・マイグレーション
 - [docs/emdash-dependency-versions.md](docs/emdash-dependency-versions.md): 依存パッケージの版と、EmDash を上げるときに確かめること
+- [docs/readme-install-verification.md](docs/readme-install-verification.md): この README の手順で新しいサイトを作って確かめた結果
 - [docs/00-index.md](docs/00-index.md): 作業中に得た知見の索引
 
 ## 開発
