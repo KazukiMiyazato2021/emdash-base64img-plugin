@@ -15,10 +15,11 @@ updated: 2026-09-24
 
 > [!summary] 概要
 > - プラグイン「base64-image」を動かして確かめるための EmDash サイト。Astro + `@astrojs/node` + SQLite で、`storage` は指定しない。
+> - Cloudflare Workers(workerd + ローカルの D1)でも動かせる。設定は `wrangler.jsonc`・`astro.config.cloudflare.mjs`・`src/worker.ts`([[#Cloudflare(workerd + D1)で動かす]])。
 > - プラグインは `file:..` でリポジトリのルートを参照する。配布物には含めない。
 > - サイト側のページは、投稿の一覧(`/posts/`)と詳細(`/posts/<slug か ID>/`)。画像は `resolveBase64Images` でまとめて解決する([[#ページ]])。
 > - 表示用の画像は、アップロードのルートで作る(seed には画像と投稿を入れていない)。サンプルの投稿を作るスクリプトがある([[#表示用のデータの作り方]])。
-> - 関連: [[T02-playground]]、[[T26-playground-pages]]、[[base64-image-plugin-spec#13.1 seed|仕様書 13.1]]、[[emdash-playground-site-config]]、[[emdash-seed-and-b64-images]]、[[astro-dev-background-for-agents]]、[[vite-watch-scope-playground]]、[[playground-site-pages]]
+> - 関連: [[T02-playground]]、[[T26-playground-pages]]、[[T32-cloudflare-check]]、[[base64-image-plugin-spec#13.1 seed|仕様書 13.1]]、[[emdash-playground-site-config]]、[[emdash-seed-and-b64-images]]、[[astro-dev-background-for-agents]]、[[vite-watch-scope-playground]]、[[playground-site-pages]]、[[wrangler-dev-local-measurement]]
 
 コマンドは、すべてリポジトリのルートで実行する。
 
@@ -107,6 +108,7 @@ http://localhost:4402/_emdash/api/setup/dev-bypass?redirect=/_emdash/admin
 npm run dev -w playground -- --port 4402                                  # 先に起動する
 node playground/scripts/create-sample-posts.ts --base http://localhost:4402  # 3 件(ギャラリー 3 枚ずつ)
 node playground/scripts/create-sample-posts.ts --base http://localhost:4402 --posts 11 --gallery 10 --trash-cover
+node playground/scripts/create-sample-posts.ts --base http://localhost:8732 --token <API トークン>  # ビルドしたサイト(wrangler dev など)
 ```
 
 | オプション | 既定 | 内容 |
@@ -115,10 +117,11 @@ node playground/scripts/create-sample-posts.ts --base http://localhost:4402 --po
 | `--posts` | 3 | 作る投稿の数。11 件以上で、一覧に次のページができる |
 | `--gallery` | 3 | 1 件のギャラリーの枚数(`gallery` の `maxItems` は 10)。横長(800×600)と縦長(600×800)を交互に作り、最後の 1 枚は代替テキストを空にする |
 | `--trash-cover` | なし | 最後の投稿のカバー画像をゴミ箱に移す(サイトで「画像が見つかりません」の枠を確かめる) |
+| `--token` | なし(環境変数 `EMDASH_TOKEN`) | 開発用ログインの代わりに、API トークン(`ec_pat_…`。`admin` スコープが要る)で API を呼ぶ。開発用ログインが 403 になる、ビルドしたサイト(`wrangler dev`・`npm run preview`)で使う。トークンの作り方は [[#Cloudflare(workerd + D1)で動かす]] |
 
-- 開発用ログインで Cookie を得て、画像を Playwright の Chromium の canvas で描き(WebP、カバーは 1280×853)、アップロードのルートに 1 枚ずつ送る。そのあと標準の REST API で投稿を作って公開する。
-- 開発用ログインを使うので、開発サーバー(`astro dev`)でだけ動く。タイトルと slug には実行した時刻が入るので、何度実行しても重ならない。
-- `npm run typecheck` の対象外(Node が型の注釈を取り除いて実行する)。
+- 開発用ログインで Cookie を得て(`--token` のときはトークンを使う)、画像を Playwright の Chromium の canvas で描き(WebP、カバーは 1280×853)、アップロードのルートに 1 枚ずつ送る。そのあと標準の REST API で投稿を作って公開する。
+- `--token` が無いときは開発用ログインを使うので、開発サーバー(`astro dev`)でだけ動く。タイトルと slug には実行した時刻が入るので、何度実行しても重ならない。
+- Node が型の注釈を取り除いて実行する。型は `npm run typecheck` で検査する([[T26-1-typecheck-playground-scripts|T26-1]])。
 
 ### 管理画面から作る
 
@@ -150,6 +153,45 @@ npm run preview -w playground -- --port 4402   # ビルドしたサイトを動�
 - `npm run verify`(ルートの `npm run build`)にも含まれる。データベースもネットワークも使わない。
 - `playground/dist/` と `playground/.emdash/migrations.json` を書き出す。どちらも git の管理外。
 
+## Cloudflare(workerd + D1)で動かす
+
+同じサイトを、Cloudflare アダプター(`@astrojs/cloudflare`)と D1 で動かす。R2(`storage`)と cron は使わない。Cloudflare のアカウントには接続しない(D1 も KV もローカル)。[[T32-cloudflare-check|T32]] で確かめた結果は [[workerd-d1-plugin-behavior]]、測り方と注意点は [[wrangler-dev-local-measurement]]。
+
+| ファイル | 内容 |
+|---|---|
+| `wrangler.jsonc` | wrangler の設定(D1 の `DB` だけ。`send_metrics: false`) |
+| `astro.config.cloudflare.mjs` | Cloudflare 用の Astro の設定(`d1({ binding: "DB", session: "auto" })`) |
+| `src/worker.ts` | Worker の入口(EmDash のテンプレートと同じ形) |
+
+```sh
+# 1. 開発サーバーで、ローカルの D1 の準備とログインをする(Node 用と同じく、エージェントからはバックグラウンドで起動する)
+WRANGLER_SEND_METRICS=false npm run dev:cloudflare -w playground -- --port 4432
+#    ブラウザで http://localhost:4432/_emdash/api/setup/dev-bypass?redirect=/_emdash/admin を開く
+#    API トークンも要るときは http://localhost:4432/_emdash/api/setup/dev-bypass?token=1 を開く(応答の data.token)
+npm run dev:cloudflare -w playground -- stop
+
+# 2. Cloudflare 用にビルドして、wrangler dev で動かす(前面で動く。止めるのは Ctrl+C)
+npm run build:cloudflare -w playground
+WRANGLER_SEND_METRICS=false npm run preview:cloudflare -w playground -- --port 8732 --inspector-port 9332 --ip 127.0.0.1
+
+# 3. サンプルの投稿(ビルドしたサイトでは --token が要る)
+node playground/scripts/create-sample-posts.ts --base http://localhost:8732 --token <API トークン>
+```
+
+- サイト: `http://localhost:8732/`、管理画面: `http://localhost:8732/_emdash/admin`。`npm run dev:cloudflare -w playground -- --port 4432` の開発サーバーでも、サイトと管理画面を使える(開発用ログインも使える)。
+- `wrangler dev`(`preview:cloudflare`)は本番のビルドを動かすので、**開発用ログインは 403** になる。先に開発サーバーでログインしておく。D1 とセッション(KV)のローカルの状態は、開発サーバーと `wrangler dev` で同じもの(`playground/.wrangler/state/v3`)を使うので、同じブラウザの `localhost` ならログインしたまま開ける。`localhost` と `127.0.0.1` は混ぜない(Cookie が別になる)。
+- 開発用ログインの `?token=1` で作った API トークンは `admin` スコープを持つ。管理画面の「設定 → API トークン」(`/_emdash/admin/settings/api-tokens`)で作ってもよい。
+- ポートは、チームの決まり(`4400 + タスク番号`・`8700 + 番号`・`9300 + 番号`)に合わせる。上の例は T32 のもの。
+- ビルドの出力は Node 用と同じ `playground/dist/`。`npm run verify` などで Node 用にビルドしたあとは、`npm run build:cloudflare -w playground` でビルドし直してから `preview:cloudflare` を動かす(逆に、Node の `npm run preview` の前は `npm run build -w playground`)。
+- ローカルの状態を消すときは、サーバーを止めてから `rm -rf playground/.wrangler/state`。
+- `wrangler.jsonc` の `send_metrics: false` で、wrangler は利用状況を送らない(`WRANGLER_SEND_METRICS=false` も同じ)。ただし wrangler は、利用者のグローバルの設定ディレクトリ(macOS は `~/Library/Preferences/.wrangler/`)にログを書く。
+
+> [!warning] 作業の最後にサーバーを止める
+> `wrangler dev` は、起動したターミナル(エージェントではバックグラウンドのタスク)を止めると終わる。開発サーバーは `npm run dev:cloudflare -w playground -- stop` で止める。最後に `lsof -nP -iTCP:<ポート> -sTCP:LISTEN` で、使ったポート(例: 4432・8732・9332)に何も出ないことを確かめる。
+
+> [!warning] wrangler dev だけで起きる失敗
+> プラグインのルートが body を読まずに返した応答(上限を超えた 413、CSRF の 403)の直後に大きい body を送ると、約半分の割合で 500(`Error inside ProxyWorker … Network connection lost`)になる。プラグインの不具合ではない。Cloudflare アダプターの開発サーバーでは起きない([[wrangler-dev-local-measurement#5.1 body を読まずに返した応答の直後のリクエストが失敗する]])。
+
 ## 設定のポイント
 
 | 項目 | 設定 | 理由 |
@@ -166,6 +208,7 @@ npm run preview -w playground -- --port 4402   # ビルドしたサイトを動�
 | `data.db` | SQLite のデータベース | 管理外 |
 | `emdash-env.d.ts` | 開発サーバーの起動時に生成されるコレクションの型 | 管理外(`playground/.gitignore`) |
 | `.emdash/` | マイグレーションのマニフェストと、メディアのアップロード | 管理外(`playground/.gitignore`) |
+| `.wrangler/` | Cloudflare 用の D1・KV のローカルの状態(`state/v3`)と、Cloudflare 用のビルドが書く wrangler の設定の転送先(`deploy/config.json`) | 管理外(ルートの `.gitignore`) |
 | `.astro/`、`dist/`、`node_modules/` | Astro の型・ログ・ビルド出力・キャッシュ | 管理外 |
 
 > [!warning] `npm run lint` と `emdash-env.d.ts`

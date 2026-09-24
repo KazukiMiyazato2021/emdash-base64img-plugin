@@ -83,6 +83,22 @@ updated: 2026-09-24
 - ロックファイルにある版は、`min-release-age=3` のままの `npm ci` でも入った。この設定は、範囲から版を選ぶときにだけ働き、ロックファイルの版を入れるときには働かない。そのため、ほかの worktree は、いつもどおり `npm ci` でよい。根拠: **実測のみ**
 - 2026-09-26 19:20(日本時間)ごろ以降は、0.39.1 も通常の設定で選ばれる。
 
+## Cloudflare 用の依存(2026-09-24)
+
+[[T32-cloudflare-check|T32]] の前に、playground に Cloudflare 用の依存を入れた([[T32-1-cloudflare-deps|T32-1]])。版は [[git-dependency-ts-source#再現の手順|T07 の spike]] と同じ系列にした。
+
+| パッケージ | 版(ロックファイル) | playground の指定 | 入れ方 |
+|---|---|---|---|
+| `@astrojs/cloudflare` | 14.3.2 | `dependencies`、`^14.3.2` | 通常の設定(`min-release-age=3`) |
+| `@emdash-cms/cloudflare` | 0.39.1 | `dependencies`、`0.39.1`(固定) | 例外([[#min-release-age の例外(2026-09-24)]])。このパッケージだけを `npm install --min-release-age=0 --save-exact` で入れた |
+| `wrangler` | 4.135.0 | `devDependencies`、`^4.135.0` | 通常の設定 |
+| `@cloudflare/workers-types` | 5.20260921.1 | `devDependencies`、`^5.20260921.1` | 通常の設定 |
+
+- 監査: 例外のコマンドのあとで、ロックファイルの差分(追加された 62 項目)の公開日時を npm registry で調べた。公開から 3 日未満は `@emdash-cms/cloudflare@0.39.1`(2026-09-23 10:10 UTC)だけで、EmDash の外は 0 個だった。`overrides` は要らなかった。根拠: **実測のみ**(2026-09-24 11:31 UTC)
+- `wrangler` 4.135.0 は `miniflare` をプレリリースの版(`5.20260918.0-alpha`)に固定している(`workerd` は 1.20260918.1)。wrangler の指定のまま入れた。根拠: **実測のみ**(`npm view wrangler@4.135.0 dependencies`)
+- `@emdash-cms/cloudflare` の peer の `pg`・`react`・`@cloudflare/kumo`・`@phosphor-icons/react` は省略できる(`peerDependenciesMeta`)。`pg` は入らない。根拠: **公式ドキュメントのみ**(`npm view @emdash-cms/cloudflare@0.39.1 peerDependenciesMeta`)
+- `npm run verify`(playground の Node 用のビルドを含む)は、依存を足したあとも通った。Cloudflare 用の設定(`wrangler.jsonc`・`astro.config.cloudflare.mjs`・`src/worker.ts`)は [[T32-cloudflare-check|T32]] で作る。
+
 ## Kumo を 2.6.0 に固定する理由
 
 - `@emdash-cms/admin@0.39.1` は `@cloudflare/kumo` に `2.6.0`(範囲なし)で依存している。0.37.0 / 0.38.0 / 0.39.0 も同じ `2.6.0`。根拠: **実測のみ**(`npm view @emdash-cms/admin@<版> dependencies`)

@@ -24,11 +24,13 @@ updated: 2026-09-24
 |---|---|---|---|
 | [[npm-workspaces-nested-worktree\|npm 12 の workspaces と入れ子の worktree]] | `docs/npm-workspaces-nested-worktree.md` | playground が `file:..` でルートを参照する構成。ロックファイルはルートの 1 つだけ。入れ子の worktree で上位の `node_modules` が解決される問題 | [[T01-scaffold\|T01]] |
 | [[test-lint-setup\|テスト・lint・E2E の設定]] | `docs/test-lint-setup.md` | vitest の projects(node / jsdom)、`cleanup()` の明示、oxlint と prettier の対象、Playwright のブラウザ | [[T01-scaffold\|T01]] |
+| [[e2e-playwright-emdash-admin\|E2E(Playwright)の組み立てと、EmDash 0.39.1 の管理画面を自動で操作して分かったこと]] | `docs/e2e-playwright-emdash-admin.md` | `npm run test:e2e` の組み立て(空のデータベースでの起動、ロールごとのログイン、テストごとの目印でデータを分ける)。Playwright で EmDash の管理画面を操作するときの注意(`toBeDisabled` と fieldset、`mod+k` が Ctrl になる UA、一覧は 20 件ずつ)。処理中の保存と新規作成の保存の実測。手で確かめる項目 | [[T31-e2e\|T31]] |
 | [[claude-code-worktree-isolation\|worktree で隔離したチームの運用]] | `docs/claude-code-worktree-isolation.md` | isolation: worktree の worktree は `main` から作られる。分岐元の確認、片付け、共有される stash | [[T01-1-workflow-docs-index\|T01-1]] |
 | [[astro-dev-background-for-agents\|エージェントから実行した astro dev はバックグラウンドで起動する]] | `docs/astro-dev-background-for-agents.md` | Astro 7.3.3 は環境変数 `CLAUDECODE` を見て `astro dev` / `astro preview` を自動でバックグラウンドにする。止めるのは `npm run dev -w playground -- stop` | [[T02-playground\|T02]] |
 | [[vite-watch-scope-playground\|playground の開発サーバーが監視する範囲]] | `docs/vite-watch-scope-playground.md` | 監視は playground の中と、読み込まれたプラグインのソースだけ。ルート自身へのリンク・`spikes/`・`.claude/` はたどらない(除外の設定は不要) | [[T02-playground\|T02]] |
 | [[git-dependency-ts-source\|git 依存 + TS ソースのプラグインを利用者のサイトで読み込む]] | `docs/git-dependency-ts-source.md` | ビルドなしの TS ソースを git 依存で入れ、Node と Cloudflare の両アダプターで読み込めた。利用者の `tsc` は `src` を検査する(`astro check` はしない)。緩い設定・厳しい設定の代わりの tsconfig で確かめる。`emdash migrate --from-config` は失敗する | [[T07-spike-git-dependency\|T07]]、[[T04-1-consumer-typecheck\|T04-1]] |
 | [[npm12-git-dependency-policy\|npm 12 の git 依存・install スクリプトの既定と min-release-age]] | `docs/npm12-git-dependency-policy.md` | npm 12 は git 依存を既定で拒否する(サイトの `.npmrc` に `allow-git=root` が要る)。依存の install スクリプト(git 依存の `prepare` も)は既定で止まる。`min-release-age` で peer の解決が `ERESOLVE` になる | [[T07-spike-git-dependency\|T07]] |
+| [[readme-install-verification\|README の導入手順で新しいサイトを作って確かめた結果]] | `docs/readme-install-verification.md` | README の手順だけで playground と同じ構成を作れた(widget でのアップロード・保存・公開と、サイトのページの表示)。例のページには `<meta charset>` が要る。`min-release-age` のままプラグインを入れると `ERESOLVE`(`--force` か `--min-release-age=0`)。EmDash 0.39.1 の例外で EmDash の外に新しい版が入ったときの `overrides`。schema API での `b64_images` の作成、標準の画面のゴミ箱からの復元 | [[T33-readme\|T33]] |
 
 ## EmDash
 
@@ -95,3 +97,5 @@ updated: 2026-09-24
 | ノート | パス | 内容 | 元のタスク |
 |---|---|---|---|
 | [[cloudflare-workers-free-d1-limits\|Workers Free で D1 に送れるクエリ数と、1 日の上限]] | `docs/cloudflare-workers-free-d1-limits.md` | Free はサブリクエストが外部 50・Cloudflare のサービス 1,000 / 呼び出し(D1 は後者)。D1 のページの「50」と食い違う。D1 Free の 1 日の上限(読み 500 万・書き 10 万行)は 2026-09-01 から厳密に適用 | [[T10-1-spec-d1-limits\|T10-1]] |
+| [[workerd-d1-plugin-behavior\|workerd + D1(wrangler dev)でのプラグインの動きと、Node + SQLite との違い]] | `docs/workerd-d1-plugin-behavior.md` | アップロード・body の上限・保存 hook・参照元の記録・画像管理のルート・i18n・管理画面の入口は Node と同じ。クエリ数は `begin` / `commit` の分だけ少ない(アップロード 71)。アップロード 1 回で D1 は 761 行を読み 93 行を書く(Free の書きの上限はアップロードだけで約 1,000 回 / 日)。`storage` を省略すると標準のメディアのアップロードは 500 `UPLOAD_ERROR` | [[T32-cloudflare-check\|T32]] |
+| [[wrangler-dev-local-measurement\|wrangler dev(ローカルの D1)で playground を動かし、測る方法と注意点]] | `docs/wrangler-dev-local-measurement.md` | Cloudflare 用の設定とビルドの流れ、ローカルの状態(`.wrangler/state/v3`)を開発サーバーと共有してログインとトークンを使う方法、Local Explorer で D1 の呼び出しを数える方法。body を読まずに返した応答の直後の大きい body が 500 になる wrangler dev だけの不具合。wrangler がグローバルの設定ディレクトリにログを書くこと | [[T32-cloudflare-check\|T32]] |

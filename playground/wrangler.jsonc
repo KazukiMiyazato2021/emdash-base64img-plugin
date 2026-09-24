@@ -1,0 +1,22 @@
+// playground を Cloudflare Workers(workerd + D1)で動かすときの wrangler の設定(T32)。
+// - EmDash のテンプレート(templates/starter-cloudflare/wrangler.jsonc)から、R2(storage)と cron を外した形。
+//   storage を使わない構成を再現する(仕様書 13.3)。定期処理(予約公開など)の cron は playground では使わない。
+// - ローカル(`wrangler dev`・Cloudflare アダプターの `astro dev`)だけで使う。D1 などのローカルの状態は
+//   playground/.wrangler/state/v3 に置かれる(git 管理外)。`database_id` は書かない(テンプレートと同じ)ので、
+//   ローカルの D1 の ID はバインディング名(`DB`)になる。
+// - 手順は playground/README.md の「Cloudflare(workerd + D1)で動かす」。
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "base64-image-playground",
+	"main": "./src/worker.ts",
+	"compatibility_date": "2026-02-24",
+	"compatibility_flags": ["nodejs_compat"],
+	// wrangler の利用状況を Cloudflare に送らない(利用者の設定より優先される)
+	"send_metrics": false,
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "base64-image-playground",
+		},
+	],
+}
