@@ -86,6 +86,7 @@ expect(missing.unknown).toEqual([]); // CSS に無い残りは、Kumo が自分�
 | `Button` | `type` の既定は `"button"`(EmDash の編集画面は `<form>` なので、送信しない)。`title` を渡すと `Tooltip` で包む | 名前は `title` ではなく `aria-label` で付ける | `button-gtdhvogt5rlrf1is.js:172`、`:177` |
 | `Button` | クラスは tailwind-merge で合わせる。`w-max`・`h-9` などの既定を `className` の `w-full`・`h-auto` で上書きできる | 大きなボタン(ドロップゾーン)は EmDash の `ImageDropTarget` と同じクラスにした | — |
 | `Input` | `label`・`description` があると Base UI の Field で包み、`aria-labelledby`・`aria-describedby` を付ける。jsdom でも同じ | 説明(空欄の注意など)は `description` で渡す | `input-f2ct7obgdzypjmp2.js` |
+| `Input` | `className` は `<input>` に付き、ラベル・説明を包む Field(`grid gap-2`、`auto` の列)には付かない。Firefox 155 では、その列の最小幅が入力欄の既定の幅(約 215px)になり、狭い列(196px)で入力欄がはみ出した。Chromium 153 でははみ出さない。根拠: 実測+公式ドキュメント([[gallery-widget-reorder-focus#5. 狭い画面での代替テキストの入力欄(Firefox)]]) | 狭い列に置くなら `className="min-w-0"` を渡す(`.min-w-0` は管理画面の CSS にある) | `input-f2ct7obgdzypjmp2.js:96-101`、`field-f1hy08um3jf9jos6.js:18` |
 | `Input` | 自分で `disabled:text-kumo-disabled` を付けるが、Kumo のテーマに `kumo-disabled` の色が無く、CSS が作られない(管理画面の Input も同じ) | 気にしない(Kumo の不具合) | `input-f2ct7obgdzypjmp2.js:51` |
 | `Banner` | role を持たない。残りの props を `div` に渡す。`title`(文字列)と `description` を渡すと、見出しと本文の形になる | エラーは外側の `role="alert"` の領域の中に置く | `banner-es5iwuk4pf25e29e.js:70` |
 

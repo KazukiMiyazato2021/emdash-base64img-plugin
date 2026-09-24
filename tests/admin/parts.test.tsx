@@ -706,6 +706,51 @@ describe("UploadProgress", () => {
 		rerender(<UploadProgress progress={null} completed={2} />);
 		expect(screen.getByRole("status")).toHaveTextContent("2 images added.");
 	});
+
+	it("処理中だけ、行の下に保存の案内を出す。読み上げの領域には入れず、キャンセルボタンの説明にする", () => {
+		const hintText = "処理が終わってから保存してください。";
+		const { rerender } = render(<UploadProgress progress={null} onCancel={callback()} />);
+		expect(screen.queryByText(hintText)).not.toBeInTheDocument();
+
+		rerender(<UploadProgress progress={COMPRESSING} onCancel={callback()} />);
+		const hint = screen.getByText(hintText);
+		expect(hint).toBeVisible();
+		// 進捗の行のすぐ下
+		expect(hint.previousElementSibling).toHaveAttribute("data-stage", "compressing");
+		// 段階が変わるたびに読まないよう、aria-live の領域の外に置く
+		expect(hint.closest("[aria-live]")).toBeNull();
+		expect(screen.getByRole("status")).not.toHaveTextContent(hintText);
+		// キャンセルボタン(処理を始めると widget がフォーカスを移す)の説明として読まれる
+		expect(screen.getByRole("button", { name: "キャンセル" })).toHaveAccessibleDescription(
+			hintText,
+		);
+
+		// 段階が変わっても、同じ要素のまま出しておく
+		rerender(<UploadProgress progress={{ stage: "uploading" }} onCancel={callback()} />);
+		expect(screen.getByText(hintText)).toBe(hint);
+		expect(screen.getByRole("status")).toHaveTextContent(/^画像をアップロードしています。$/);
+
+		// 処理が終わったら消す(完了の読み上げにも入れない)
+		rerender(<UploadProgress progress={null} completed={1} onCancel={callback()} />);
+		expect(screen.queryByText(hintText)).not.toBeInTheDocument();
+		expect(screen.getByRole("status")).toHaveTextContent(/^画像を追加しました。$/);
+
+		// キャンセルボタンが無くても、案内は出す
+		rerender(<UploadProgress progress={COMPRESSING} />);
+		expect(screen.getByText(hintText)).toBeVisible();
+	});
+
+	it("保存の案内の英語の文", async () => {
+		document.documentElement.lang = "en";
+		render(<UploadProgress progress={COMPRESSING} onCancel={callback()} />);
+
+		expect(screen.getByText("Save after processing finishes.")).toBeVisible();
+		expect(screen.getByRole("button", { name: "Cancel" })).toHaveAccessibleDescription(
+			"Save after processing finishes.",
+		);
+		await changeLang("ja");
+		expect(screen.getByText("処理が終わってから保存してください。")).toBeInTheDocument();
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -899,6 +944,20 @@ describe("AltTextInput", () => {
 		);
 		rerender(<AltTextInput value="" onChange={textHandler()} itemLabel="image 2" />);
 		expect(screen.getByRole("textbox", { name: "Alternative text (image 2)" })).toBeInTheDocument();
+	});
+
+	it("入力欄(<input>)に min-w-0 を付ける(狭い列で、Kumo の包みの grid の最小幅にしない)", () => {
+		render(<AltTextInput value="" onChange={textHandler()} itemLabel="画像 2" />);
+
+		const input = screen.getByRole("textbox", { name: "代替テキスト(画像 2)" });
+		expect(input.tagName).toBe("INPUT");
+		expect(input).toHaveClass("min-w-0");
+		// Kumo の Input は className を <input> に付ける(ラベルと説明を包む要素には付かない)
+		const field = input.parentElement;
+		expect(field).not.toBeNull();
+		expect(field).toContainElement(screen.getByText("代替テキスト(画像 2)"));
+		expect(field).not.toHaveClass("min-w-0");
+		expect(ADMIN_CSS).toContain(".min-w-0{min-width:");
 	});
 });
 

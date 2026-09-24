@@ -5,6 +5,9 @@
  *   (Kumo の Input の `description`。`aria-describedby` で入力欄に結び付く)。
  * - 上限は `MAX_ALT_LENGTH`(1,000)。HTML の `maxlength` は UTF-16 のコード単位で数えるので、サーバーの上限
  *   (コードポイントで数える)より厳しいか同じになり、上限を超える値は入力できない(`src/shared/constants.ts`)。
+ * - 入力欄に `min-w-0` を付ける。Kumo の Input は、ラベルと説明と一緒に `grid`(`auto` の列)で包まれ、その列の最小幅が
+ *   入力欄の既定の幅(Firefox 155 で約 215px)になる。ギャラリーの行のように狭い列に置くと、行からはみ出した
+ *   (docs/gallery-widget-reorder-focus.md の 5 章)。Kumo の Input は `className` を `<input>` に付ける。
  */
 
 import { Input } from "@cloudflare/kumo";
@@ -61,6 +64,7 @@ export function AltTextInput({
 		<Input
 			ref={inputRef}
 			id={id}
+			className="min-w-0"
 			label={itemLabel === undefined ? t.label : t.labelFor(itemLabel)}
 			description={value.trim() === "" ? t.decorative : undefined}
 			value={value}
