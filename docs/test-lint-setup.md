@@ -71,7 +71,7 @@ afterEach(() => {
 
 - `strict` に加えて `noUncheckedIndexedAccess` / `noImplicitOverride` / `verbatimModuleSyntax` / `isolatedModules` をオンにした(EmDash の `tsconfig.base.json` とほぼ同じ)。
 - `lib` は `es2024` / `esnext.typedarrays` / `dom` / `dom.iterable`。TypeScript 6.0.3 では `Uint8Array.fromBase64` の型が `lib.esnext.typedarrays.d.ts` にある([[T04-webp-utils]] で使える)。根拠: **実測のみ**
-- `include` は `src` / `tests` / `e2e` / `*.config.ts`。`types` は `["node"]`([[npm-workspaces-nested-worktree#TypeScript の @types の探し方]])。
+- `include` は `src` / `tests` / `e2e` / `playground/scripts` / `*.config.ts`。`types` は `["node"]`([[npm-workspaces-nested-worktree#TypeScript の @types の探し方]])。`playground/scripts`(Node が型の注釈を取り除いて実行するスクリプト)は、[[T26-1-typecheck-playground-scripts|T26-1]] で足した。
 - 利用者のサイトの `tsc` は、TS ソースのまま配布する `src` を利用者の設定で検査する([[git-dependency-ts-source#利用者側の型チェック]])。`tsconfig.consumer-loose.json`(`lib` を ES2022 に絞り、`strict: false`)と `tsconfig.consumer-strict.json`(strictest より厳しい設定)で `src` だけを検査する。どちらも `tsconfig.json` を継承する([[T04-1-consumer-typecheck]])。
 
 ## oxlint(1.83.0)

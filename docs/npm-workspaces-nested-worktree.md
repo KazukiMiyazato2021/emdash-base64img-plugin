@@ -10,7 +10,7 @@ tags:
   - worktree
 source_task: "[[T01-scaffold]]"
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-24
 ---
 
 # npm 12 の workspaces と入れ子の worktree
@@ -113,7 +113,7 @@ worktree の中から `require.resolve.paths()` を出すと、次の順に探�
 | ツール | 設定 | 確認 |
 |---|---|---|
 | vitest | `include` を `tests/**/*.test.{ts,tsx}` だけにした | テスト 0 件のときも成功した(`passWithNoTests`) |
-| tsc | `include` を `src` / `tests` / `e2e` / `*.config.ts` だけにした | `--listFilesOnly` で、プロジェクトのファイルと worktree の `node_modules` だけが読み込まれた |
+| tsc | `include` を `src` / `tests` / `e2e` / `*.config.ts` だけにした(のちに [[T26-1-typecheck-playground-scripts\|T26-1]] で `playground/scripts` を足した) | `--listFilesOnly` で、プロジェクトのファイルと worktree の `node_modules` だけが読み込まれた(`playground/scripts` を足したあとも、メインの作業ディレクトリで同じだった) |
 | oxlint | `ignorePatterns` に `references/**`、`.claude/**`、`playground/dist/**`、`playground/.astro/**`、`spikes/**`、`plans/**`、`tasks/**`、`docs/**` | 各場所に lint エラーのあるファイルを置き、`e2e/` と `playground/src/` のものだけが報告された |
 | prettier | `.prettierignore` に同じ場所と `*.md`、`package-lock.json` | 同上。prettier 3.9.8 は `.gitignore` も読む(`.gitignore` にだけ書いた `test-results/` のファイルは、明示しても対象外になった) |
 

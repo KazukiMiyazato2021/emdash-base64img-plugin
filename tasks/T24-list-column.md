@@ -42,6 +42,8 @@ created: 2026-09-23
 - [ ] `visibleItems` の分のサムネイルを、1回のリクエストでまとめて取得する
 - [ ] 表示: サムネイル、「+N」、「—」、警告アイコン
 - [ ] サムネイルは [[T14-admin-i18n-api|T14]] の `fetchThumbnails`(100 件ずつ)で取得する。`thumbnail: null` は `imageRefs` に無い画像(完全削除した・記録が無い)で、警告アイコンを出す。ゴミ箱に入った画像はサムネイルが返る(仕様書 11.4。[[T17-admin-data-routes#結果|T17]])。[[T21-orphan-routes|T21]] がゴミ箱の状態を記録することにしたら、それに合わせる
+- [ ] 見た目のクラスは、管理画面の CSS にあるものだけを使う(管理画面の CSS はビルド済みで、プラグインのファイルを読まない)。無いクラスと枠の色は style で書く。テストでは `tests/admin/admin-css.ts` の `findMissingClasses(container, sourceTokens("<自分のソース>"))` で、使うクラスが CSS にあることを確かめる([[T22-1-admin-css-test-helper|T22-1]]、[[emdash-admin-plugin-ui-styling]])
+- [ ] アイコンは `src/admin/parts/icons.tsx` の `UploadIcon`・`ImageMissingIcon`・`WarningIcon` を使える(`@phosphor-icons/react` はこのプラグインの peerDependencies に無いので、自前の SVG。飾りとして `aria-hidden`)。Kumo 2.6.0 の注意([[emdash-admin-plugin-ui-styling#Kumo 2.6.0 の注意点|知見ノート]]): `Loader` は英語の `aria-label="Loading"` と `role="status"` を持つ(飾りなら `aria-hidden` の要素で包み、伝えるなら訳した `aria-label` を渡す)。`Button` の名前は `title` でなく `aria-label` で付ける(`title` はツールチップで包む)。`Label`(`Input` の `label`)に `required={false}` を渡すと英語の「(optional)」が出る。Kumo の省略できる props に `undefined` になりうる値を渡すと、利用者の厳しい型チェック(`exactOptionalPropertyTypes`)で型エラーになるので、値があるときだけ展開する。読み上げの領域は `role="status"` でなく `<output>`(oxlint の `jsx-a11y/prefer-tag-over-role`)
 
 ## 完了条件
 

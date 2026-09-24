@@ -47,6 +47,8 @@ created: 2026-09-23
 - [ ] 制約(Safari 非対応、HEIC 非対応、容量、バックアップ、標準の `b64_images` の画面を使わないこと)
   - `b64_images` は標準の画面で編集しない。標準の編集画面からは保存も公開もできない(保存 hook が拒否する)。画像を差し替えるときは、新しくアップロードする([[T19-image-entry-hook#他のタスクへの影響|T19]])
   - 標準の新規作成の画面・REST・seed で作った画像は `imageRefs` に記録が無く、投稿から参照すると保存が拒否される。画像は widget からアップロードする([[T16-reference-hook#seed の画像の扱い|T16]])
+- [ ] サイト側の例: `getEmDashEntry` は、エントリが見つからないときも `error`(Astro の `LiveEntryNotFoundError`)を返す。`error` があるだけで 500 にすると、存在しない URL が 500 になる。playground の詳細ページ(`playground/src/pages/posts/[slug].astro`)の書き方を例にする([[playground-site-pages#getEmDashEntry は見つからないときも error を返す]])
+- [ ] サイト側の例: LCP の対象の画像に `priority` を付けるとき、対象の画像が見つからないとどの画像にも付かないことがある。描画できる最初の画像を選ぶ(仕様書 12 章、[[playground-site-pages#LCP の対象の選び方]])
 
 ## 完了条件
 
