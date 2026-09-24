@@ -38,6 +38,7 @@ import type {
 	ThumbnailsRequest,
 	ThumbnailsResponse,
 } from "../../shared/types";
+import { getManyInBatches } from "../image-refs";
 
 // ---------------------------------------------------------------------------
 // 上限
@@ -65,15 +66,6 @@ export const PREVIEW_MAX_BODY_BYTES = idsBodyMaxBytes(PREVIEW_MAX_IDS);
 
 /** サムネイル取得の body の上限(バイト)。100 件なら 13,109 + 1,024 = 14,133 */
 export const THUMBNAILS_MAX_BODY_BYTES = idsBodyMaxBytes(THUMBNAILS_MAX_IDS);
-
-/**
- * `imageRefs` の `getMany` 1 回に入れる ID の数。
- * `getMany` は ID を分けずに IN 句に入れ、バインド変数を「ID の数 + 2」個使う(`plugin_id` と `collection`。
- * `references/emdash/packages/core/src/database/repositories/plugin-storage.ts:271-288`)。
- * D1 の上限は 1 クエリ 100 個なので、100 件を 1 回で渡すと失敗する。
- * EmDash 自身の IN 句の分割単位(`SQL_BATCH_SIZE`、`utils/chunks.ts:17`)と同じ 50 件ずつに分ける。
- */
-export const IMAGE_REFS_BATCH_SIZE = 50;
 
 /** サイトに表示される画像エントリの `status`(サイトの取得は既定で `published` だけを読む。`loader.ts:1233`) */
 const PUBLISHED_STATUS = "published";
@@ -183,7 +175,7 @@ export const previewRoute: PluginRoute<PreviewRequest> = {
 /**
  * `imageRefs` のサムネイルと本体の寸法を返す。
  *
- * - ID を `IMAGE_REFS_BATCH_SIZE`(50)件ずつに分けて、`getMany` を並行に呼ぶ(100 件で 2 クエリ)。
+ * - ID を `IMAGE_REFS_BATCH_SIZE`(50)件ずつに分けて、`getMany` を並行に呼ぶ(`getManyInBatches`。100 件で 2 クエリ)。
  * - `thumbnail` を `null` にするのは、`imageRefs` に無い画像(完全削除した・記録が無い)と、記録の値が不正な画像。
  *   ゴミ箱に入った画像は `imageRefs` に残るので、サムネイルを返す(`b64_images` を 1 件ずつ読まないと区別できない)。
  * - 取得の失敗は、そのまま投げる(EmDash が 500 `INTERNAL_ERROR` にする)。
@@ -197,13 +189,7 @@ export async function handleThumbnails(ctx: ThumbnailsRouteContext): Promise<Thu
 	}
 
 	const ids = uniqueIds(ctx.input.ids);
-	const results = await Promise.all(
-		chunk(ids, IMAGE_REFS_BATCH_SIZE).map((part) => imageRefs.getMany(part)),
-	);
-	const records = new Map<string, unknown>();
-	for (const result of results) {
-		for (const [id, record] of result) records.set(id, record);
-	}
+	const records = await getManyInBatches(imageRefs, ids);
 
 	const invalid: string[] = [];
 	const items = ids.map((id): ThumbnailItem => {
@@ -246,13 +232,4 @@ export const thumbnailsRoute: PluginRoute<ThumbnailsRequest> = {
 /** 重複を除き、最初に現れた順に並べる */
 function uniqueIds(ids: readonly string[]): string[] {
 	return [...new Set(ids)];
-}
-
-/** `size` 件ずつに分ける */
-function chunk<T>(items: readonly T[], size: number): T[][] {
-	const chunks: T[][] = [];
-	for (let start = 0; start < items.length; start += size) {
-		chunks.push(items.slice(start, start + size));
-	}
-	return chunks;
 }
