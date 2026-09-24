@@ -74,7 +74,7 @@ spec: "[[base64-image-plugin-spec]]"
 | 4 | 7 | [[T27-image-widget\|T27]] 単一画像 widget<br>[[T27-1-handoff-image-widget\|T27-1]] T27 の結果を後続タスクに反映(サブタスク)<br>[[T28-gallery-widget\|T28]] ギャラリー widget<br>[[T28-1-handoff-gallery-widget\|T28-1]] T28 の結果を後続タスクに反映(サブタスク)<br>[[T28-2-save-hint-alt-width\|T28-2]] 処理中の保存の案内と代替テキストの幅(サブタスク)<br>[[T29-plugin-definition\|T29]] プラグイン定義の組み立て<br>[[T29-1-handoff-plugin-definition\|T29-1]] T29 の結果を後続タスクに反映(サブタスク) |
 | 5 | 2 | [[T30-admin-entry\|T30]] 管理画面エントリの組み立て<br>[[T30-1-handoff-admin-entry\|T30-1]] T30 の結果を後続タスクに反映(サブタスク) |
 | 6 | 8 | [[T30-2-heavy-import-test-timeout\|T30-2]] 本物の管理画面を読むテストのタイムアウト(サブタスク)<br>[[T31-e2e\|T31]] E2E テスト<br>[[T31-1-handoff-e2e\|T31-1]] T31 の結果を反映(サブタスク)<br>[[T32-1-cloudflare-deps\|T32-1]] playground に Cloudflare 用の依存を入れる(サブタスク)<br>[[T32-cloudflare-check\|T32]] Cloudflare での確認<br>[[T32-2-handoff-cloudflare\|T32-2]] T32 の結果を README などに反映(サブタスク)<br>[[T33-readme\|T33]] README<br>[[T33-1-handoff-readme\|T33-1]] T33 の結果を後続タスクに反映(サブタスク) |
-| 7 | 2 | [[T34-release\|T34]] v0.1.0 リリース<br>[[T34-1-publish-and-install-check\|T34-1]] GitHub への push と、GitHub の URL でのインストール(サブタスク。利用者の確認待ち) |
+| 7 | 2 | [[T34-release\|T34]] v0.1.0 リリース<br>[[T34-1-publish-and-install-check\|T34-1]] GitHub への push と、GitHub の URL でのインストール(サブタスク) |
 
 **クリティカルパス**(最も長い依存の連なり、8 段): [[T01-scaffold|T01]] → [[T03-shared-contracts|T03]] → [[T12-input-decode|T12]] → [[T23-upload-hook|T23]] → [[T27-image-widget|T27]] → [[T30-admin-entry|T30]] → [[T31-e2e|T31]] → [[T34-release|T34]]
 
@@ -385,7 +385,7 @@ flowchart LR
 | [[T33-readme\|T33]] | README と導入手順を書く | ドキュメント | 6 | [[T29-plugin-definition\|T29]]、[[T30-admin-entry\|T30]] | `README.md` |
 | [[T33-1-handoff-readme\|T33-1]] | T33 の結果(README)を後続タスクのノートに反映する(サブタスク) | ドキュメント | 6 | [[T33-readme\|T33]] | `tasks/T34` |
 | [[T34-release\|T34]] | v0.1.0 をリリースする | リリース | 7 | [[T31-e2e\|T31]]、[[T32-cloudflare-check\|T32]]、[[T33-readme\|T33]] | `package.json`(version)<br>`src/server/plugin.ts`(PLUGIN_VERSION)<br>`tests/package-exports.test.ts`<br>`plans/base64-image-plugin-spec.md`(status) |
-| [[T34-1-publish-and-install-check\|T34-1]] | v0.1.0 を GitHub に push し、GitHub の URL でインストールして確かめる(サブタスク。利用者の確認待ち) | リリース | 7 | [[T34-release\|T34]] | `README.md`(インストールの節) |
+| [[T34-1-publish-and-install-check\|T34-1]] | v0.1.0 を GitHub に push し、GitHub の URL でインストールして確かめる(サブタスク) | リリース | 7 | [[T34-release\|T34]] | `README.md`(インストールの節) |
 
 ## 状態の一覧(Dataview プラグインがある場合)
 
