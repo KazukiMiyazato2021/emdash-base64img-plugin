@@ -404,17 +404,24 @@ flowchart LR
 
 **判定(画像管理ページを開いたときに行う)**
 - 参照元ごとに `ctx.content.get` でエントリを取得する。`null` なら「参照元が削除された」(ゴミ箱と完全削除のどちらも)。
+  - 参照元のコレクションが消されていると、`get` は例外を投げる(テーブルが無い)。そのときだけコレクションの一覧(`ctx.schema.listCollections`、2 クエリ。リクエストに 1 回)を読み、無ければ「参照元が削除された」にする。あれば例外のまま 500 にする(データベースの失敗を「削除された」と誤らないため)。根拠: 実測+公式ドキュメント([[T21-orphan-routes#結果|T21]])
 - 列の値(`get` の `data`)と、`draftRevisionId` があればその下書きリビジョン(`getRevision`)の両方で、参照元の `field` に画像 ID が残っているかを確認する。
   - 下書きは、公開版の行とは別にリビジョンのテーブルに保存されている(`packages/core/src/emdash-runtime.ts:3516`)。一度も公開していないエントリの列の値は、作成したときの値。根拠: 実測+公式ドキュメント
+  - 同じエントリはリクエストの中で 1 回だけ読み、列の値で見つかれば下書きは読まない。値は参照元の記録と同じ `readReferencedImageIds` で読み、単一画像かギャラリーかは値の形で決める。フィールドが消されていれば(列が無い)「参照元から外された」。根拠: 実測のみ([[T21-orphan-routes#結果|T21]])
 - 判定結果は4種類:
   - **使用中**
   - **参照元が削除された**(ゴミ箱に入った場合を含む)
   - **参照元から外された**
   - **参照元なし**(アップロードしたが保存されなかった)
+  - 画像の状態バッジは、参照元ごとの状態のうち、使用中 → 参照元が削除された → 外された の順で最初に見つかったもの(参照元がゴミ箱から戻ると、画像がまた要るため)。
 - 判定結果とは別に、画像エントリ自身の状態(ゴミ箱に入っていない / ゴミ箱に入っている / エントリが無い)も返す。完全削除のボタンは、ゴミ箱に入った画像にだけ出すため([[T06-decision-trash-permission#結果|T06]])。値の名前は `src/shared/schema.ts` の `imageUsageSchema` / `imageEntryStatusSchema`([[T03-shared-contracts#結果|T03]])。
   - 0.39.1 では、capability `content:restore` の `ctx.content.getTrashedVersioned` が、ゴミ箱に入っているエントリだけを返す(`packages/core/src/emdash-runtime.ts:3877`)。`ctx.content.get` はゴミ箱に入ったものと無いものの両方で `null` なので、組み合わせると区別できる。`getTrashedVersioned` は、`get` が `null` のときだけ呼ぶ(ゴミ箱に入っていないエントリに呼ぶとクエリが多い)。根拠: 実測+公式ドキュメント([[T10-spike-after-save#結果|T10]])
-- 判定はページ送りで行う。プラグインの `ctx.content.list` では ID の IN 検索ができず(`packages/core/src/plugins/types.ts:443`)、参照元ごとに取得するので、1 リクエストのクエリ数が件数に比例して増えるため。上限は 1 呼び出し 1,000 クエリ([[#2.2 プラットフォームの上限|2.2]])だが、応答時間を抑えるため、それより十分小さい予算で区切る。予算の値は [[T21-orphan-routes|T21]] で決める([[T10-1-spec-d1-limits|T10-1]])。
+  - `content:restore` を宣言して使う([[T21-orphan-routes#結果|T21]])。「記録があって `get` が `null` ならゴミ箱」とみなすと、記録だけが残った画像(完全削除の hook の失敗など)をゴミ箱と誤り、完全削除のボタンが 404 になるため。
+- 判定はページ送りで行う。プラグインの `ctx.content.list` では ID の IN 検索ができず(`packages/core/src/plugins/types.ts:443`)、参照元ごとに取得するので、1 リクエストのクエリ数が件数に比例して増えるため。上限は 1 呼び出し 1,000 クエリ([[#2.2 プラットフォームの上限|2.2]])だが、応答時間を抑えるため、それより十分小さい予算で区切る([[T10-1-spec-d1-limits|T10-1]])。予算は 1 リクエスト 100 クエリ(ルートの固定費を含む)にした([[T21-orphan-routes#結果|T21]])。
   - 1 回に扱う件数は固定にせず、クエリ数の見積もりで決める。1 件のクエリ数は、参照元が 1 / 3 / 6(削除済み / 下書きなし / 下書きあり)、画像の状態が 2 / 5 / 3(ゴミ箱に入っていない / ゴミ箱 / 無い)。同じ参照元は、リクエストの中で 1 回だけ調べる。参照元がそれぞれ別の投稿だと、10 件で 50 を超える。根拠: 実測のみ([[emdash-plugin-content-query-counts]])
+  - 見積もりは最悪の値で行う: 画像 1 枚につき 5、まだ読んでいない参照元のエントリ 1 件につき 6、参照元があればコレクションの一覧の 2(リクエストに 1 回)。予算に収まるだけ載せ、1 ページは最大 10 枚。参照元が 1 件ずつの画像なら 8 枚で、実際のクエリは 42(下書きなし)〜 90(画像がゴミ箱、参照元は下書きだけに画像)。根拠: 実測のみ(SQLite。[[image-management-routes]])
+  - 並びは `imageRefs` の `createdAt` の新しい順(同じ時刻は ID の大きい順)。カーソルには最後に読んだ記録の `createdAt` と ID を入れる。EmDash のストレージのカーソルは、その記録が消えると先頭から読み直すので使わない(完全削除でページがずれないようにする)。根拠: 公式ドキュメントのみ(EmDash のカーソル。`packages/core/src/database/repositories/plugin-storage.ts:381`)。記録が消えても続きから読めることは実測のみ(単体テスト)
+  - 1 枚だけで予算を超える画像(参照元のエントリが 16 件以上)は、その画像だけを扱うリクエストを続けて、1 回に 15〜16 件ずつ調べる。その間の応答は `items` が空で `nextCursor` がある(画面は続けて読む)。一覧に載せる参照元(記録の順に先頭から 20 件)の状態が分かり、どれかが使用中なら、残りは調べない。参照元 40 件の画像で 2〜3 リクエスト、1 回最大 98 クエリだった。根拠: 実測のみ
 
 > [!warning] 「参照されていない」は「消しても安全」ではない
 > 判定の対象は、現在のコンテンツ(公開版と下書き)だけ。古いリビジョンや、複製したまま保存も公開もしていないエントリからは、まだ参照されている可能性がある。警告文にもそう明記する。
@@ -428,7 +435,12 @@ flowchart LR
     - EmDash の標準より緩い。標準 API では、Contributor は自分のコンテンツもゴミ箱に移せない(`content:delete_own` は Author 以上。`packages/auth/src/rbac.ts:22`。実測+公式ドキュメント)。そのため Contributor が、他人の投稿で使われている画像もゴミ箱に移せる。ゴミ箱に入った画像は、サイトに表示されなくなる(サイト側の取得は `deleted_at IS NULL` のものだけ。`packages/core/src/loader.ts:1341`。公式ドキュメントのみ)。
     - ゴミ箱から戻せるのは Editor 以上(標準 API の restore)。プラグインが作った画像は作成者(`authorId`)が空なので、`content:edit_any` で判定される(`packages/core/src/astro/routes/api/content/[collection]/[id]/restore.ts:44`)。根拠: 実測+公式ドキュメント
     - 画像管理ページでは、ゴミ箱に移す前に確認し、使用中の画像ならそのことを示す([[#11.5 画像管理ページ]])。
+    - ルート(`images/trash`)は、`imageRefs` に記録のある画像だけを移す(無ければ 404 `IMAGE_NOT_FOUND`)。使用中でも移す(使用中かは画面が一覧の状態で確かめる)。もうゴミ箱に入っていれば成功として返す。クエリは 9。根拠: 実測のみ([[T21-orphan-routes#結果|T21]])
+    - プラグインの `ctx.content.delete` では、`content:afterDelete` は呼ばれない(標準 API のゴミ箱への移動・完全削除では呼ばれる)。根拠: 実測+公式ドキュメント(`packages/core/src/emdash-runtime.ts:3705`、`:3759`)
+    - ゴミ箱から戻した画像は下書き(公開版なし)になる。サイトの取得は公開済みのものだけなので、標準 API の `POST …/publish` で公開し直すまで表示されない。根拠: 実測(下書きになること)+公式ドキュメント(`packages/core/src/database/repositories/content.ts:1513`、`packages/core/src/loader.ts:1233`)
   - **完全削除**: 管理者のみ。標準の API `DELETE /_emdash/api/content/b64_images/{id}/permanent` を、ログイン中の管理者の権限で呼ぶ(`packages/core/src/astro/routes/api/content/[collection]/[id]/permanent.ts:14`。権限は `content:delete_permanent`)。
+    - 完全削除のあと、`content:afterDelete`(`b64_images` で `permanent: true`)で `imageRefs` の記録を消す。hook は `priority: 50`・`errorPolicy: "continue"` で、失敗はログに出す。記録が残ると、一覧に「エントリが無い」画像として出る。根拠: 実測+公式ドキュメント([[T21-orphan-routes#結果|T21]])
+- ゴミ箱に入っているかは `imageRefs` に記録しない。画像管理の一覧は画像エントリを読んで判定する。0.39.1 には戻したときの hook(`content:afterRestore`)があるが、プラグインの `ctx.content.delete` では hook が呼ばれず、記録を書く場所が増えるため([[T21-orphan-routes#結果|T21]])。
 - プラグインは完全削除ができない(`skills/creating-plugins/references/sandbox-boundaries.md`)。ゴミ箱を自動で空にする処理も見当たらない。容量が戻るのは完全削除したときだけ。
 - EmDash 標準の `b64_images` 一覧画面とゴミ箱画面は、1ページ100件分の base64 を読み込むので使わない(1件約 100KB)。
 - 標準の編集画面からは、`b64_images` のエントリを保存も公開もできない。保存・自動保存・「Publish now」のたびに `image` を送り、保存 hook が拒否するため(「Unpublish」は通る)。根拠: 実測+公式ドキュメント([[T19-image-entry-hook#結果|T19]])
