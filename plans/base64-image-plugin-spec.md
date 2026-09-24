@@ -789,7 +789,7 @@ export default defineConfig({
 - Safari 対応(EmDash 本体で、CSP に `'wasm-unsafe-eval'` を許可する変更が必要)
 - アニメーション WebP・APNG・AVIF のシーケンスにも、アニメーションが消える注意書きを出す。判定はファイルの先頭で行える(WebP の `VP8X` のフラグ、APNG の `acTL`、AVIF の `avis`)が、注意のコードと文言の追加が要る([[T12-input-decode#未解決・サブタスクの候補|T12]])
 - 既存の `b64_images`(seed や移行で作ったもの)を `imageRefs` に登録する機能。サムネイルはブラウザでしか作れないので、管理画面から行う必要がある([[T16-reference-hook#未解決・サブタスクの候補|T16]])。アップロードの途中(作成と `imageRefs` の保存の間)で処理が止まったときや、`imageRefs` の保存に失敗したときに残るエントリも、この機能で拾える([[T18-upload-route#未解決|T18]])
-- 画像管理ページに、ゴミ箱から戻す操作(編集者以上。標準 API の `POST /_emdash/api/content/b64_images/{id}/restore`)を置く。今は、標準 API で戻し(標準の画面は 1 ページ 100 件の base64 を読むので使わない)、戻した画像(下書き)を画像管理ページの「公開」で公開し直す([[T25-images-page#影響・サブタスクの候補|T25]])
+- 画像管理ページに、ゴミ箱から戻す操作(編集者以上。標準 API の `POST /_emdash/api/content/b64_images/{id}/restore`)を置く。今は、標準 API で戻し(標準の画面は 1 ページ 100 件の base64 を読むので使わない)、戻した画像(下書き)を画像管理ページの「公開」で公開し直す([[T25-images-page#影響・サブタスクの候補|T25]])。API トークンを作れるのは管理者だけなので、編集者は、管理者に頼むか、標準の画面のゴミ箱の「復元」で戻すことになる(標準の画面は、開くだけで一覧 100 件とゴミ箱 50 件の画像の本体を読み込む。[[readme-install-verification]])
 - 記録だけが残った画像(画像管理の一覧の `missing`。完全削除の hook の失敗などで、`b64_images` のエントリが無いのに `imageRefs` の記録がある)の記録を、画像管理ページから消す操作([[T21-orphan-routes#未解決・サブタスクの候補|T21]])
 - 必須(`required`)の画像フィールドで画像が無いときの表示。EmDash 標準の画像フィールドは「This field is required」を出すが、widget は出さない(必須の確認は EmDash の保存の検証が行う)。揃えるなら、辞書に文言を足して空の表示の下に出す([[T27-image-widget#未解決・サブタスクの候補|T27]])
 - サイトのビジュアル編集から `?field=<slug>` で開いたときに、単一画像の widget にフォーカスを移す。管理画面は `#field-<slug>` を `focus()` するが、単一画像の widget は `id` を根の fieldset に付けているのでフォーカスできず、body のままになる(スクロールはする)。fieldset に `tabIndex={-1}` を付ける案がある(推測のみ。[[emdash-plugin-field-widget]])。ギャラリーは `id` をドロップゾーンのボタンに付けていて、フォーカスが移る([[T28-gallery-widget#決めたこと|T28]])

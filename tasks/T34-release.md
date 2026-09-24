@@ -38,6 +38,8 @@ git 依存で配布する最初のバージョンを作る。
 - [ ] バージョンを 0.1.0 にして、タグ `v0.1.0` を作る(GitHub への push は利用者の確認を得てから)
 - [ ] 別の空のサイトから `github:<owner>/emdash-base64img-plugin#v0.1.0` でインストールし、起動を確認する(npm 12 では、そのサイトの `.npmrc` に `allow-git=root` が要る。[[npm12-git-dependency-policy]])
 - [ ] 仕様書の status を更新する
+- [ ] README のインストールのコマンド(`github:KazukiMiyazato2021/emdash-base64img-plugin#v0.1.0`。owner は `git remote` から)を、作ったタグと、リポジトリを公開するか非公開にするかに合わせる。非公開なら、README の「非公開のリポジトリから入れるとき」(トークンを使う方法)は T33 では確かめていないので、ここで確かめるか、確かめていないことを README に残す([[T33-readme#結果|T33]])
+- [ ] 別のサイトでの確認には、T33 の確かめ方のスクリプト(メインの作業ディレクトリの `spikes/t33-readme/`。git 管理外。README のコードブロックを取り出してサイトを作る・管理画面の widget でアップロードして公開する・サイトのページを確かめる)を使える。手順と結果の形は [[readme-install-verification]]。EmDash 0.39.1 の公開から 3 日たつ前(2026-09-26 19:20 日本時間ごろより前)に行うなら、`min-release-age` の例外と監査が要る([[emdash-dependency-versions#min-release-age の例外(2026-09-24)]])
 
 ## 完了条件
 
