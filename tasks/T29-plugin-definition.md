@@ -51,7 +51,9 @@ created: 2026-09-23
 - [ ] `admin`(`entry`、`fieldWidgets`、`pages`)
 - [ ] 起動時に `b64_images` があるかを確認し、なければエラーを出す
 - [ ] descriptor 関数 `base64ImagePlugin()`
-- [ ] [[T07-spike-git-dependency|T07]] の結果に合わせた配布形態(TS ソースのまま、またはビルドあり)
+- [ ] [[T07-spike-git-dependency|T07]] の結果に合わせた配布形態(TS ソースのまま。T07 で、Node と Cloudflare の両アダプターで読み込めることを確かめた。ビルドは入れない)
+- [ ] ルートは、各タスク([[T17-admin-data-routes|T17]]・[[T18-upload-route|T18]]・[[T21-orphan-routes|T21]])が export する `PluginRoute<Input>` の定義を、`routes: { [ROUTES.x]: xRoute }` の形で登録する。`definePluginRoute` は json の入力の型が `unknown` になるので使わない。`input` を書き忘れても型エラーにならないので、各ルートの単体テストで確かめる([[T08-spike-route-body#T18 で使うルートの宣言|T08]])
+- [ ] `src/index.ts` 以下は、利用者のサイトの `tsc` でも検査される(`astro.config.mjs` から辿られる)。`npm run typecheck` の 3 つの設定を通す([[T04-1-consumer-typecheck|T04-1]]、[[T07-1-spec-distribution|T07-1]])
 
 ## 完了条件
 
