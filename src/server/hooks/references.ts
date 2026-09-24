@@ -28,9 +28,10 @@ import {
 	type WidgetKind,
 } from "../../shared/constants";
 import type { ServerErrorCode } from "../../shared/errors";
-import { getWidgetKind, normalizeFieldOptions } from "../../shared/options";
+import { normalizeFieldOptions } from "../../shared/options";
 import { base64ImageRefSchema } from "../../shared/schema";
 import type { Base64ImageRef } from "../../shared/types";
+import { getFieldWidgetKind } from "../validate";
 
 /**
  * 1 回の `getMany` に入れる画像 ID の数。EmDash 0.39.1 の `getMany` は ID を分けずに IN 句に入れ、
@@ -110,21 +111,6 @@ export function getImageFields(fields: readonly ReferenceFieldInfo[]): ImageFiel
 		result.push({ slug: field.slug, label: field.label, kind, options: field.options });
 	}
 	return result;
-}
-
-/**
- * フィールドが、このプラグインの widget を使う `json` フィールドなら、その種類を返す。そうでなければ null。
- * 管理画面はフィールドの型を見ずに widget を割り当てるが、参照(オブジェクト)をそのまま保存できるのは `json`
- * フィールドだけなので、型も確かめる。T11 の `src/server/validate.ts` の `getFieldWidgetKind` と同じ規則・同じ形で、
- * このブランチの分岐元にはまだ無いため、ここに置いている(マージのときに、そちらに差し替える)。
- */
-function getFieldWidgetKind(field: {
-	readonly slug: string;
-	readonly type: string;
-	readonly widget?: string | undefined;
-	readonly options?: unknown;
-}): WidgetKind | null {
-	return field.type === "json" ? getWidgetKind(field.widget) : null;
 }
 
 // ---------------------------------------------------------------------------

@@ -230,7 +230,7 @@ flowchart LR
 [ { "v": 1, "id": "01J…", … }, { "v": 1, "id": "01J…", … } ]
 ```
 
-- `id`: 画像エントリの ID。英数字で始まり、英数字・`_`・`-` だけからなる 128 文字まで(EmDash が作る ULID は満たす)。seed で slug を省いたエントリは seed の `id` がそのまま ID になるので(`packages/core/src/seed/apply.ts:676`)、`b64_images` を seed で作るときはこの規則に合わせる([[T03-shared-contracts#結果|T03]])。
+- `id`: 画像エントリの ID。英数字で始まり、英数字・`_`・`-` だけからなる 128 文字まで(EmDash が作る ULID は満たす)。seed で slug を省いたエントリは seed の `id` がそのまま ID になるので(`packages/core/src/seed/apply.ts:676`)、`b64_images` を seed で作るときはこの規則に合わせる([[T03-shared-contracts#結果|T03]])。ただし、seed で作った画像を参照する投稿は、管理画面で保存できない([[#8. サーバー側の検証|8 章]]③)。画像はアップロードで作る。
 - `locale`: 画像エントリのロケール。
   - 多言語サイトで取得時に locale を省くと、匿名の閲覧者には既定のロケールが、編集モードとプレビューの編集者にはページのロケールが使われる。見る人によって結果が変わるので、取得時にこの値を明示的に指定する(`packages/core/src/query.ts:769`)。根拠: 実測+公式ドキュメント([[T09-spike-query-count#結果|T09]])
 - `alt`: 使う場所やロケールごとに設定できる。1,000 文字以内(Unicode のコードポイントで数える)。空欄は装飾画像として扱う。
@@ -368,11 +368,15 @@ flowchart LR
 |---|---|---|
 | ① アップロード用ルート | ・保存先のフィールドが存在し、このプラグインの widget を使う `json` フィールドであること(`ctx.schema.getCollection` で `type` / `widget` / `options` を読む。`packages/core/src/plugins/types.ts:407`)<br>・`dataUrl` が `data:image/webp;base64,` で始まり、長さが `maxStoredBytes` 以下(固定上限 500,000)。長さはデコードする前に確かめる<br>・デコードした中身が静止画の WebP(RIFF / WEBP、`VP8 ` / `VP8L` / `VP8X`。アニメーションは拒否)で、ヘッダーから読んだ寸法が width / height と一致し、長辺が `maxEdge` 以下<br>・`thumb` が静止画の WebP で、長辺 96px 以下、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下) | 拒否(HTTP 400。コードと理由の対応は [[T11-server-validation#T04 の理由とエラーコードの対応\|T11]]) |
 | ② `b64_images` の `content:beforeSave` | 値の形(`base64ImageEntrySchema`)と、`src` の ① と同じ中身の検証。保存先のフィールドが分からないので、固定上限(保存 500,000 バイト・長辺 4,096px)を当てる。`meta.bytes` が WebP 本体のバイト数と一致すること。API / MCP / 管理画面など、どこからの書き込みでも実行する | 拒否 |
-| ③ 参照を持つコレクションの `content:beforeSave` | ・参照の形(`{ v, id, locale, width, height, alt }` の型、alt は 1,000 文字以内)<br>・ギャラリーの枚数が `maxItems` 以下で、同じ画像が重複していないこと<br>・参照している画像 ID が、すべて `imageRefs` に存在すること(`getMany` でまとめて1クエリ) | 拒否し、どのフィールドの何が問題かをメッセージで返す |
+| ③ 参照を持つコレクションの `content:beforeSave` | 対象は、このプラグインの widget を使う `json` フィールドのうち、送られてきたものだけ(`null` と空の配列は「画像なし」として通す)<br>・参照の形(`{ v, id, locale, width, height, alt }` の型、alt は 1,000 文字以内)<br>・ギャラリーの枚数が `maxItems` 以下で、同じ画像が重複していないこと<br>・参照している画像 ID が、すべて `imageRefs` に存在すること(ID の重複を除き、50 件ずつ `getMany`。ふつうは 1 クエリ)<br>・フィールド定義の読み出し(`ctx.schema.getCollection`)で、ほかに 2 クエリ使う。widget のフィールドが無いコレクションの保存でも、この 2 クエリは増える | 拒否(`ContentSaveRejectedError`。422 `SAVE_REJECTED`)。どのフィールドの何が問題かを、日本語と英語を並べたメッセージで返す(問題は 3 件まで。[[T16-reference-hook#決めたこと\|T16]]) |
 
 - 保存 hook では書き込み元を判別できない(`runContentBeforeSave` には書き込み元のプラグインを除外する引数がない。`packages/core/src/plugins/hooks.ts:543`)。そのため、書き込み元ではなく中身で判定する。
 - 処理の重さ: 約 100KB の data URL のデコードと WebP ヘッダーの解析は、`Uint8Array.fromBase64` で 0.011ms、`atob` で 0.149ms(実測のみ。[[#付録 A. 実測データ|付録 A.4]])。固定上限の入力でのルートの検証全体(JSON の parse・スキーマ・①・②)は、中央値 0.40ms / 0.93ms(`fromBase64` / `atob`)、新しいプロセスの 1 回目で 1.9ms / 3.1ms(実測のみ。Node 26。[[T11-server-validation#処理時間(Workers Free の CPU 時間は 10ms)|T11]])。
 - ③の存在確認の影響: 管理者が画像を完全削除したあと、その画像を参照している投稿を保存しようとすると、保存が拒否される。widget 側では「画像が見つかりません」と表示し、削除ボタンで参照を外せるようにする。
+  - seed で作った画像(`imageRefs` に記録が無い)を参照する投稿も拒否される。管理画面は毎回すべてのフィールドを送るので、タイトルだけを変えても保存できない。画像はアップロードで作る。根拠: 実測+公式ドキュメント([[T16-reference-hook#seed の画像の扱い|T16]])
+  - ゴミ箱に入った画像を参照する保存は通る(`imageRefs` は完全削除まで残るため)。
+- 保存 hook は管理画面の言語を知らない(event・ctx・リクエストの文脈のどれにも無い)。③のメッセージは訳されずに、保存の失敗の通知にそのまま出る(改行は空白になる)。そのため、日本語と英語を並べる。根拠: 実測+公式ドキュメント([[emdash-content-before-save]])
+- ③の hook の処理時間は、クエリを含めて中央値 0.20ms(SQLite。実測のみ。[[T16-reference-hook#実測(スパイク)|T16]])。
 
 ## 9. 参照元の記録と未使用画像の検出
 
@@ -552,6 +556,7 @@ const images = await resolveBase64Images(refs);
   - `supports: []` でも、公開すると内容をまるごと複製したリビジョンが 1 件できる(`content.ts:2308`)。
   - `image` の `required: true` は、省略を 400 で拒否する(標準の REST API で確認)。`null` は DB の NOT NULL 制約で 500 になるので、中身は [[#8. サーバー側の検証|8 章]] の②で拒否する。
 - seed が適用されるのは、コレクションが 0 件のデータベースへの最初のリクエストと、セットアップ(開発では dev-bypass)のときだけ。既存のコレクションは変更されない(`packages/core/src/seed/apply.ts:217`)。
+- seed に `b64_images` のエントリを入れても、それを参照する投稿は保存できない(`imageRefs` に記録が無いため。[[#8. サーバー側の検証|8 章]]③)。画像はアップロードで作る。
 
 ### 13.2 フィールドの `options`
 
@@ -678,6 +683,8 @@ export default defineConfig({
 | git 依存(npm 12) | 利用者のサイトの `.npmrc` に `allow-git=root` が要る([[npm12-git-dependency-policy]]) |
 | 利用者の型チェック | 利用者のサイトの `tsc` は、TS ソースのまま配布する `src` を利用者の設定で検査する。このリポジトリでは、緩い設定と厳しい設定の代わりの tsconfig で確かめている([[T04-1-consumer-typecheck\|T04-1]])。TypeScript 5.x の実物での確認は、T07 の時点のコードだけ |
 | マイグレーションのコマンド | `emdash migrate --from-config` は、Node が `node_modules` の中の `.ts` を読めないので失敗する。既定の `emdash migrate`(build のマニフェストを使う)は使える。EmDash は `--from-config` をローカルの調査用としている([[git-dependency-ts-source]]) |
+| seed の画像 | seed で作った `b64_images` は `imageRefs` に記録が無く、それを参照する投稿は保存 hook で拒否される([[#8. サーバー側の検証\|8 章]]③) |
+| 保存の拒否の文言 | サーバーは管理画面の言語を知らないので、保存 hook の拒否のメッセージは日本語と英語を並べる([[#8. サーバー側の検証\|8 章]]) |
 | Cloudflare の開発サーバー | Cloudflare アダプターの `astro dev` では、最初のリクエストでプラグインが依存の最適化に加わり、1 回だけ再読み込みが起きる。サイトの `vite.ssr.optimizeDeps.include` にプラグインを入れると起きない([[git-dependency-ts-source#Cloudflare アダプターの astro dev の再最適化\|T07]]) |
 
 ## 19. 対象外・将来の検討事項
@@ -804,7 +811,10 @@ export default defineConfig({
 | `packages/core/src/search/fts-manager.ts:111` | 検索は FTS5 の仮想テーブル |
 | `packages/core/src/query.ts:769` / `loader.ts:772` | ロケールの決まり方、IN 句 |
 | `packages/core/src/plugins/types.ts:407` / `:443` / `:544` | スキーマ情報・一覧の絞り込み条件・`ContentAccess` |
-| `packages/core/src/plugins/hooks.ts:543` | beforeSave では書き込み元のプラグインを除外できない |
+| `packages/core/src/plugins/hooks.ts:543` | beforeSave では書き込み元のプラグインを除外できない。`errorPolicy: "continue"` の hook は、拒否の例外も捨てられる |
+| `packages/core/src/plugins/save-rejection.ts` | 保存 hook から保存を拒否する例外(`ContentSaveRejectedError`) |
+| `packages/core/src/emdash-runtime.ts:513` | 保存 hook の拒否の応答(422 `SAVE_REJECTED`)。ほかの例外は 500 `CONTENT_HOOK_ERROR` |
+| `packages/admin/src/router.tsx:1097` | 保存の失敗の通知(`message` をそのまま出す) |
 | `packages/core/src/emdash-runtime.ts:3516` / `:5560` | 下書きはリビジョンに保存される、afterSave は遅れて実行される |
 | `packages/auth/src/rbac.ts:19` | 権限(content:create / delete_own / publish_own) |
 

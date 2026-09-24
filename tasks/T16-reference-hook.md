@@ -188,6 +188,10 @@ export function createPlugin() {
 5. 18 章(既知の制約とリスク)に「seed で作った画像は、参照を持つコレクションの保存 hook で拒否される」と「保存の拒否の文言は日本語と英語を並べる(サーバーは管理画面の言語を知らない)」。
 6. 付録 B に `packages/core/src/plugins/save-rejection.ts`(拒否の例外)、`packages/core/src/emdash-runtime.ts:513`(拒否の応答)、`packages/core/src/plugins/hooks.ts:543`(`errorPolicy` と拒否)、`packages/admin/src/router.tsx:1097`(保存の失敗の通知)。
 
+> [!note] 反映済み(リーダー、マージのとき)
+> - 上の 1〜6 を仕様書に反映した。
+> - `phase/2` を取り込み、`src/server/hooks/references.ts` の中の `getFieldWidgetKind` を、[[T11-server-validation|T11]] の `src/server/validate.ts` のものに差し替えた(規則と形は同じ)。3 つの型チェックと、このタスクのテスト 40 件が通った。
+
 ### 他のタスクへの影響
 
 | タスク | 影響 |
