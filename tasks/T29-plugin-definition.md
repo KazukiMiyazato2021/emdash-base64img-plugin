@@ -212,4 +212,4 @@ playground を 4429 で起動し、`node playground/scripts/create-sample-posts.
 - 部品(`src/server/**`・`src/shared/**`・`src/admin/**`)に直すべきところは見つからなかった。変更していない。
 
 > [!note] 反映済み(リーダー、マージのとき)
-> 知見ノート 2 つを索引に登録した。仕様書 15 章の構成の図を、`src/server/plugin.ts` と今のディレクトリに合わせて直した。「他のタスクへの影響」は後続タスクのノートに書く(サブタスク)。EmDash の公式ドキュメントと動きが違う件(lifecycle hook)の報告は、利用者の判断が要るので、今は行わない。
+> 知見ノート 2 つを索引に登録した。仕様書 15 章の構成の図を、`src/server/plugin.ts` と今のディレクトリに合わせて直した。「他のタスクへの影響」は後続タスクのノートに書いた([[T29-1-handoff-plugin-definition|T29-1]])。EmDash の公式ドキュメントと動きが違う件(lifecycle hook)の報告は、利用者の判断が要るので、今は行わない。
