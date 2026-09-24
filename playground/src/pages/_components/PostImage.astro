@@ -1,0 +1,45 @@
+---
+/**
+ * 参照 1 つ分の画像を描画する(仕様書 12 章)。
+ *
+ * - 画像は、ページで `resolveBase64Images` を 1 回だけ呼んだ結果(`images`)から `images.get(imageRef)` で引く。
+ * - 描画は `emdash/ui` の `Image`。data URL は変換されず、`<img src="data:…" width height>` がそのまま出る。
+ *   `priority` を付けると `loading="eager"` と `fetchpriority="high"`、付けないと `loading="lazy"`。
+ * - 画像が見つからない(ゴミ箱に入った・削除された)・値が不正・取得に失敗したときは、`get` が `undefined` を返す。
+ *   そのときは、参照の寸法で場所を取った代わりの枠を出す(Layout Shift を起こさない)。
+ * - E2E で探せるよう、`data-field`(フィールド)と `data-image-id`(画像 ID)を付ける。
+ */
+
+import { Image } from "emdash/ui";
+import type { Base64ImageRef, ResolvedBase64Images } from "emdash-plugin-base64-image/astro";
+
+interface Props {
+	imageRef: Base64ImageRef;
+	images: ResolvedBase64Images;
+	/** フィールドの slug(`cover` / `gallery`) */
+	field: string;
+	/** LCP の対象になる画像に付ける */
+	priority?: boolean;
+}
+
+const { imageRef, images, field, priority = false } = Astro.props;
+const image = images.get(imageRef);
+---
+
+{
+	image ? (
+		<Image image={image} priority={priority} data-field={field} data-image-id={imageRef.id} />
+	) : (
+		<div
+			class="image-missing"
+			role="img"
+			aria-label="画像が見つかりません"
+			style={`aspect-ratio: ${imageRef.width} / ${imageRef.height};`}
+			data-testid="image-missing"
+			data-field={field}
+			data-image-id={imageRef.id}
+		>
+			画像が見つかりません
+		</div>
+	)
+}

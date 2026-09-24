@@ -1,0 +1,69 @@
+---
+/**
+ * playground のページの共通の枠。
+ *
+ * `src/pages/` の中で `_` から始まるディレクトリはルートにならない(Astro の規則)。
+ * T26 で変更してよいのが `src/pages/**` だけなので、共通の部品はここに置いた。
+ */
+
+interface Props {
+	/** `<title>` と見出しに使う */
+	title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="ja">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>{title} | base64-image playground</title>
+	</head>
+	<body>
+		<header class="site-header">
+			<nav>
+				<a href="/">トップ</a>
+				<a href="/posts/">投稿の一覧</a>
+				<a href="/_emdash/admin">管理画面</a>
+			</nav>
+		</header>
+		<main>
+			<slot />
+		</main>
+	</body>
+</html>
+
+<style is:global>
+	body {
+		margin: 0 auto;
+		max-width: 60rem;
+		padding: 0 1rem 3rem;
+		font-family: system-ui, sans-serif;
+		line-height: 1.6;
+		color: #1f2328;
+	}
+	.site-header nav {
+		display: flex;
+		gap: 1rem;
+		padding: 1rem 0;
+		border-bottom: 1px solid #d0d7de;
+	}
+	/* 画像は枠の幅に合わせて縮め、縦横比は width / height 属性から決まる(Layout Shift を防ぐ) */
+	img.emdash-image-media {
+		display: block;
+		width: 100%;
+		height: auto;
+	}
+	/* 画像が見つからないときの代わり。参照の寸法で場所を取る */
+	.image-missing {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		background: #eaeef2;
+		color: #57606a;
+		font-size: 0.875rem;
+	}
+</style>
