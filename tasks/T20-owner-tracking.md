@@ -38,8 +38,15 @@ created: 2026-09-23
 
 - [ ] `content:afterSave` で、保存されたエントリの中の参照を取り出す
 - [ ] `imageRefs.getMany` → `owners` に追記 → `putMany`(1〜2クエリ)
+  - 読むときは `getManyInBatches`(`src/server/image-refs.ts`)を使う。`getMany` は ID を分けずに IN 句に入れ、D1 では 99 件から例外になるので、50 件ずつに分ける([[T16-2-image-refs-batches|T16-2]])
+  - このプラグインのフィールドは `getFieldWidgetKind`(`src/server/validate.ts`)で判定する(`json` 型で、かつ widget がこのプラグインのもの。[[T11-server-validation|T11]]・[[T16-reference-hook|T16]] と同じ規則)
 - [ ] 追記だけを行い、削除はしない。同じ参照元は重複させない
 - [ ] afterSave は遅れて実行されるので、例外は外に出さずにログに出す
+- [ ] [[T10-spike-after-save#結果|T10]] の結果に合わせる(仕様書 9 章):
+  - 参照は `event.content.data`(下書き)と `event.content.liveData`(列の値)の両方から集める
+  - `content:afterPublish` でも同じ処理をする(一覧の一括公開では afterSave が呼ばれない)
+  - hook に `errorPolicy: "continue"` を指定する
+  - `b64_images` と、このプラグインの widget を持たないコレクションは読み飛ばす
 
 ## 完了条件
 

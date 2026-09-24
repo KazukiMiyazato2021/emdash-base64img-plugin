@@ -40,6 +40,8 @@ created: 2026-09-23
 - [ ] 差し替え・削除・代替テキストの入力
 - [ ] `onChange` に参照(`{ v, id, locale, width, height, alt }`)を渡す
 - [ ] 失敗したときは、フィールドの値を変えない
+- [ ] `<input type="file">` の `accept` は `image/*` にする。MIME タイプを並べると HEIC を選べなくなり、HEIC の案内を出せない。Firefox はデコードの間(6,400 万画素で 100ms 前後)画面を止めるので、「読み込み中…」はデコードを始める前に描画しておく([[T12-input-decode#後続タスク向けのメモ|T12]])
+- [ ] 保存済みの画像のプレビューは `fetchPreviews`([[T14-admin-i18n-api|T14]]・[[T17-admin-data-routes|T17]])。`image: null` は「画像が見つかりません」。プレビューは `b64_images` を読むので、`imageRefs` に記録が無い画像(seed など)も表示されるが、保存は拒否される([[T16-reference-hook#他のタスクへの影響|T16]])。保存の前に気付けるよう、`fetchThumbnails` で `imageRefs` にあるかも確かめるかを決める
 
 ## 完了条件
 

@@ -34,6 +34,20 @@ export type WebpDataUrlParseResult =
 
 const INVALID_BASE64 = { ok: false, reason: "INVALID_BASE64" } as const;
 
+/**
+ * `Uint8Array.fromBase64` / `toBase64` のうち、使う形だけを自前で宣言する。
+ *
+ * このプラグインは TS ソースのまま配布され、利用者の tsc が利用者の設定で `src` を検査する。
+ * TypeScript 5.x や、lib を ES2022 などに絞った設定では、これらの型が lib に無い。
+ * lib の型に頼らずに呼ぶことで、どの設定でも型が通るようにする(docs/git-dependency-ts-source.md)。
+ */
+interface Base64Uint8ArrayConstructor {
+	readonly fromBase64?: (base64: string, options: { lastChunkHandling: "strict" }) => Uint8Array;
+}
+interface Base64Uint8Array {
+	readonly toBase64?: () => string;
+}
+
 /** `btoa` の代わりに文字列を組み立てるとき、`String.fromCharCode` に 1 回で渡すバイト数 */
 const BINARY_STRING_CHUNK = 0x2000;
 
@@ -116,8 +130,9 @@ function base64Value(code: number): number {
 function decodeWithRuntime(base64: string): Uint8Array | undefined {
 	try {
 		// 呼び出しのたびに確かめる(テストで、fromBase64 が無い環境を再現できるように)。
-		if (typeof Uint8Array.fromBase64 === "function") {
-			return Uint8Array.fromBase64(base64, { lastChunkHandling: "strict" });
+		const { fromBase64 } = Uint8Array as unknown as Base64Uint8ArrayConstructor;
+		if (typeof fromBase64 === "function") {
+			return fromBase64.call(Uint8Array, base64, { lastChunkHandling: "strict" });
 		}
 		const binary = atob(base64);
 		const bytes = new Uint8Array(binary.length);
@@ -139,7 +154,8 @@ function decodeWithRuntime(base64: string): Uint8Array | undefined {
 
 /** バイト列を標準の base64(`=` の詰め物あり)にする */
 export function encodeBase64(bytes: Uint8Array): string {
-	if (typeof bytes.toBase64 === "function") return bytes.toBase64();
+	const { toBase64 } = bytes as unknown as Base64Uint8Array;
+	if (typeof toBase64 === "function") return toBase64.call(bytes);
 	let binary = "";
 	for (let i = 0; i < bytes.length; i += BINARY_STRING_CHUNK) {
 		binary += String.fromCharCode(...bytes.subarray(i, i + BINARY_STRING_CHUNK));
@@ -170,8 +186,9 @@ export function decodeWebpDataUrl(dataUrl: string): WebpDataUrlDecodeResult {
  */
 export function parseWebpDataUrl(dataUrl: string): WebpDataUrlParseResult {
 	const decoded = decodeWebpDataUrl(dataUrl);
-	if (!decoded.ok) return decoded;
+	// `=== false` で比べる。利用者の設定で strictNullChecks が無効だと、`!decoded.ok` では絞り込まれないため。
+	if (decoded.ok === false) return decoded;
 	const parsed = parseWebp(decoded.bytes);
-	if (!parsed.ok) return parsed;
+	if (parsed.ok === false) return parsed;
 	return { ok: true, bytes: decoded.bytes, info: parsed.info };
 }

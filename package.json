@@ -17,7 +17,7 @@
 		"playground"
 	],
 	"scripts": {
-		"typecheck": "tsc --noEmit",
+		"typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.consumer-loose.json && tsc --noEmit -p tsconfig.consumer-strict.json",
 		"build": "npm run typecheck && npm run build --workspaces --if-present",
 		"lint": "oxlint --deny-warnings && prettier --check .",
 		"format": "prettier --write .",
