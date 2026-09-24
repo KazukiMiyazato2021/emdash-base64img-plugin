@@ -66,6 +66,7 @@ updated: 2026-09-24
 | [[server-image-validation\|サーバー側の画像の検証(アップロードと画像エントリ)]] | `docs/server-image-validation.md` | 保存先は widget と `json` 型の両方で判定する。長さはデコードする前に確かめる。サムネイルは長辺 96px まで(小さなデータで大きな寸法を作れる)。画像エントリは固定上限。境界値の WebP の作り方。検証全体は 0.40ms / 0.93ms | [[T11-server-validation\|T11]] |
 | [[compress-image-browser-check\|圧縮処理(compressImage・createThumbnail)を Chromium・Firefox で動かした結果]] | `docs/compress-image-browser-check.md` | 写真 5 枚の結果は T05 の表と長辺・画質・エンコード回数まで一致した。中断は 0.4ms 以内に reject。透過は保持される。乱数ノイズの画像は Chromium の GPU 描画だけ上限を超えた | [[T13-encode-search\|T13]] |
 | [[jsdom-browser-api-gaps\|jsdom でブラウザ側の画像処理をテストするときの注意]] | `docs/jsdom-browser-api-gaps.md` | jsdom 30.1.0 には `createImageBitmap`・`OffscreenCanvas` が無く、canvas の `getContext` は `null`。canvas の部分は差し替えられるように作り、偽物でテストする。`abort()` の `reason` は Node の `DOMException` | [[T13-encode-search\|T13]] |
+| [[input-image-decode\|入力画像の形式の判定とデコード]] | `docs/input-image-decode.md` | `File.type` は拡張子だけで決まり、`createImageBitmap` は中身で形式を決める(ICO もデコードする)ので、形式は先頭のバイトで判定する。デコードは 1 画素約 4 バイトのメモリを使うので、画素数はヘッダーで確かめる。Firefox はデコードの間、画面を止める | [[T12-input-decode\|T12]] |
 
 ## Cloudflare
 

@@ -679,6 +679,8 @@ export default defineConfig({
 |---|---|
 | ブラウザ | 管理画面は Safari 非対応(canvas で WebP を作れない) |
 | 入力形式 | HEIC / HEIF は非対応 |
+| アニメーション | GIF・アニメーション WebP・APNG は、最初のフレームの静止画になる。アニメーションが消える注意書きは GIF だけに出す([[#6.5 入力形式と上限(Q8)\|6.5]]) |
+| Firefox でのデコード | Firefox 155 は、デコードの間(6,400 万画素の JPEG で 78〜92ms)画面を止め、その間の中断はデコードが終わってから届く。途中で切れた JPEG・PNG は、欠けた部分を白・透明にしてデコードする(検出しない)。libheif で作ったグリッドの AVIF はデコードできない(`INPUT_DECODE_FAILED`)([[T12-input-decode#結果\|T12]]) |
 | 編集ロック | 編集ロック中でも widget を操作できる(EmDash 側の制約) |
 | 容量 | D1 の 500MB で約 2,500 枚(公開時にできるリビジョンを含む。[[#5.4 容量の目安\|5.4]])。使われなくなった画像は自動では消えず、プラグインからは完全削除もできない。使用量は Cloudflare のダッシュボードで監視する |
 | バックアップ | D1 Time Travel(直近7日)だけ |
@@ -701,6 +703,7 @@ export default defineConfig({
 - 未使用画像の自動検出・自動削除(cron)
 - npm での公開
 - Safari 対応(EmDash 本体で、CSP に `'wasm-unsafe-eval'` を許可する変更が必要)
+- アニメーション WebP・APNG・AVIF のシーケンスにも、アニメーションが消える注意書きを出す。判定はファイルの先頭で行える(WebP の `VP8X` のフラグ、APNG の `acTL`、AVIF の `avis`)が、注意のコードと文言の追加が要る([[T12-input-decode#未解決・サブタスクの候補|T12]])
 - 既存の `b64_images`(seed や移行で作ったもの)を `imageRefs` に登録する機能。サムネイルはブラウザでしか作れないので、管理画面から行う必要がある([[T16-reference-hook#未解決・サブタスクの候補|T16]])
 
 ## 20. 決定ログ

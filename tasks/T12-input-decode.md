@@ -169,3 +169,7 @@ const decoded = await decode(new File([png], "a.png", { type: "image/png" }));
 - **アニメーションの注意(サブタスクの候補)**: アニメーション WebP・APNG(AVIF のシーケンスも同じと考えられる)も最初のフレームになるが、注意のコードは `GIF_FIRST_FRAME_ONLY` だけで、文言も GIF のもの。注意を出すなら、`NOTICE_CODES`(T03 の `src/shared/errors.ts`)にコードを足し、T14 の `NOTICE_MESSAGES` に文言を足す必要がある。判定(WebP の `VP8X` のアニメーションのフラグ、APNG の `acTL`、AVIF の `avis`)は `input.ts` に足せる。
 - **仕様書 18 章(既知の制約)への追記の候補(リーダー)**: Firefox 155 は、途中で切れた JPEG・PNG を部分的にデコードする。libheif で作ったグリッドの AVIF をデコードできない(`INPUT_DECODE_FAILED` になる)。デコードの間は主スレッドが止まる。
 - `docs/00-index.md` に [[input-image-decode]] を追加する(リーダー)。
+
+> [!note] 反映済み(リーダー、マージのとき)
+> - 仕様書 18 章に、アニメーションと Firefox でのデコードの制約を足した。アニメーションの注意は、最初の版には入れず、仕様書 19 章(将来の検討事項)に書いた。
+> - `docs/00-index.md` に [[input-image-decode]] を登録した。
