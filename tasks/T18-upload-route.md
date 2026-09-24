@@ -228,6 +228,9 @@ playground の複製(`astro dev`、SQLite)で、応答の `Server-Timing` の `d
 2. 4.2 の図: 「create → getVersioned → publish」のあとに「メタデータを保存」となっている。実装は create → `imageRefs` → getVersioned → publish。
 3. 7 章の「必要な capability」は、プラグイン全体の一覧として読める。アップロードが使うのは `schema:read` / `content:write` / `content:publish` だけ(`content:revisions:read` は 9 章のため)。書き分けるかは T29 と合わせて決める。
 
+> [!note] 反映済み(リーダー、マージのとき)
+> 上の 1〜3(8 章の表の①、4.2 の図の順番、7 章の capability)を反映し、知見ノートを索引に登録した。
+
 ### 他のタスクへの影響
 
 | タスク | 内容 |

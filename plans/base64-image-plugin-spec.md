@@ -175,9 +175,10 @@ sequenceDiagram
     Editor->>W: 画像を選択 / ドロップ / 貼り付け
     W->>W: デコード・リサイズ・WebP 圧縮<br/>サムネイル生成
     W->>R: POST(data URL・サムネイル・寸法・保存先)
-    R->>R: 検証(形式・サイズ・寸法・保存先フィールド)
-    R->>C: create → getVersioned → publish
+    R->>R: 検証(保存先のフィールドとロケール・形式・サイズ・寸法)
+    R->>C: create
     R->>S: メタデータを保存(参照元がわかれば記録)
+    R->>C: getVersioned → publish
     R-->>W: 参照 { v, id, locale, width, height }
     W->>P: onChange(参照)→ 編集者が保存
     P->>P: beforeSave で参照を検証
@@ -370,13 +371,14 @@ flowchart LR
 - ロケール: 画像エントリはサイトの既定ロケールで作り(5.1)、参照の `locale` はそのロケールにする。`target.locale`(参照元のエントリのロケール)は、`imageRefs` の参照元にだけ記録する。i18n を設定したサイトでは設定されたロケールのどれか(表記は設定にそろえる)、設定していないサイトでは 35 文字までを受け付け、ほかは 400 `INVALID_TARGET`。ロケールの設定は `emdash` の `getI18nConfig()` で読む(`ctx.site.locale` は別の値)。根拠: 実測+公式ドキュメント
   - widget は、`target.entryId` を送るときは、そのエントリのロケールも送る。省くと参照元は既定ロケールで記録され、既定ロケール以外のエントリでは、保存時の参照元の記録(9 章)がロケールだけ違う参照元をもう 1 件足す。根拠: 実測のみ([[emdash-plugin-upload-route#参照元の記録(T20)との関係]])
 - 公開まで行う理由: Contributor には公開権限がない(`content:publish_own` は Author 以上。`packages/auth/src/rbac.ts:28`)。標準 API で作成すると下書きのまま残り、サイトに表示されない。
-- 必要な capability: `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read`
+- 必要な capability(プラグイン全体): `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read`
+  - アップロードで使うのは `schema:read`(保存先のフィールド定義)・`content:write`(作成)・`content:publish`(公開)。`content:read` は `definePlugin` が自動で足す。`content:revisions:read` は [[#9. 参照元の記録と未使用画像の検出|9 章]]の判定で使う([[T18-upload-route#T29 がルートを登録する方法|T18]])。
 
 ## 8. サーバー側の検証
 
 | 場所 | 検証内容 | 不正なとき |
 |---|---|---|
-| ① アップロード用ルート | ・保存先のフィールドが存在し、このプラグインの widget を使う `json` フィールドであること(`ctx.schema.getCollection` で `type` / `widget` / `options` を読む。`packages/core/src/plugins/types.ts:407`)<br>・`dataUrl` が `data:image/webp;base64,` で始まり、長さが `maxStoredBytes` 以下(固定上限 500,000)。長さはデコードする前に確かめる<br>・デコードした中身が静止画の WebP(RIFF / WEBP、`VP8 ` / `VP8L` / `VP8X`。アニメーションは拒否)で、ヘッダーから読んだ寸法が width / height と一致し、長辺が `maxEdge` 以下<br>・`thumb` が静止画の WebP で、長辺 96px 以下、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下) | 拒否(HTTP 400。コードと理由の対応は [[T11-server-validation#T04 の理由とエラーコードの対応\|T11]]) |
+| ① アップロード用ルート | ・保存先のフィールドが存在し、このプラグインの widget を使う `json` フィールドであること(`ctx.schema.getCollection` で `type` / `widget` / `options` を読む。`packages/core/src/plugins/types.ts:407`)<br>・`target.locale` がサイトのロケールであること(i18n を設定したサイトでは設定されたロケールのどれか、設定していないサイトでは 35 文字まで。[[#7. アップロード(書き込み経路)\|7 章]])<br>・`dataUrl` が `data:image/webp;base64,` で始まり、長さが `maxStoredBytes` 以下(固定上限 500,000)。長さはデコードする前に確かめる<br>・デコードした中身が静止画の WebP(RIFF / WEBP、`VP8 ` / `VP8L` / `VP8X`。アニメーションは拒否)で、ヘッダーから読んだ寸法が width / height と一致し、長辺が `maxEdge` 以下<br>・`thumb` が静止画の WebP で、長辺 96px 以下、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下) | 拒否(HTTP 400。コードと理由の対応は [[T11-server-validation#T04 の理由とエラーコードの対応\|T11]]) |
 | ② `b64_images` の `content:beforeSave` | ・作成(`isNew: true`)で、値の形(`base64ImageEntrySchema`)と、`src` の ① と同じ中身の検証。保存先のフィールドが分からないので、固定上限(保存 500,000 バイト・長辺 4,096px)を当てる。`meta.bytes` が WebP 本体のバイト数と一致すること。`image` が無い・`null` の作成も拒否する<br>・更新(`isNew: false`)で `image` が送られてきたら、値によらず拒否する(5.1)。`image` の無い更新は通す<br>・API / MCP / 管理画面 / プラグインの `ctx.content.create` など、どこからの書き込みでも実行する。クエリはしない | 拒否(`ContentSaveRejectedError`。422 `SAVE_REJECTED`)。日本語と英語を 1 行ずつ並べたメッセージで返す(英語は T11 の `message`。[[T19-image-entry-hook#決めたこと\|T19]]) |
 | ③ 参照を持つコレクションの `content:beforeSave` | 対象は、このプラグインの widget を使う `json` フィールドのうち、送られてきたものだけ(`null` と空の配列は「画像なし」として通す)<br>・参照の形(`{ v, id, locale, width, height, alt }` の型、alt は 1,000 文字以内)<br>・ギャラリーの枚数が `maxItems` 以下で、同じ画像が重複していないこと<br>・参照している画像 ID が、すべて `imageRefs` に存在すること(ID の重複を除き、50 件ずつ `getMany`。ふつうは 1 クエリ)<br>・フィールド定義の読み出し(`ctx.schema.getCollection`)で、ほかに 2 クエリ使う。widget のフィールドが無いコレクションの保存でも、この 2 クエリは増える | 拒否(`ContentSaveRejectedError`。422 `SAVE_REJECTED`)。どのフィールドの何が問題かを、日本語と英語を並べたメッセージで返す(問題は 3 件まで。[[T16-reference-hook#決めたこと\|T16]]) |
 
