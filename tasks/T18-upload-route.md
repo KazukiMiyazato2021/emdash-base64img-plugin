@@ -37,6 +37,9 @@ created: 2026-09-23
 ## 作業内容
 
 - [ ] ルートの定義([[T08-spike-route-body|T08]] の結果に基づく body の宣言。権限は `content:create`)
+  - [[T08-spike-route-body#T18 で使うルートの宣言|T08 の雛形]]のとおり: `PluginRoute<UploadRequest>`、`methods: ["POST"]`、`request: { body: "json", maxBytes: 600_000 }`、`input: uploadRequestSchema`。`definePluginRoute` は json の入力の型が `unknown` になるので使わない
+  - 単体テストで、スキーマに合わない入力が拒否されること(`input` の書き忘れは型エラーにならない)と、固定上限の入力を `JSON.stringify` したバイト数が `UPLOAD_MAX_BODY_BYTES` 以下であることを確かめる
+- [ ] `target.locale` を、サイトに設定されたロケールと照らし合わせる。`localeSchema` は EmDash の `LOCALE_CODE_PATTERN`(`references/emdash/packages/core/src/i18n/config.ts:15`)と同じ正規表現で、長さの上限が無い。450,002 文字のロケールも `uploadRequestSchema` を通った([[T08-spike-route-body#仕様書とほかのタスクへの影響|T08]])。照らし合わせ方(EmDash の i18n の設定の読み方)と、スキーマに長さの上限を足すかを決める([[T08-1-spec-route-body|T08-1]])
 - [ ] 検証([[T11-server-validation|T11]])→ `ctx.content.create("b64_images", …)` → `getVersioned` → `publish` → `imageRefs.put` → 参照を返す
 - [ ] `target.entryId` があれば、最初の参照元として記録する
 - [ ] 途中で失敗したときの後始末(作成済みのエントリの扱い)を決めて実装する
@@ -46,7 +49,7 @@ created: 2026-09-23
 ## 完了条件
 
 - [ ] 単体テスト(偽の ctx): 正常系、検証エラー、作成・公開・保存それぞれの失敗
-- [ ] 1リクエストのクエリ数が 50 に収まることを playground で確認した
+- [ ] 1 リクエストのクエリ数を playground で測って記録した(上限は 1 呼び出し 1,000。仕様書 2.2)
 
 ## 変更してよいファイル
 
