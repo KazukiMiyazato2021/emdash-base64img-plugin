@@ -398,6 +398,15 @@ describe("エラーコードの文言", () => {
 		expect(ERROR_MESSAGES.en.INPUT_HEIC_REJECTED).toContain("JPEG");
 	});
 
+	it("INVALID_TARGET の文言は、フィールドの誤りと、エントリの言語がサイトに無いこと(T18)の両方を伝える", () => {
+		expect(ERROR_MESSAGES.ja.INVALID_TARGET).toContain("このプラグインの画像フィールドではない");
+		expect(ERROR_MESSAGES.ja.INVALID_TARGET).toContain(
+			"エントリの言語がサイトに設定されていません",
+		);
+		expect(ERROR_MESSAGES.en.INVALID_TARGET).toContain("not an image field of this plugin");
+		expect(ERROR_MESSAGES.en.INVALID_TARGET).toContain("locale is not configured for the site");
+	});
+
 	it("固定の上限を文言に差し込む", () => {
 		expect(ERROR_MESSAGES.ja.INPUT_FILE_TOO_LARGE).toContain("上限 40MB");
 		expect(ERROR_MESSAGES.en.INPUT_FILE_TOO_LARGE).toContain("maximum 40 MB");
