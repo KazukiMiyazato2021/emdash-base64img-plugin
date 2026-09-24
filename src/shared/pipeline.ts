@@ -38,7 +38,7 @@ export interface DecodedImage extends ImageSource {
 }
 
 export interface DecodeOptions {
-	readonly signal?: AbortSignal;
+	readonly signal?: AbortSignal | undefined;
 }
 
 /**
@@ -54,7 +54,7 @@ export interface EncodeRequest {
 	readonly height: number;
 	/** 画質(0〜1) */
 	readonly quality: number;
-	readonly signal?: AbortSignal;
+	readonly signal?: AbortSignal | undefined;
 }
 
 /**
@@ -79,7 +79,7 @@ export type CompressOptions = Pick<
 > & {
 	/** 省略すると canvas のエンコーダーを使う */
 	readonly encoder?: WebpEncoder;
-	readonly signal?: AbortSignal;
+	readonly signal?: AbortSignal | undefined;
 	readonly onProgress?: (progress: CompressProgress) => void;
 };
 
@@ -111,7 +111,7 @@ export type CompressImage = (
 export interface ThumbnailOptions {
 	/** 省略すると canvas のエンコーダーを使う */
 	readonly encoder?: WebpEncoder;
-	readonly signal?: AbortSignal;
+	readonly signal?: AbortSignal | undefined;
 }
 
 export interface ThumbnailResult {
@@ -133,7 +133,7 @@ export type CreateThumbnail = (
 ) => Promise<ThumbnailResult>;
 
 export interface UploadOptions {
-	readonly signal?: AbortSignal;
+	readonly signal?: AbortSignal | undefined;
 }
 
 /** アップロード用ルートを呼ぶ(T14)。ルートのエラーは、応答の `error.code` を持つ `Base64ImageError` で reject する */

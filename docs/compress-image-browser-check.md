@@ -33,7 +33,7 @@ updated: 2026-09-24
 | Cr-SW | Chromium 153.0.8010.12。`chromium.launch({ headless: true })`(headless shell。ソフトウェア描画) |
 | Cr-GPU | Chromium 153.0.8010.12。`chromium.launch({ headless: true, channel: "chromium" })`(new headless。GPU 描画) |
 | Fx | Firefox 155.0。`firefox.launch({ headless: true })` |
-| 写真 | [[canvas-webp-encoding|T05]] と同じ 5 枚(2400×1600 の JPEG)。リポジトリには入れていない |
+| 写真 | [[canvas-webp-encoding\|T05]] と同じ 5 枚(2400×1600 の JPEG)。リポジトリには入れていない |
 | 日付 | 2026-09-24 |
 
 ## 手順
