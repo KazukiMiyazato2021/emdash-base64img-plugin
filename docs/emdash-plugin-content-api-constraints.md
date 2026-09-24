@@ -55,7 +55,9 @@ updated: 2026-09-24
 ## `ctx.content.get` のクエリ数
 
 - `get` は `findById`(1 クエリ)のあと、`seoRepo.isEnabled(collection)`(1 クエリ)を呼ぶ。SEO が有効なら、さらに `seoRepo.get`(1 クエリ)を呼ぶ(`core/src/plugins/content-access.ts:25-51`、`core/src/database/repositories/seo.ts:45-52`)。
-- `b64_images` は `supports: []` で SEO が無いので、見つかった画像 1 件につき 2 クエリ、見つからなければ 1 クエリ。D1 の上限(1 リクエスト 50 クエリ)に余裕を残すため、プレビュー取得は 1 回 10 件まで(`PREVIEW_MAX_IDS`)にした。実測は [[T17-admin-data-routes]] で行う。
+- `b64_images` は `supports: []` で SEO が無いので、見つかった画像 1 件につき 2 クエリ、見つからなければ 1 クエリ。プレビュー取得は 1 回 10 件まで(`PREVIEW_MAX_IDS`)にした。
+  - T03 の時点では、D1 の上限を「1 リクエスト 50 クエリ」と考えて件数を決めた。実際の上限は 1 呼び出し 1,000 だった([[cloudflare-workers-free-d1-limits]])。
+  - [[T17-admin-data-routes|T17]] の実測でも 10 件のままにした。理由は、クエリ数ではなく応答の大きさと CPU 時間(10 件で最大 5MB・約 3.5〜5.6ms)に変わった([[emdash-plugin-preview-thumbnail-routes]])。
 
 ## plugin widget に渡る props
 

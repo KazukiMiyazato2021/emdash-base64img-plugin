@@ -147,6 +147,7 @@ await deleteImagePermanently(id); // T25。管理者のみ。ゴミ箱に入っ�
 ### 後続タスク・未解決
 
 1. `fetchPreviews` は 1 回 10 件なので、20 枚のギャラリーは 2 回に分かれる(並行)。仕様書 11.2 の「まとめて1回で取得する」とずれる。件数は [[T17-admin-data-routes|T17]] がクエリ数を実測して決める([[T03-shared-contracts#未解決・サブタスクの候補|T03 の未解決 3]])。仕様書 11.2 は、T17 の結果とあわせて直すのがよい。
+   - → T17 で決着: 10 件のまま(応答の大きさと CPU 時間のため)。仕様書 11.2 も T17 で直した([[T17-admin-data-routes#結果|T17]])。
 2. `HOST_ERROR_CODES` に無い EmDash のコード(`NOT_AUTHENTICATED` / `ACCOUNT_DISABLED` / `INVALID_TOKEN` / `INVALID_PLUGIN_ROUTE` / `RATE_LIMITED` など)は、HTTP ステータスから変換しているので、T03 の変更は要らない。元のコードは `details.responseCode` に残る。
 3. Cloudflare Access の期限切れで、API の要求がどう返るか(リダイレクトか 401 か)は確かめていない。[[T32-cloudflare-check|T32]] で Access を使うなら確かめられる。
 4. プラグインのルートがまだ無いので(T29 の前)、`uploadImage` などの成功は実物では確かめていない(モックのテストだけ)。E2E([[T31-e2e|T31]])で確かめる。

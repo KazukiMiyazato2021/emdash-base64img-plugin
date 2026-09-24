@@ -51,6 +51,11 @@ created: 2026-09-23
   - 参照元が多い画像(1 枚で予算を超えるもの)は、参照元をページ送りするか上限を設ける
 - [ ] 画像の状態(ゴミ箱に入っていない / ゴミ箱 / 無い)は、`get` と `getTrashedVersioned` で判定する。`getTrashedVersioned` は `get` が `null` のときだけ呼ぶ。capability `content:restore` を宣言するかを決める(復元の権限も含むため。[[T03-shared-contracts#結果|T03]])
 - [ ] `content:afterDelete` の `id` は URL に書いた値そのまま(slug のこともある)。`permanent === true` のときだけ `imageRefs` を消す([[T10-spike-after-save#結果|T10]])
+- [ ] 複数の画像 ID の記録を `getMany` で読むときは、`getManyInBatches`(`src/server/image-refs.ts`。50 件ずつ)を使う([[T16-2-image-refs-batches|T16-2]])
+- [ ] ゴミ箱に入った画像を `imageRefs` に記録するかを決める([[T17-admin-data-routes#結果|T17]] の未解決)
+  - 今の `thumbnails` ルートは、ゴミ箱に入った画像を区別できない(`imageRefs` は完全削除まで残る)。そのため、一覧の列([[T24-list-column|T24]])はゴミ箱の画像にもサムネイルを出す
+  - `content:afterDelete` の `permanent: false` で記録し、ゴミ箱から戻したときに消す必要がある。戻したときに呼ばれる hook が 0.39.1 にあるかを確かめる
+  - 記録するなら、T03 の `imageRefsRecordSchema` を変える(サブタスクにする)
 
 ## 完了条件
 
