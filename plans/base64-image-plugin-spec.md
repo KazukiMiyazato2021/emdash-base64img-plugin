@@ -102,7 +102,8 @@ package: emdash-plugin-base64-image
 | D1 の SQL 文の長さ | 100KB | 公式ドキュメントのみ |
 | D1 のバインド変数 | 100 / クエリ | 公式ドキュメントのみ |
 | D1 Time Travel(Free) | 7日 | 公式ドキュメントのみ |
-| EmDash API のリクエスト body | 10MB(`packages/core/src/api/parse.ts:13`) | 公式ドキュメントのみ |
+| EmDash の標準 API のリクエスト body | 10MB(`packages/core/src/api/parse.ts:13`)。プラグインのルートには当てはまらない | 公式ドキュメントのみ |
+| プラグインのルートのリクエスト body | `request` を宣言したルートだけ、既定 1 MiB・最大 8 MiB(`maxBytes`)。宣言しないと上限なし([[emdash-plugin-route-body-limit]]) | 実測+公式ドキュメント |
 
 ### 2.3 storage なしで使えなくなる EmDash の機能
 
@@ -644,7 +645,7 @@ export default defineConfig({
 問題が見つかったら、設計に戻る。
 
 - [x] git 依存 + TS ソースのプラグインを、Vite(Node と workerd)が読み込めるか → 読み込めた。ビルドは入れない。npm 12 では、サイトの `.npmrc` に `allow-git=root` が要る。Cloudflare アダプターの `astro dev` では、最初のリクエストで 1 回だけ再読み込みが起きる([[T07-spike-git-dependency#結果|T07]]、[[#14. 配布とバージョン|14 章]]、[[#18. 既知の制約とリスク|18 章]])
-- [ ] プラグインのルートの body 上限(既定 1MiB。`skills/creating-plugins/references/sandbox-boundaries.md`)で、100KB の data URL を問題なくやり取りできるか
+- [x] プラグインのルートの body 上限(既定 1MiB。`skills/creating-plugins/references/sandbox-boundaries.md`)で、100KB の data URL を問題なくやり取りできるか → できる。「既定 1MiB」は `request` を宣言したルートだけの上限で、native も同じ(`maxBytes` で最大 8 MiB)。宣言しないと上限なし。アップロードのルートは `request: { body: "json", maxBytes: 600_000 }` を宣言する。100KB も固定上限の 500KB も受け取れた([[T08-spike-route-body#結果|T08]]、[[#7. アップロード(書き込み経路)|7 章]])
 - [x] `resolveBase64Images` で画像を解決するのに、実際に何クエリかかるか(画像エントリの authorId によってバイライン取得のクエリが増えるかも含めて) → 50 件までの 1 回の呼び出しは 1 クエリ。このプラグインの画像(authorId なし)では、1 ページ 1〜3 クエリ。authorId のある画像はバイラインの補完で増える([[T09-spike-query-count#結果|T09]]、[[#12. サイト側の描画|12 章]])
 - [x] canvas の WebP のファイルサイズが、ブラウザ間と cwebp とでどれだけずれるか → 同じ画素ならエンコーダーの差は小さい(Firefox は cwebp と同じ、Chromium は +0.2〜1.2%)。ずれの主な原因は縮小の方法で、上の 6.3 の方法に決めた([[T05-spike-canvas-webp#結果|T05]]、[[#A.5 ブラウザの canvas での確認|付録 A.5]])
 
@@ -691,7 +692,7 @@ export default defineConfig({
 | Q2 | スコープ | 単一画像とギャラリー。本文中の画像と OGP は対象外 | 本文ブロックの編集 UI は Block Kit のみ(公式ドキュメントのみ) |
 | Q3 | 保存形式 | `json` フィールド、`MediaValue` 互換の形 | 標準の `Image` が data URL をそのまま描画できる(公式ドキュメントのみ) |
 | Q4 | 画像本体の置き場所 | 非表示コレクション `b64_images` に置き、フィールドには参照だけを持つ | 画像を投稿に直接持たせると、管理画面の一覧が 146.9MB になる(実測+公式ドキュメント) |
-| Q5 | ライフサイクル | 変更しない・再利用しない・自動削除しない。参照元をプラグインストレージに記録し、画像管理ページで警告を出す | プラグインは完全削除できない。D1 は1リクエスト50クエリまで(公式ドキュメントのみ) |
+| Q5 | ライフサイクル | 変更しない・再利用しない・自動削除しない。参照元をプラグインストレージに記録し、画像管理ページで警告を出す | プラグインは完全削除できない。D1 は1リクエスト50クエリまで(公式ドキュメントのみ。決めた時点の理解で、Workers Free で D1 に送れるのは 1 呼び出し 1,000 クエリまでと分かった。[[T10-1-spec-d1-limits\|T10-1]]) |
 | Q6 | サイズ予算 | 保存する data URL で 100,000 バイト以下 | 利用者の選択 |
 | — | ブラウザ | Safari は対象外。canvas で WebP を作る | Safari は WebP を作れない(外部ドキュメントのみ)。WASM は CSP で禁止されている(公式ドキュメントのみ) |
 | Q7 | リサイズと画質 | 画質の下限(0.60)を守り、収まらなければ縮小する(1600 → 480px) | 写真5枚で検証(実測のみ) |
@@ -779,7 +780,7 @@ export default defineConfig({
 |---|---|
 | `skills/creating-plugins/SKILL.md` | プラグインの形式(sandboxed / native)と capability |
 | `skills/creating-plugins/references/admin-ui.md` | field widget(sandboxed で使える要素、native の React) |
-| `skills/creating-plugins/references/sandbox-boundaries.md` | ルートの body 上限、完全削除できないこと |
+| `skills/creating-plugins/references/sandbox-boundaries.md` | ルートの body 上限(既定 1MiB は `request` を宣言したルートだけ)、完全削除できないこと |
 | `skills/creating-plugins/references/storage.md` | プラグインストレージの API(`getMany` / `putMany`) |
 | `packages/admin/src/components/ContentEditor.tsx:1806` | plugin widget の解決方法と、widget に渡される props |
 | `packages/admin/src/router.tsx:440` | 管理画面の一覧は 100件ずつ取得する |
@@ -788,7 +789,9 @@ export default defineConfig({
 | `packages/admin/src/components/editor/PluginBlockNode.tsx:41` | 本文ブロックの定義は Block Kit のみ |
 | `packages/core/src/database/repositories/content.ts:760` | 一覧取得は `SELECT *` |
 | `packages/core/src/cleanup.ts:37` | リビジョンは最大 50件残る |
-| `packages/core/src/api/parse.ts:13` | リクエスト body の上限は 10MB |
+| `packages/core/src/api/parse.ts:13` | 標準 API のリクエスト body の上限は 10MB(プラグインのルートには当てはまらない) |
+| `packages/core/src/plugins/routes.ts:129` / `route-wire.ts:177` | プラグインのルートの body は、`request` を宣言したときだけ上限付きで読む |
+| `packages/core/src/plugins/http-route-dispatch.ts:49-79` | プラグインのルートの権限・API トークンのスコープ・CSRF の確認 |
 | `packages/core/src/schema/zod-generator.ts:174` | `json` フィールドはサーバー側で中身を検証しない |
 | `packages/core/src/components/EmDashImage.astro` / `packages/core/src/media/responsive.ts:127` | data URL をそのまま描画する |
 | `packages/core/src/astro/middleware/csp.ts:92` / `auth.ts:301` | 管理画面の CSP |
