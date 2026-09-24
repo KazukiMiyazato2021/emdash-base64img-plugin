@@ -473,6 +473,7 @@ flowchart LR
   - 処理中は、進捗の行の下に「処理が終わってから保存してください。」(英語は「Save after processing finishes.」)と出す。処理中に保存すると画像が外れるため(18 章の「処理中の保存」)。案内は `aria-live` の領域に入れず(段階が変わるたびに読まない)、キャンセルボタンの説明(`aria-describedby`)にする。ドロップゾーンのボタンから処理を始めると、widget はフォーカスをキャンセルボタンへ移すので、そのときに読まれる。根拠: 実測のみ(Chromium 153 の支援技術のツリーで、キャンセルボタンの説明になった。スクリーンリーダーでは確かめていない。[[T28-2-save-hint-alt-width#結果|T28-2]])
 - widget は、アップロードの保存先(`target`)を、管理画面の URL(`/_emdash/admin/content/<collection>/<エントリ ID か new>` と `?locale=`)と props の `id`(`field-<slug>`)から求める。plugin widget には、コレクション・エントリ ID・ロケールが渡らない。`entryId` と `locale` は組にして、URL から両方が分かるときだけ送る。`?locale=` の無い画面(ダッシュボードなどから開いた編集画面)では参照元を送らず、保存のときに記録する。根拠: 公式ドキュメントのみ([[emdash-admin-content-editor-url]]、[[T23-upload-hook#結果|T23]])
 - plugin widget には `readOnly` が渡されない(`packages/admin/src/components/ContentEditor.tsx:1833-1842`)。ただし、フィールドの並びは `<fieldset disabled={readOnly}>` の中にあり(`:1336`)、編集ロック中は widget の中のボタンと入力欄もブラウザが無効にする。`div` で受けるドロップだけは届くので、widget は自分の fieldset が `:disabled` のときにファイルを受け付けない。根拠: 実測+公式ドキュメント([[emdash-plugin-field-widget]]、[[T27-image-widget#決めたこと|T27]])
+- 部品は、管理画面の入口(`src/admin.tsx`。descriptor の `adminEntry`)の export で管理画面に渡す: `fields`(widget。キーは `WIDGET_KINDS` の名前 `image` / `gallery`)、`pages`(画像管理ページ。キーは `IMAGES_PAGE.path`)、`contentListColumns`(一覧の列)。入口は読み込み時に一覧の列のマニフェストを取り始める(11.4)。プラグイン定義の `admin.fieldWidgets` / `admin.pages` はマニフェストに載るだけで、入口に部品が無いと、widget は標準の入力(`json` は textarea)になり、サイドバーにページの項目が出ない(コマンドパレットの項目は 404 の画面を開く)。根拠: 実測+公式ドキュメント([[emdash-admin-entry-assembly]]、[[emdash-plugin-definition-registration]])
 
 ### 11.2 単一画像 widget(`base64-image:image`)
 
@@ -536,7 +537,7 @@ flowchart LR
 
 ### 11.5 画像管理ページ
 
-- `admin.pages` で登録する。パスは `/images`(`/_emdash/admin/plugins/base64-image/images`)、ラベルは管理画面の辞書にある「Images」の ID `an5hVd`、アイコンは `image`。部品は `src/admin/ImagesPage.tsx` の `ImagesPage`(props なし)。
+- `admin.pages` と、管理画面の入口の `pages`(11.1)で登録する。パスは `/images`(`/_emdash/admin/plugins/base64-image/images`)、ラベルは管理画面の辞書にある「Images」の ID `an5hVd`、アイコンは `image`。部品は `src/admin/ImagesPage.tsx` の `ImagesPage`(props なし)。
   - サイドバーとコマンドパレットは、ラベルを管理画面の Lingui で訳す(`i18n._(label)`)。辞書のキーは Lingui の ID なので、文字列の「Images」は訳されず(日本語の画面でも「Images」)、本番のビルドでは「Uncompiled message detected!」の警告が出る。ID なら日本語は「画像」、英語は「Images」になり、警告も出ない。根拠: 実測+公式ドキュメント([[T25-images-page#結果|T25]]、[[emdash-admin-plugin-pages]])
 - 一覧に出すもの: サムネイル、寸法、保存サイズ、参照元へのリンク、状態バッジ([[#9. 参照元の記録と未使用画像の検出]])、作成日時、公開の状態(下書きの画像はサイトに出ない)、参照元の全体の件数(載せきれない分は「ほか N 件」)。
   - 参照元は記録ごとに 1 行で並べ、フィールド・ロケール・状態を添える。リンク先は編集画面(`/_emdash/admin/content/<collection>/<エントリ ID>?locale=<ロケール>`)。削除された参照元はリンクにしない。
@@ -756,6 +757,7 @@ export default defineConfig({
 | 編集ロック | plugin widget には `readOnly` が渡らない(EmDash 側の制約)。編集ロックは、EmDash がフィールドを包む `<fieldset disabled>` に頼っている(ボタンと入力欄はブラウザが無効にし、枠へのドロップは widget が受け付けない。[[#11.1 共通方針\|11.1]])。EmDash の版が変わったら、実際の管理画面で確かめ直す。根拠: 実測+公式ドキュメント([[emdash-plugin-field-widget]]) |
 | 処理中の保存 | 画像の処理中に「Save」を押すと、保存の要求を送ってから応答が届くまでに widget が値に加えた画像が、フォームから外れる。EmDash が手動の保存の応答でフォームの値を置き換えるため(自動保存では置き換えない)。外れた画像のエントリは残り、使われない画像になる。新規作成の最初の保存では、widget が作り直されて残りの処理が止まるとみられる(推測のみ)。根拠: 実測+公式ドキュメント(ギャラリーで 4 枚 → 1〜2 枚。[[gallery-widget-reorder-focus#4. 処理中に「Save」を押したとき(EmDash の挙動)]])。処理中は、両方の widget が進捗の行の下に「処理が終わってから保存してください。」と出す(11.1)。案内だけで、保存は止めない([[T28-2-save-hint-alt-width#結果\|T28-2]]) |
 | 必須のギャラリー | 必須(`required`)のギャラリーでも、画像を全部消した `[]` のまま保存できる。EmDash の必須の確認は、値なし・`null`・空文字だけを拒否するため(単一画像の `null` は拒否される)。根拠: 公式ドキュメントのみ(`packages/core/src/api/handlers/validation.ts:196-221`。[[T28-gallery-widget#未解決・サブタスクの候補\|T28]]) |
+| `b64_images` の無いサイト | サイトの seed に `b64_images` が無いと、編集者は最初のアップロードで初めて知る(widget がファイルの処理のあとに「画像を保存するコレクション b64_images がありません。サイトの設定を確認してください。」を出し、値は変えない)。サイトを作る人は、サーバーのログで直し方を知る。先に知らせる表示は作らない。根拠: 実測のみ([[emdash-admin-entry-assembly#5. b64_images の無いサイト]]、[[T30-admin-entry#b64_images の無いサイト(検討の結果)\|T30]]) |
 | 画像管理ページの表示 | サイドバーのプラグインのページの項目は、ロールで絞られない(閲覧者にも出る)。閲覧者が開くと、一覧は 403 になり、ページは「寄稿者以上」と示す。根拠: 実測+公式ドキュメント([[emdash-admin-plugin-pages]]) |
 | コマンドパレット | 管理画面のコマンドパレットで「Images」などと入力すると、非表示のコレクション `b64_images` も候補に出る。選ぶと、使わないとした標準の一覧(`/_emdash/admin/content/b64_images`。1 ページ 100 件の base64 を読む。[[#10. 画像のライフサイクル\|10 章]])に移る。根拠: 実測(候補に出ることと、移る先。[[T25-images-page#影響・サブタスクの候補\|T25]]、[[T29-plugin-definition#他のタスクへの影響・サブタスクの候補\|T29]])、推測のみ(一覧の重さは測っていない) |
 | 一覧の列の見出し | 列の見出しは、管理画面の辞書にある「Image」のメッセージ ID を使って、管理画面の言語で表示する。EmDash の版が変わって辞書から「Image」が消えると、見出しに ID(`hG89Ed`)がそのまま出る。インストールした `@emdash-cms/admin` の辞書に ID があることは、単体テストで確かめている([[T24-list-column#結果\|T24]]) |
