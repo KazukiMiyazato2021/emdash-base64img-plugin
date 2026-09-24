@@ -58,6 +58,7 @@ updated: 2026-09-24
 | [[emdash-admin-locale-lang\|EmDash 0.39.1 の管理画面の言語と html の lang 属性]] | `docs/emdash-admin-locale-lang.md` | `<html lang>` は cookie `emdash-locale` → `Accept-Language` → `en` で決まる。設定画面で言語を変えると再読み込みせずに書き換わるので、`MutationObserver` で追随する | [[T14-admin-i18n-api\|T14]] |
 | [[emdash-admin-content-editor-url\|EmDash 0.39.1 の管理画面の編集画面の URL と、widget の保存先の求め方]] | `docs/emdash-admin-content-editor-url.md` | plugin widget の props にはコレクション・エントリ ID・ロケールが無いので、URL(`/_emdash/admin/content/<collection>/<ID か new>` と `?locale=`)と props の `id`(`field-<slug>`)から求める。`?locale=` はダッシュボード・コマンドパレット・サイトのツールバーから開くと付かない。ルーターの `?locale=` の読み方 | [[T23-upload-hook\|T23]] |
 | [[emdash-admin-content-list-columns\|EmDash 0.39.1 の管理画面のコンテンツ一覧の列(判定の呼ばれ方・マニフェストの先読み・見出しの訳)]] | `docs/emdash-admin-content-list-columns.md` | 列の `collections` は同期関数で、コレクションやロールが変わったときだけ呼ばれるので、入口の読み込み時にマニフェストを先読みする。`fetchManifest` は Lingui の有効化の前に失敗するので `emdash/plugin-utils` で送る。`label` は Lingui の ID で訳される(文字列は訳されない) | [[T24-list-column\|T24]] |
+| [[emdash-admin-plugin-pages\|EmDash 0.39.1 の管理画面のプラグインのページ(登録・ラベルの訳・ロール・useCurrentUser)]] | `docs/emdash-admin-plugin-pages.md` | ページは `definePlugin` の `admin.pages` と入口の `pages` の 2 か所で登録する。サイドバーとコマンドパレットは `label` を Lingui の ID で訳す(「Images」の ID `an5hVd` なら ja は「画像」)。項目はロールで絞られない。`useCurrentUser()` がそのまま使える | [[T25-images-page\|T25]] |
 | [[emdash-admin-plugin-ui-styling\|EmDash 0.39.1 の管理画面で、プラグインの部品に Kumo と CSS のクラスを使うときの注意]] | `docs/emdash-admin-plugin-ui-styling.md` | 管理画面の CSS はビルド済みでプラグインのファイルを読まないので、CSS にあるクラスだけが当たる(テストで確かめる)。層の外の `*` の `border-color` が枠の色のクラスより強い。Kumo 2.6.0 の `Loader`・`Label`・`Button`・`Banner` の注意。厳しい型チェックでは、Kumo の省略できる props に `undefined` を渡せない | [[T22-widget-parts\|T22]] |
 
 ## ライブラリ
@@ -66,6 +67,8 @@ updated: 2026-09-24
 |---|---|---|---|
 | [[zod-string-length-code-points\|zod 4.5 の文字列の長さはコードポイントで数える]] | `docs/zod-string-length-code-points.md` | `max` / `min` はコードポイント単位。data URL のスキーマは ASCII に限り、長さの上限をバイトの上限と一致させた | [[T03-shared-contracts\|T03]] |
 | [[react-hook-testing-pitfalls\|React のフックのテストで気を付けること(StrictMode・act の外の更新・oxlint の誤検出)]] | `docs/react-hook-testing-pitfalls.md` | `renderHook` の `wrapper` で `<StrictMode>` を包んでも effect は 2 回動かない(`reactStrictMode: true` を使う)。`console.error` を見張って act の外の更新を失敗にする。oxlint 1.83.0 の `react(memo-dependencies)` は `catch` の無い `try` / `finally` で誤って報告する | [[T23-upload-hook\|T23]] |
+| [[react-effect-lint-and-vitest-hooks\|oxlint の set-state-in-effect と、Vitest の afterEach で投げるときの後片付け]] | `docs/react-effect-lint-and-vitest-hooks.md` | oxlint 1.83.0 の `react(set-state-in-effect)` は effect から呼んだ関数の中の `setState` をエラーにする(読み込みと反映を分ける)。Vitest 4.1.11 の `afterEach` はどれかが投げると残りを呼ばないので、投げる前に `cleanup()` を呼ぶ | [[T25-images-page\|T25]] |
+| [[kumo-dialog-confirm-a11y\|Kumo 2.6.0 の Dialog で確認を作るときのキーボードと読み上げ]] | `docs/kumo-dialog-confirm-a11y.md` | `role="alertdialog"` は外側を押しても閉じない(Escape では閉じる)。最初のフォーカスは中の最初の要素。開いている間、外側は `aria-hidden` になるが `aria-live` の領域は隠れない。ボタンが消えるときのフォーカスの移し方。`disabled` にするとフォーカスが失われる | [[T25-images-page\|T25]] |
 
 ## ブラウザ・画像処理
 
