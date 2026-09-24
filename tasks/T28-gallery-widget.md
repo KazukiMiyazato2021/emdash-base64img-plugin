@@ -2,7 +2,7 @@
 id: T28
 title: "ギャラリーの widget を作る"
 type: 実装
-status: todo
+status: doing
 wave: 4
 depends_on:
   - "[[T22-widget-parts]]"
