@@ -31,7 +31,7 @@ updated: 2026-09-24
 > - playground を複製した使い捨てのサイト(`spikes/after-save/site/`、git 管理外)に、受け取った event をそのまま JSONL に書く native プラグイン 2 つ(`spike-recorder`、`spike-observer`)を入れた。操作は、管理画面が送るのと同じ REST のリクエストと、Playwright で動かした実際の管理画面の両方で行った。[[#再現手順]]
 > - macOS 26.4(Darwin 25.4.0、arm64)、Node 26.10.0、emdash 0.39.1、Astro 7.3.3、SQLite(`node:sqlite`)、Playwright 1.63.0(Chromium 153.0.8010.12、headless)。開発サーバーはポート 4410。2026-09-24 に計測。
 > - インストールされた `node_modules/emdash/src` の `emdash-runtime.ts` / `plugins/hooks.ts` / `plugins/content-access.ts` / `after.ts` は、`references/emdash/`(タグ `emdash@0.39.1`)と同一だった(`diff`)。以下の行番号は `references/emdash/packages/` 以下。
-> - Cloudflare Workers(workerd + D1)では確かめていない。[[T32-cloudflare-check|T32]] で確かめる。
+> - Cloudflare Workers(workerd + D1)では、[[T32-cloudflare-check|T32]] が `wrangler dev`(ローカルの D1)で参照元の記録の hook(afterSave・afterPublish)を動かし、クエリ数と記録の結果が Node と同じだった([[workerd-d1-plugin-behavior]])。event の中身を記録して比べてはいない。本番の Workers では確かめていない。
 
 ## 操作ごとに呼ばれる hook
 

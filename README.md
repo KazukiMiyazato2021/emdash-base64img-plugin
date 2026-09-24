@@ -122,10 +122,11 @@ export default defineConfig({
 ```
 
 - EmDash の Cloudflare のテンプレートから作ったサイトでは、`storage: r2({ binding: "MEDIA" })` と、wrangler の設定の `r2_buckets` を外す。
+- この形は、このリポジトリの playground の Cloudflare 用の設定([playground/astro.config.cloudflare.mjs](playground/astro.config.cloudflare.mjs)・[playground/wrangler.jsonc](playground/wrangler.jsonc)・[playground/src/worker.ts](playground/src/worker.ts))で、`wrangler dev`(workerd + ローカルの D1)で動くことを確かめた。アップロード・保存・参照元の記録・画像管理ページは Node と同じ結果だった。本番の Workers へのデプロイでは確かめていない。詳しくは [docs/workerd-d1-plugin-behavior.md](docs/workerd-d1-plugin-behavior.md)。
 - `vite.ssr.optimizeDeps.include` は Cloudflare アダプターの `astro dev` のためのもの。無くても動くが、最初のリクエストで Vite が依存を最適化し直し、ページが 1 回読み込み直される。Node アダプターでは起きないので要らない。詳しくは [docs/git-dependency-ts-source.md](docs/git-dependency-ts-source.md)。
 
 > [!NOTE]
-> Node では、`storage` を省略すると、EmDash が `./.emdash/uploads` のローカルの storage を既定で使う。そのため、EmDash 標準のメディアのアップロードも動く。R2 の無い Cloudflare のサイトでは、標準のメディアの機能(メディアライブラリ、標準の画像・ファイルのフィールド、リッチテキストへの画像のアップロード)は使えず、このプラグインがサイトで唯一の画像の手段になる。
+> Node では、`storage` を省略すると、EmDash が `./.emdash/uploads` のローカルの storage を既定で使う。そのため、EmDash 標準のメディアのアップロードも動く。R2 の無い Cloudflare のサイトでは、標準のメディアの機能(メディアライブラリ、標準の画像・ファイルのフィールド、リッチテキストへの画像のアップロード)は使えず、このプラグインがサイトで唯一の画像の手段になる。`wrangler dev` で確かめたときは、標準のメディアのアップロードが 500 `UPLOAD_ERROR`(`Upload failed`)になった(`NO_STORAGE` ではない)。
 
 ### 4. コレクションとフィールドを作る
 
@@ -479,6 +480,7 @@ curl -X POST "$SITE/_emdash/api/content/b64_images/<画像の ID>/restore" \
 | アニメーション | GIF・アニメーション WebP・APNG は、最初のフレームの静止画になる |
 | 変換 | 位置情報を含む EXIF は消える。透過は残る。色は sRGB になる |
 | 容量 | 画像 1 枚は最大 100,000 バイト(既定)。公開すると本体を写したリビジョンが 1 件できるので、1 枚でその約 2 倍を使う。D1 Free の 500MB で約 2,500 枚。使用量は Cloudflare のダッシュボードで見る |
+| D1 の 1 日の上限(Free) | 書き込みは 10 万行 / 日、読み込みは 500 万行 / 日で、超えると UTC の 0 時までクエリが失敗する。画像 1 枚のアップロードで約 93 行を書き、約 761 行を読む(投稿の保存・公開は 1 回 38〜50 行を書く)。アップロードだけなら書き込みの上限は約 1,000 回 / 日にあたる。数は `wrangler dev` のローカルの D1 で測ったもの |
 | バックアップ | 戻せるのは D1 の Time Travel(Free は直近 7 日)だけ。`wrangler d1 export` は、EmDash の検索の仮想テーブルがあるデータベースでは使えない |
 | ページの重さ | 画像は HTML に埋め込まれる。10 件の一覧で最大約 1MB、カバーとギャラリー 10 枚のページで約 1.1MB |
 | 対象外 | リッチテキストの本文中の画像と、OGP の画像 |
