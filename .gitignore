@@ -17,6 +17,9 @@ dist/
 test-results/
 playwright-report/
 
+# E2E の global setup が作るもの(ログインの状態・API で上げる画像)
+e2e/.cache/
+
 # worktree の置き場
 .claude/worktrees/
 

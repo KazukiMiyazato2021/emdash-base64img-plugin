@@ -723,13 +723,14 @@ export default defineConfig({
 |---|---|
 | 単体テスト(vitest) | WebP ヘッダーの解析、サーバー側の検証、参照のスキーマ、画質の探索処理(エンコーダーを差し替え可能にして試す)、参照元の判定 |
 | widget のテスト(vitest + jsdom + Testing Library) | 操作と状態の遷移。jsdom には canvas がないので、エンコーダーはモックにする |
-| E2E(Playwright、Chromium・Firefox) | 実ブラウザの canvas で「圧縮 → アップロード → 保存 → サイトに表示(img の width / height を確認)→ 一覧のサムネイル → 画像管理ページ」を通しで確認する。Safari の検出は、toBlob が PNG を返すモックで確認する |
+| E2E(Playwright、Chromium・Firefox) | 実ブラウザの canvas で「圧縮 → アップロード → 保存 → サイトに表示(img の width / height を確認)→ 一覧のサムネイル → 画像管理ページ」を通しで確認する。ほかに、widget の操作(キーボード・ドロップ・貼り付け・並べ替え・上限)、一覧の列、画像管理ページ(ロールごとの操作・ページ送り)、異常系、処理中の保存、編集ロック、編集画面の開き方ごとの保存先、サイトのページ、サーバー側の検証(API に直接送る)を確認する。Safari の検出は、toBlob が PNG を返すモックで確認する |
 
 - `@emdash-cms/plugin-test` は使わない。sandboxed プラグイン向け(workerd とマニフェストが前提)のため(`packages/plugin-test/package.json`)。
 - playground: 普段の開発は Node + SQLite で素早く確認し、`wrangler dev` + D1 でも動くことを確かめる。
   - Cloudflare 用の設定は `playground/wrangler.jsonc`・`astro.config.cloudflare.mjs`・`src/worker.ts`(D1 だけ。R2 と cron は使わない)。`npm run build:cloudflare -w playground` のあと `npm run preview:cloudflare -w playground`(`wrangler dev`)で動かす。ビルドしたサイトでは開発用ログインが使えないので、サンプルの投稿のスクリプトに API トークン(`--token`)を渡す([[T32-cloudflare-check|T32]])。
   - サイト側のページ(投稿の一覧 `/posts/`、詳細 `/posts/<slug>/`)と、アップロードのルートでサンプルの投稿を作るスクリプト(`playground/scripts/create-sample-posts.ts`)がある。seed には画像と投稿を入れない(seed の画像は `imageRefs` に記録が無く、それを参照する投稿は保存できないため)([[T26-playground-pages|T26]])。
   - E2E の入力画像(形式ごとの画像・大きすぎる画像・壊れた画像)は `e2e/fixtures/make-images.ts` で作り、git に入れない(40MB を超えるファイルを含むため)。macOS の `sips` と Playwright の Chromium を使う([[T26-playground-pages|T26]]、[[e2e-input-image-fixtures]])。
+- E2E は `npm run test:e2e` で実行する(`npm run verify` には入れない)。playground の開発サーバーを空のデータベースで起動して動かし、終わったら止める。スクリーンリーダーでの読み上げ、OS からの本物のドラッグ、ヘッドレスでない Firefox での貼り付け、翻訳の切り替え、Safari の実機は手で確認する([[T31-e2e|T31]]、[[e2e-playwright-emdash-admin]])。
 - Cloudflare の本番環境(Workers Free)でクエリ数と CPU 時間を測るのは任意。利用者のアカウントに手動でデプロイして行う。T32 では行っていない(利用者の了承待ち。手順の案は [[T32-cloudflare-check#デプロイして測る(任意・利用者の了承待ち)|T32]])。
 
 ## 16. 実装前の検証(スパイク)
@@ -758,7 +759,7 @@ export default defineConfig({
 | アニメーション | GIF・アニメーション WebP・APNG は、最初のフレームの静止画になる。アニメーションが消える注意書きは GIF だけに出す([[#6.5 入力形式と上限(Q8)\|6.5]]) |
 | Firefox でのデコード | Firefox 155 は、デコードの間(6,400 万画素の JPEG で 78〜92ms)画面を止め、その間の中断はデコードが終わってから届く。途中で切れた JPEG・PNG は、欠けた部分を白・透明にしてデコードする(検出しない)。libheif で作ったグリッドの AVIF はデコードできない(`INPUT_DECODE_FAILED`)([[T12-input-decode#結果\|T12]]) |
 | 編集ロック | plugin widget には `readOnly` が渡らない(EmDash 側の制約)。編集ロックは、EmDash がフィールドを包む `<fieldset disabled>` に頼っている(ボタンと入力欄はブラウザが無効にし、枠へのドロップは widget が受け付けない。[[#11.1 共通方針\|11.1]])。EmDash の版が変わったら、実際の管理画面で確かめ直す。根拠: 実測+公式ドキュメント([[emdash-plugin-field-widget]]) |
-| 処理中の保存 | 画像の処理中に「Save」を押すと、保存の要求を送ってから応答が届くまでに widget が値に加えた画像が、フォームから外れる。EmDash が手動の保存の応答でフォームの値を置き換えるため(自動保存では置き換えない)。外れた画像のエントリは残り、使われない画像になる。新規作成の最初の保存では、widget が作り直されて残りの処理が止まるとみられる(推測のみ)。根拠: 実測+公式ドキュメント(ギャラリーで 4 枚 → 1〜2 枚。[[gallery-widget-reorder-focus#4. 処理中に「Save」を押したとき(EmDash の挙動)]])。処理中は、両方の widget が進捗の行の下に「処理が終わってから保存してください。」と出す(11.1)。案内だけで、保存は止めない([[T28-2-save-hint-alt-width#結果\|T28-2]]) |
+| 処理中の保存 | 画像の処理中に「Save」を押すと、保存の要求を送ってから応答が届くまでに widget が値に加えた画像が、フォームから外れる。EmDash が手動の保存の応答でフォームの値を置き換えるため(自動保存では置き換えない)。外れた画像のエントリは残る。アップロードのときに参照元が記録されているので、画像管理ページでは「参照元から外された」(`detached`)として出る。新規作成の最初の保存では、widget が作り直され、処理中のアップロードは中断され、残りのファイルは処理されない。どちらも知らせは出ない(E2E で実測。両方のブラウザ。[[T31-e2e#確かめたこと\|T31]])。根拠: 実測+公式ドキュメント(ギャラリーで 4 枚 → 1〜2 枚。[[gallery-widget-reorder-focus#4. 処理中に「Save」を押したとき(EmDash の挙動)]])。処理中は、両方の widget が進捗の行の下に「処理が終わってから保存してください。」と出す(11.1)。案内だけで、保存は止めない([[T28-2-save-hint-alt-width#結果\|T28-2]]) |
 | 必須のギャラリー | 必須(`required`)のギャラリーでも、画像を全部消した `[]` のまま保存できる。EmDash の必須の確認は、値なし・`null`・空文字だけを拒否するため(単一画像の `null` は拒否される)。根拠: 公式ドキュメントのみ(`packages/core/src/api/handlers/validation.ts:196-221`。[[T28-gallery-widget#未解決・サブタスクの候補\|T28]]) |
 | `b64_images` の無いサイト | サイトの seed に `b64_images` が無いと、編集者は最初のアップロードで初めて知る(widget がファイルの処理のあとに「画像を保存するコレクション b64_images がありません。サイトの設定を確認してください。」を出し、値は変えない)。サイトを作る人は、サーバーのログで直し方を知る。先に知らせる表示は作らない。根拠: 実測のみ([[emdash-admin-entry-assembly#5. b64_images の無いサイト]]、[[T30-admin-entry#b64_images の無いサイト(検討の結果)\|T30]]) |
 | 画像管理ページの表示 | サイドバーのプラグインのページの項目は、ロールで絞られない(閲覧者にも出る)。閲覧者が開くと、一覧は 403 になり、ページは「寄稿者以上」と示す。根拠: 実測+公式ドキュメント([[emdash-admin-plugin-pages]]) |
