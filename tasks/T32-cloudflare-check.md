@@ -50,6 +50,7 @@ Node + SQLite だけでなく、workerd + D1 でも動くことを確かめる�
 - [ ] playground のページ(`/posts/`・`/posts/<slug>/`)は `wrangler dev` でもそのまま使える見込み。サンプルの投稿を作るスクリプトは開発用ログイン(`astro dev` だけ)を使うので、`wrangler dev` では使えない(API トークンでのログインには対応していない)。データの作り方を決める([[T26-playground-pages#他のタスクへの影響|T26]])
 - [ ] D1 で、画像管理の一覧のクエリ数(予算は 1 リクエスト 100。SQLite の実測は 1 ページ 42〜90)と、ゴミ箱のルートのクエリ数(9)を確かめる。一覧を並行に投げたときの応答時間と、消されたコレクションの `get` の例外の形(SQLite は `ERR_SQLITE_ERROR` の no such table。そのクエリは `db.count` に数えられない)も確かめる([[image-management-routes]]、[[T21-orphan-routes#仕様書・他のタスクへの影響|T21]])
 - [ ] `b64_images` があるかの確認は、プラグインのインスタンスごとの最初の `b64_images` 以外の保存でクエリを増やす(あれば +2、無ければ +1)。Workers では isolate が作り直されるたびに起きるので、D1 で数を確かめる。config で登録した native プラグインで、起動時に lifecycle hook(`plugin:install` / `plugin:activate`)が呼ばれないことは Node でだけ確かめた(workerd でも同じとみられる。推測のみ)([[T29-plugin-definition#他のタスクへの影響・サブタスクの候補|T29]]、[[emdash-native-plugin-lifecycle-hooks]])
+- [ ] 管理画面の入口(widget・一覧の列・サイドバーの項目と画像管理ページ)が、wrangler dev でも動くことを確かめる。T30 は Node の開発サーバーと本番のビルドだけで確かめた(確かめ方は [[emdash-admin-entry-assembly#6. 再現手順]])([[T30-admin-entry#未解決|T30]])
 
 ## 完了条件
 
