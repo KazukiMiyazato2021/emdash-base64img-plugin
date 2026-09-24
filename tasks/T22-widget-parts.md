@@ -356,4 +356,4 @@ return (
 7. `docs/00-index.md` に [[emdash-admin-plugin-ui-styling]] と [[admin-image-input-browser-behavior]] を登録する(リーダー)。
 
 > [!note] 反映済み(リーダー、マージのとき)
-> 7 の知見ノート 2 つを索引に登録した。1〜3 は、後続タスクのノートに書く(サブタスク)。
+> 7 の知見ノート 2 つを索引に登録した。1〜3 は [[T22-2-handoff-widget-parts|T22-2]] で後続タスク(T24・T25・T27・T28・T31)のノートに書いた。テストの補助は [[T22-1-admin-css-test-helper|T22-1]] で共通にした。
