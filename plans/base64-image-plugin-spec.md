@@ -687,7 +687,7 @@ export default defineConfig({
 | バックアップ | D1 Time Travel(直近7日)だけ |
 | D1 の 1 日の上限 | Free では、読み 500 万行・書き 10 万行 / 日を超えると、その日はクエリが失敗する(2026-09-01 から)。画像 1 枚のアップロードで書く行は、公開時の索引の更新を含めて数十行の見込み(推測のみ。[[T32-cloudflare-check\|T32]] で確かめる) |
 | ページの重さ | 画像は HTML にインラインで埋め込まれる。一覧ページ10件で最大約 1MB、カバー1枚+ギャラリー10枚のページで約 1.1MB。圧縮すれば転送量はほぼ WebP 本体の合計まで下がる見込み(推測のみ) |
-| 標準画面 | `b64_images` の標準の一覧画面・ゴミ箱画面は重い(1ページ100件 × 約 100KB) |
+| 標準画面 | `b64_images` の標準の一覧画面・ゴミ箱画面は重い(1ページ100件 × 約 100KB)。標準の編集画面からは保存も公開もできない(保存 hook が `image` を送る更新を拒否する)。非公開にしたものは、標準の API の `POST …/publish` で公開し直す([[#10. 画像のライフサイクル\|10 章]]) |
 | スコープ外 | 本文中の画像と OGP 画像には対応しない |
 | git 依存(npm 12) | 利用者のサイトの `.npmrc` に `allow-git=root` が要る([[npm12-git-dependency-policy]]) |
 | 利用者の型チェック | 利用者のサイトの `tsc` は、TS ソースのまま配布する `src` を利用者の設定で検査する。このリポジトリでは、緩い設定と厳しい設定の代わりの tsconfig で確かめている([[T04-1-consumer-typecheck\|T04-1]])。TypeScript 5.x の実物での確認は、T07 の時点のコードだけ |
@@ -826,6 +826,10 @@ export default defineConfig({
 | `packages/core/src/plugins/save-rejection.ts` | 保存 hook から保存を拒否する例外(`ContentSaveRejectedError`) |
 | `packages/core/src/emdash-runtime.ts:513` | 保存 hook の拒否の応答(422 `SAVE_REJECTED`)。ほかの例外は 500 `CONTENT_HOOK_ERROR` |
 | `packages/admin/src/router.tsx:1097` | 保存の失敗の通知(`message` をそのまま出す) |
+| `packages/admin/src/router.tsx:1483` | 「Publish now」は保存してから公開する |
+| `packages/core/src/emdash-runtime.ts:2151` | プラグインの `ctx.content.create` は、保存 hook の拒否を通常の `Error`(`code: "SAVE_REJECTED"`)にする |
+| `packages/core/src/emdash-runtime.ts:3632` | `supports` に `revisions` の無いコレクションの更新は、公開中の値を書き換える |
+| `packages/core/src/astro/middleware/auth.ts:270` | MCP は Bearer のトークンでしか呼べない |
 | `packages/core/src/emdash-runtime.ts:3516` / `:5560` | 下書きはリビジョンに保存される、afterSave は遅れて実行される |
 | `packages/auth/src/rbac.ts:19` | 権限(content:create / delete_own / publish_own) |
 

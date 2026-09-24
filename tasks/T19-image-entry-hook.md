@@ -155,6 +155,9 @@ export function createPlugin() {
 1. 18 章(既知の制約とリスク): 「`b64_images` は標準の編集画面から保存・公開できない。非公開にしたものは、標準の API の `POST …/publish` で公開し直す」。
 2. 付録 B: `packages/core/src/emdash-runtime.ts:2151`(プラグインの `ctx.content.create` が拒否を通常の `Error` にする)、`:3632`(`supports` に `revisions` の無いコレクションの更新は列を書き換える)、`packages/admin/src/router.tsx:1483`(「Publish now」は保存してから公開する)、`packages/core/src/astro/middleware/auth.ts:270`(MCP は Bearer だけ)。
 
+> [!note] 反映済み(リーダー、マージのとき)
+> 上の 1(18 章の「標準画面」の行に追記)と 2(付録 B)を反映した。
+
 ### テスト
 
 - `tests/server/image-entry.test.ts`: 64 件。偽の ctx は、何かのプロパティを読むと例外を投げる Proxy(hook が ctx を使わない=クエリをしないことを確かめる)。T11 の `validateImageEntry` は `vi.mock` で呼び出しを数え、実際の値では作れない失敗(保存先の理由、`details` の欠け)だけ結果を差し替えた。
