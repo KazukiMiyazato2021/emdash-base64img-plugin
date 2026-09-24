@@ -175,9 +175,10 @@ sequenceDiagram
     Editor->>W: 画像を選択 / ドロップ / 貼り付け
     W->>W: デコード・リサイズ・WebP 圧縮<br/>サムネイル生成
     W->>R: POST(data URL・サムネイル・寸法・保存先)
-    R->>R: 検証(形式・サイズ・寸法・保存先フィールド)
-    R->>C: create → getVersioned → publish
+    R->>R: 検証(保存先のフィールドとロケール・形式・サイズ・寸法)
+    R->>C: create
     R->>S: メタデータを保存(参照元がわかれば記録)
+    R->>C: getVersioned → publish
     R-->>W: 参照 { v, id, locale, width, height }
     W->>P: onChange(参照)→ 編集者が保存
     P->>P: beforeSave で参照を検証
@@ -259,7 +260,7 @@ flowchart LR
 ### 5.4 容量の目安
 
 - 画像1枚は最大 100,000 バイト。ただし、公開するとデータを丸ごと複製したリビジョンが 1 件できる(`packages/core/src/database/repositories/content.ts:2309-2318`。`supports: []` でも同じ。実測+公式ドキュメント、[[T02-playground#結果|T02]])。そのため 1 枚で DB を約 2 倍使い、D1 の 500MB で約 2,500 枚(未使用画像を含む。推測のみ)。
-  - プラグインが公開するときに、この複製を避けられるかは [[T18-upload-route|T18]] で確かめる([[T02-1-prettier-storage-capacity|T02-1]])。
+  - プラグインからは避けられない([[T18-upload-route#結果|T18]])。作成で公開状態にはできず(`ContentCreateOptions` は `locale` と `translationOf` だけ)、初めての公開は必ずその時点の値を複製する。小さい仮の値で公開してから差し替えると複製は 166 バイトになるが、標準 API でそのリビジョンを復元すると画像が仮の値に戻り、差し替え(`ctx.content.update`)は保存 hook を通らないので採らない。根拠: 実測+公式ドキュメント([[emdash-plugin-upload-route#公開時のリビジョンの複製を避けられるか]])
 - 投稿側の行とリビジョンには参照しか入らないため、小さいまま保たれる。
 
 ## 6. 圧縮仕様(ブラウザ)
@@ -338,11 +339,11 @@ flowchart LR
 - ルートの権限は `content:create`(Contributor 以上。`packages/auth/src/rbac.ts:19`)。
 - ルートの宣言: `methods: ["POST"]`、`request: { body: "json", maxBytes: 600_000 }`、`input: uploadRequestSchema`。書き方は [[T08-spike-route-body#結果|T08]] と [[emdash-plugin-route-body-limit]]。
   - body の上限(既定 1 MiB、最大 8 MiB)は、`request` を宣言したルートにだけ掛かる。宣言しないと、EmDash は body を上限なしに読む(12MB の JSON も受け取った)。根拠: 実測+公式ドキュメント(`packages/core/src/plugins/routes.ts:129`、`route-wire.ts:177`)
-  - 600,000 バイトは、固定上限の `dataUrl`(500,000)と `thumb`(8,000)を入れた body(正しい入力で最大 509,462 バイト)に余裕を足した値。超えると、読む前か読みながら数えて 413 `INVALID_PLUGIN_REQUEST` になる。入力がスキーマに合わなければ 400 `VALIDATION_ERROR` で、ハンドラーは呼ばれない。根拠: 実測+公式ドキュメント
+  - 600,000 バイトは、固定上限の `dataUrl`(500,000)と `thumb`(8,000)を入れた body(正しい入力で最大 511,515 バイト。`target.locale` を上限の 35 文字にし、ASCII 以外を `\uXXXX` で書いたとき。[[T18-upload-route#結果|T18]])に余裕を足した値。超えると、読む前か読みながら数えて 413 `INVALID_PLUGIN_REQUEST` になる。入力がスキーマに合わなければ 400 `VALIDATION_ERROR` で、ハンドラーは呼ばれない。根拠: 実測+公式ドキュメント
   - 画面からは `X-EmDash-Request: 1` を付けて呼ぶ(無いと 403 `CSRF_REJECTED`)。根拠: 実測+公式ドキュメント
   - body の parse・スキーマ・WebP の検証の CPU 時間は、固定上限の body でも 0.28ms(新しいプロセスでの 1 回目は 1.1ms)で、Workers Free の 10ms と比べて小さい。根拠: 実測のみ(Node 26、Apple M5 Pro)
 - **1リクエストで1枚**だけ扱う。1 リクエストの処理とクエリ数を小さく保つため。
-  - アップロード 1 回のクエリ数は、SQLite での実測で 72(ルートの固定費 1、作成 30、取得 3、公開 38。公開の 28 本は EmDash 本体の、メディアの使用状況の索引の更新)。根拠: 実測のみ([[T10-spike-after-save#結果|T10]]、[[emdash-plugin-content-query-counts]])
+  - アップロード 1 回のクエリ数は、SQLite での実測で 75(ルートの固定費 1、フィールド定義 2、作成 30、`imageRefs` 1、取得 3、公開 38。作成と公開のそれぞれ 15 本は EmDash 本体の、メディアの使用状況の索引の更新)。i18n を設定したサイトでは 77。根拠: 実測のみ([[T18-upload-route#結果|T18]]、[[emdash-plugin-upload-route]])
   - Workers Free で D1 に送れるのは 1 呼び出し 1,000 クエリまでなので、収まる(公式ドキュメントのみ。[[cloudflare-workers-free-d1-limits]])。D1 の limits のページには「Free は 1 呼び出し 50」という記述が残っていて食い違う。EmDash 本体の保存も 55〜62 クエリ使うので、1,000 と読むのが妥当(推測のみ)。実際の D1 での数は [[T32-cloudflare-check|T32]] で確かめる([[T10-1-spec-d1-limits|T10-1]])。
 - 入力:
 
@@ -360,20 +361,24 @@ flowchart LR
 
 - 応答: `{ "ref": { "v": 1, "id": "01J…", "locale": "ja", "width": 1280, "height": 853, "alt": "" } }`。widget はこの参照をそのままフィールドの値にできる。
 - エラー: ハンドラーは `PluginRouteError(code, message, status)` を投げる。EmDash はこれを HTTP ステータスと `{ "success": false, "error": { "code", "message" } }` に変換する。`details` は応答に含まれないので、画面の文言はコードだけで決める。根拠: 実測+公式ドキュメント(`packages/core/src/plugins/http-route-dispatch.ts:134`。[[emdash-plugin-route-errors]])。コードの一覧は `src/shared/errors.ts`。
-- 処理の順番:
-  1. 検証する([[#8. サーバー側の検証]] の①)。
-  2. `ctx.content.create("b64_images", …)` で作成する。
-  3. `getVersioned` で最新の版を取得し、`publish` で公開する。
-  4. `imageRefs` にメタデータを保存する。
+- 処理の順番([[T18-upload-route#結果|T18]]):
+  1. 検証する([[#8. サーバー側の検証]] の①)。その前に、`target.locale` をサイトに設定されたロケールと照らし合わせる(下記)。
+  2. `ctx.content.create("b64_images", …)` で作成する。同じプラグインの `content:beforeSave`(②)もここで値を確かめ、拒否されたら 400 `IMAGE_ENTRY_INVALID`(何も作られない)。
+  3. `imageRefs` にメタデータを保存する。
+  4. `getVersioned` で最新の版を取得し、`publish` で公開する。
   5. 参照を返す。
+- `imageRefs` を公開より先に保存するのは、公開で失敗したときに、作った画像を画像管理ページ(`imageRefs` を一覧する)から見つけて消せるようにするため。作成のあとで失敗したら、画像エントリをゴミ箱に移し(プラグインは完全削除できない)、500 `UPLOAD_FAILED` を返す。`imageRefs` の記録は残す。根拠: 実測+公式ドキュメント([[emdash-plugin-upload-route]])
+- ロケール: 画像エントリはサイトの既定ロケールで作り(5.1)、参照の `locale` はそのロケールにする。`target.locale`(参照元のエントリのロケール)は、`imageRefs` の参照元にだけ記録する。i18n を設定したサイトでは設定されたロケールのどれか(表記は設定にそろえる)、設定していないサイトでは 35 文字までを受け付け、ほかは 400 `INVALID_TARGET`。ロケールの設定は `emdash` の `getI18nConfig()` で読む(`ctx.site.locale` は別の値)。根拠: 実測+公式ドキュメント
+  - widget は、`target.entryId` を送るときは、そのエントリのロケールも送る。省くと参照元は既定ロケールで記録され、既定ロケール以外のエントリでは、保存時の参照元の記録(9 章)がロケールだけ違う参照元をもう 1 件足す。根拠: 実測のみ([[emdash-plugin-upload-route#参照元の記録(T20)との関係]])
 - 公開まで行う理由: Contributor には公開権限がない(`content:publish_own` は Author 以上。`packages/auth/src/rbac.ts:28`)。標準 API で作成すると下書きのまま残り、サイトに表示されない。
-- 必要な capability: `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read`
+- 必要な capability(プラグイン全体): `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read`
+  - アップロードで使うのは `schema:read`(保存先のフィールド定義)・`content:write`(作成)・`content:publish`(公開)。`content:read` は `definePlugin` が自動で足す。`content:revisions:read` は [[#9. 参照元の記録と未使用画像の検出|9 章]]の判定で使う([[T18-upload-route#T29 がルートを登録する方法|T18]])。
 
 ## 8. サーバー側の検証
 
 | 場所 | 検証内容 | 不正なとき |
 |---|---|---|
-| ① アップロード用ルート | ・保存先のフィールドが存在し、このプラグインの widget を使う `json` フィールドであること(`ctx.schema.getCollection` で `type` / `widget` / `options` を読む。`packages/core/src/plugins/types.ts:407`)<br>・`dataUrl` が `data:image/webp;base64,` で始まり、長さが `maxStoredBytes` 以下(固定上限 500,000)。長さはデコードする前に確かめる<br>・デコードした中身が静止画の WebP(RIFF / WEBP、`VP8 ` / `VP8L` / `VP8X`。アニメーションは拒否)で、ヘッダーから読んだ寸法が width / height と一致し、長辺が `maxEdge` 以下<br>・`thumb` が静止画の WebP で、長辺 96px 以下、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下) | 拒否(HTTP 400。コードと理由の対応は [[T11-server-validation#T04 の理由とエラーコードの対応\|T11]]) |
+| ① アップロード用ルート | ・保存先のフィールドが存在し、このプラグインの widget を使う `json` フィールドであること(`ctx.schema.getCollection` で `type` / `widget` / `options` を読む。`packages/core/src/plugins/types.ts:407`)<br>・`target.locale` がサイトのロケールであること(i18n を設定したサイトでは設定されたロケールのどれか、設定していないサイトでは 35 文字まで。[[#7. アップロード(書き込み経路)\|7 章]])<br>・`dataUrl` が `data:image/webp;base64,` で始まり、長さが `maxStoredBytes` 以下(固定上限 500,000)。長さはデコードする前に確かめる<br>・デコードした中身が静止画の WebP(RIFF / WEBP、`VP8 ` / `VP8L` / `VP8X`。アニメーションは拒否)で、ヘッダーから読んだ寸法が width / height と一致し、長辺が `maxEdge` 以下<br>・`thumb` が静止画の WebP で、長辺 96px 以下、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下) | 拒否(HTTP 400。コードと理由の対応は [[T11-server-validation#T04 の理由とエラーコードの対応\|T11]]) |
 | ② `b64_images` の `content:beforeSave` | ・作成(`isNew: true`)で、値の形(`base64ImageEntrySchema`)と、`src` の ① と同じ中身の検証。保存先のフィールドが分からないので、固定上限(保存 500,000 バイト・長辺 4,096px)を当てる。`meta.bytes` が WebP 本体のバイト数と一致すること。`image` が無い・`null` の作成も拒否する<br>・更新(`isNew: false`)で `image` が送られてきたら、値によらず拒否する(5.1)。`image` の無い更新は通す<br>・API / MCP / 管理画面 / プラグインの `ctx.content.create` など、どこからの書き込みでも実行する。クエリはしない | 拒否(`ContentSaveRejectedError`。422 `SAVE_REJECTED`)。日本語と英語を 1 行ずつ並べたメッセージで返す(英語は T11 の `message`。[[T19-image-entry-hook#決めたこと\|T19]]) |
 | ③ 参照を持つコレクションの `content:beforeSave` | 対象は、このプラグインの widget を使う `json` フィールドのうち、送られてきたものだけ(`null` と空の配列は「画像なし」として通す)<br>・参照の形(`{ v, id, locale, width, height, alt }` の型、alt は 1,000 文字以内)<br>・ギャラリーの枚数が `maxItems` 以下で、同じ画像が重複していないこと<br>・参照している画像 ID が、すべて `imageRefs` に存在すること(ID の重複を除き、50 件ずつ `getMany`。ふつうは 1 クエリ)<br>・フィールド定義の読み出し(`ctx.schema.getCollection`)で、ほかに 2 クエリ使う。widget のフィールドが無いコレクションの保存でも、この 2 クエリは増える | 拒否(`ContentSaveRejectedError`。422 `SAVE_REJECTED`)。どのフィールドの何が問題かを、日本語と英語を並べたメッセージで返す(問題は 3 件まで。[[T16-reference-hook#決めたこと\|T16]]) |
 
