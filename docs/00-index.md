@@ -45,6 +45,8 @@ updated: 2026-09-24
 | [[emdash-plugin-route-permissions\|EmDash のプラグインルートの権限]] | `docs/emdash-plugin-route-permissions.md` | ルートの `permission` とロールごとの結果(0.38.0 で実測)。省略すると Admin のみ。`ctx.content` は利用者の権限を確かめない。画面側のロールの取り方 | [[T06-decision-trash-permission\|T06]] |
 | [[emdash-plugin-route-errors\|EmDash 0.39.1 のプラグインルートのエラーの返り方]] | `docs/emdash-plugin-route-errors.md` | `PluginRouteError` は `{ success: false, error: { code, message } }` と HTTP ステータスになる。`details` は応答に入らない。想定外の例外は `INTERNAL_ERROR` | [[T03-shared-contracts\|T03]] |
 | [[emdash-plugin-content-api-constraints\|EmDash 0.39.1 のプラグイン API で、データの形に関わる制約]] | `docs/emdash-plugin-content-api-constraints.md` | エントリ ID は作成まで決まらない。seed の ID はそのまま使われる。`getTrashedVersioned` でゴミ箱を判定できる。`get` は 1 件 2 クエリ。widget に collection / entryId / locale は渡らない | [[T03-shared-contracts\|T03]] |
+| [[emdash-admin-api-requests\|EmDash 0.39.1 の API を管理画面の部品から呼ぶときの送り方とエラーの形]] | `docs/emdash-admin-api-requests.md` | 同じオリジンの `/_emdash/api/...` を `X-EmDash-Request: 1` 付きの `fetch` で呼ぶ。未ログインはプラグインのルートが `UNAUTHORIZED`、標準 API が `NOT_AUTHENTICATED`。外部の認証の失敗は `text/plain`。`src/client/api.ts` のコードの決め方 | [[T14-admin-i18n-api\|T14]] |
+| [[emdash-admin-locale-lang\|EmDash 0.39.1 の管理画面の言語と html の lang 属性]] | `docs/emdash-admin-locale-lang.md` | `<html lang>` は cookie `emdash-locale` → `Accept-Language` → `en` で決まる。設定画面で言語を変えると再読み込みせずに書き換わるので、`MutationObserver` で追随する | [[T14-admin-i18n-api\|T14]] |
 
 ## ライブラリ
 
