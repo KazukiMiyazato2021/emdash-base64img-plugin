@@ -1,32 +1,31 @@
 /**
- * base64-image プラグイン(サーバー側の入口)。仮実装。
+ * base64-image プラグイン(サーバー側の入口)。
  *
- * EmDash 0.38.0 の native プラグインの形に合わせている(`packages/plugins/color/src/index.ts`)。
- * - `createPlugin()`: EmDash が生成する仮想モジュールが、`entrypoint` から名前付きで import して呼ぶ。
- * - `base64ImagePlugin()`: サイトの `astro.config.mjs` で `plugins: [base64ImagePlugin()]` に渡す descriptor。
+ * EmDash 0.39.1 の native プラグインの形(公式の color プラグインと同じ。docs/emdash-native-plugin-entrypoints.md)。
+ * - `createPlugin()`: EmDash が生成する仮想モジュールが、descriptor の `entrypoint` から名前付きで import して
+ *   `createPlugin(descriptor.options)` の形で呼ぶ。中身は `src/server/plugin.ts`(ルート・hook・ストレージ・capability・
+ *   管理画面の登録)。
+ * - `base64ImagePlugin()`: サイトの `astro.config.mjs` で `emdash({ plugins: [base64ImagePlugin()] })` に渡す descriptor。
  *
- * ルート・hook・ストレージ・capability・widget の登録は T29 で行う。
+ * TS ソースのまま配布する(ビルドなし。T07)。利用者のサイトの `tsc` は、`astro.config.mjs` からこのファイル以下を
+ * 利用者の設定で検査する。管理画面の部品(React・Kumo)はここから読み込まない(管理画面の入口は `./admin`)。
  */
 
 import type { PluginDescriptor } from "emdash";
-import { definePlugin } from "emdash";
 
-const PLUGIN_ID = "base64-image";
-const PLUGIN_VERSION = "0.0.0";
-const PACKAGE_NAME = "emdash-plugin-base64-image";
-const ADMIN_ENTRY = `${PACKAGE_NAME}/admin`;
+import {
+	ADMIN_ENTRY,
+	createBase64ImagePlugin,
+	PACKAGE_NAME,
+	PLUGIN_VERSION,
+} from "./server/plugin";
+import { PLUGIN_ID } from "./shared/constants";
 
 /**
- * プラグイン本体を作る。EmDash が `createPlugin(descriptor.options)` の形で呼ぶ。
+ * プラグイン本体を作る。EmDash が `createPlugin(descriptor.options)` の形で呼ぶ(options は使わない)。
  */
 export function createPlugin() {
-	return definePlugin({
-		id: PLUGIN_ID,
-		version: PLUGIN_VERSION,
-		admin: {
-			entry: ADMIN_ENTRY,
-		},
-	});
+	return createBase64ImagePlugin();
 }
 
 export default createPlugin;

@@ -151,6 +151,10 @@ package: emdash-plugin-base64-image
 - sandboxed プラグインの field widget で使えるのは、Block Kit 要素(`text_input` / `number_input` / `toggle` / `select` / `media_picker`)だけ。ファイル選択、canvas での圧縮、プレビューができない。
 - 根拠: `skills/creating-plugins/references/admin-ui.md`、`packages/admin/src/components/ContentEditor.tsx:1806`(公式ドキュメントのみ)
 
+**プラグインの定義**([[T29-plugin-definition|T29]])
+- `definePlugin` は `src/server/plugin.ts` の `createBase64ImagePlugin()` にまとめる。`src/index.ts` は `createPlugin()` と descriptor の `base64ImagePlugin()` だけを持つ。
+- `content:beforeSave` は 1 つのプラグインに 1 つだけなので、`b64_images`([[#8. サーバー側の検証|8 章]]②)とほかのコレクション(③)を 1 つの handler で振り分ける。priority は 200(EmDash の既定の 100 より後。ほかのプラグインの beforeSave が値を変えたあとの、実際に保存される値を確かめる)、`errorPolicy` は既定の `abort`(`continue` にすると拒否の例外が捨てられ、保存が通る)。根拠: 実測+公式ドキュメント([[emdash-plugin-definition-registration]])
+
 **画像本体を投稿に直接持たせない理由(Q4)**
 - 管理画面の一覧は、1ページ100件を全データ込み(`SELECT *`)で取得する(`packages/admin/src/router.tsx:440`、`packages/core/src/database/repositories/content.ts:760`)。
   - カバー1枚+10枚ギャラリーの投稿が100件あると、応答は 146.9MB になり、Workers のメモリ上限 128MB を超える。
@@ -372,7 +376,8 @@ flowchart LR
 - ロケール: 画像エントリはサイトの既定ロケールで作り(5.1)、参照の `locale` はそのロケールにする。`target.locale`(参照元のエントリのロケール)は、`imageRefs` の参照元にだけ記録する。i18n を設定したサイトでは設定されたロケールのどれか(表記は設定にそろえる)、設定していないサイトでは 35 文字までを受け付け、ほかは 400 `INVALID_TARGET`。ロケールの設定は `emdash` の `getI18nConfig()` で読む(`ctx.site.locale` は別の値)。根拠: 実測+公式ドキュメント
   - widget は、`target.entryId` を送るときは、そのエントリのロケールも送る。省くと参照元は既定ロケールで記録され、既定ロケール以外のエントリでは、保存時の参照元の記録(9 章)がロケールだけ違う参照元をもう 1 件足す。根拠: 実測のみ([[emdash-plugin-upload-route#参照元の記録(T20)との関係]])
 - 公開まで行う理由: Contributor には公開権限がない(`content:publish_own` は Author 以上。`packages/auth/src/rbac.ts:28`)。標準 API で作成すると下書きのまま残り、サイトに表示されない。
-- 必要な capability(プラグイン全体): `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read`
+- 必要な capability(プラグイン全体): `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read` / `content:restore`([[T29-plugin-definition|T29]])
+  - `content:restore` は、画像管理の一覧とゴミ箱への移動が `getTrashedVersioned` に使う(`content:read` は含まない。[[T21-orphan-routes#T29 への引き継ぎ|T21]])。宣言が足りないと、ルートは 500 になり、hook は警告だけを出して登録されない(beforeSave には `content:write`、afterSave・afterPublish・afterDelete には `content:read` が要る)。根拠: 実測+公式ドキュメント([[emdash-plugin-definition-registration]])
   - アップロードで使うのは `schema:read`(保存先のフィールド定義)・`content:write`(作成)・`content:publish`(公開)。`content:read` は `definePlugin` が自動で足す。`content:revisions:read` は [[#9. 参照元の記録と未使用画像の検出|9 章]]の判定で使う([[T18-upload-route#T29 がルートを登録する方法|T18]])。
 
 ## 8. サーバー側の検証
@@ -606,7 +611,9 @@ const images = await resolveBase64Images(refs);
 }
 ```
 
-- プラグインは起動時に `b64_images` があるかを確認し、なければエラーを出す。プラグインからはコレクションを作れない(`ctx.schema` は読み取り専用)。
+- プラグインは `b64_images` があるかを確かめ、無ければ作り方を書いたエラーのログを出す(保存と有効化は止めない)。プラグインからはコレクションを作れない(`ctx.schema` は読み取り専用)。
+  - 確かめるのは、`plugin:activate`(管理者がプラグインを有効に戻したとき)と、プラグインのインスタンス(プロセス。Workers では isolate)ごとの最初の `b64_images` 以外の保存(`content:beforeSave`)。EmDash 0.39.1 には、`astro.config.mjs` で登録した native プラグインの起動時に呼ばれる hook が無い(`plugin:install` は呼ばれず、`plugin:activate` も起動時には呼ばれない)。クエリは最初の 1 回だけ増える(あれば 2、無ければ 1)。根拠: 実測+公式ドキュメント([[T29-plugin-definition#決めたこと|T29]]、[[emdash-native-plugin-lifecycle-hooks]])
+  - 無いまま画像を上げると、アップロードのルートが 500 `IMAGE_COLLECTION_MISSING` を返す([[#7. アップロード(書き込み経路)|7 章]])。
 - `b64_images` は上の構成で足りる。タイトル用のフィールドは要らない(作成・公開・取得・一覧ができ、管理画面の一覧とダッシュボードには ID が表示される)。根拠: 実測+公式ドキュメント([[T02-playground#結果|T02]])
   - `routable: false` は必須。プラグインが作るエントリには slug が無く、routable のままでは公開できない(`Cannot publish routable content without a slug`。`packages/core/src/database/repositories/content.ts:2305`)。
   - `hidden: true` で外れるのは、サイドバーとダッシュボードのクイックアクションだけ。ダッシュボードの件数と最近の更新には出る(画像本体は読まない)。
@@ -678,11 +685,13 @@ export default defineConfig({
 /                        ← パッケージのルート(git 依存でインストールされる対象)
 ├─ package.json          files: ["src"]、exports: "." / "./admin" / "./astro"
 ├─ src/
-│  ├─ index.ts           definePlugin(ルート・hook・ストレージ・capability)
-│  ├─ admin.tsx          widget(単一画像 / ギャラリー)・画像管理ページ・一覧の列
+│  ├─ index.ts           createPlugin()・descriptor(base64ImagePlugin())
+│  ├─ admin.tsx          管理画面の入口(widget・画像管理ページ・一覧の列を export する)
 │  ├─ astro.ts           resolveBase64Images・型・type guard(サイト側で使う)
-│  ├─ server/            アップロード用ルート・検証・参照元の記録
-│  ├─ client/            圧縮処理(canvas)・サムネイル生成
+│  ├─ admin/             widget・画像管理ページ・一覧の列・共通の部品(parts/)・アップロードのフック(hooks/)
+│  ├─ server/            plugin.ts(definePlugin)・ルート(routes/)・保存 hook と参照元の記録(hooks/)・検証
+│  ├─ client/            入力画像の判定とデコード・圧縮(canvas)・サムネイル・文言・API クライアント
+│  ├─ site/              サイト側の画像の解決(resolveBase64Images の本体)
 │  └─ shared/            WebP ヘッダーの解析・参照のスキーマ・定数
 ├─ tests/                vitest(単体テスト)
 ├─ playground/           動作確認用の EmDash サイト(配布物には含めない)
@@ -736,7 +745,7 @@ export default defineConfig({
 | Firefox でのデコード | Firefox 155 は、デコードの間(6,400 万画素の JPEG で 78〜92ms)画面を止め、その間の中断はデコードが終わってから届く。途中で切れた JPEG・PNG は、欠けた部分を白・透明にしてデコードする(検出しない)。libheif で作ったグリッドの AVIF はデコードできない(`INPUT_DECODE_FAILED`)([[T12-input-decode#結果\|T12]]) |
 | 編集ロック | 編集ロック中でも widget を操作できる(EmDash 側の制約) |
 | 画像管理ページの表示 | サイドバーのプラグインのページの項目は、ロールで絞られない(閲覧者にも出る)。閲覧者が開くと、一覧は 403 になり、ページは「寄稿者以上」と示す。根拠: 実測+公式ドキュメント([[emdash-admin-plugin-pages]]) |
-| コマンドパレット | 管理画面のコマンドパレットで「Images」などと入力すると、非表示のコレクション `b64_images` も候補に出る。選ぶと、使わないとした標準の一覧(1 ページ 100 件の base64 を読む。[[#10. 画像のライフサイクル\|10 章]])が開くとみられる。根拠: 実測(候補に出ること)、推測のみ(開いたときの動き)([[T25-images-page#影響・サブタスクの候補\|T25]]) |
+| コマンドパレット | 管理画面のコマンドパレットで「Images」などと入力すると、非表示のコレクション `b64_images` も候補に出る。選ぶと、使わないとした標準の一覧(`/_emdash/admin/content/b64_images`。1 ページ 100 件の base64 を読む。[[#10. 画像のライフサイクル\|10 章]])に移る。根拠: 実測(候補に出ることと、移る先。[[T25-images-page#影響・サブタスクの候補\|T25]]、[[T29-plugin-definition#他のタスクへの影響・サブタスクの候補\|T29]])、推測のみ(一覧の重さは測っていない) |
 | 一覧の列の見出し | 列の見出しは、管理画面の辞書にある「Image」のメッセージ ID を使って、管理画面の言語で表示する。EmDash の版が変わって辞書から「Image」が消えると、見出しに ID(`hG89Ed`)がそのまま出る。インストールした `@emdash-cms/admin` の辞書に ID があることは、単体テストで確かめている([[T24-list-column#結果\|T24]]) |
 | 容量 | D1 の 500MB で約 2,500 枚(公開時にできるリビジョンを含む。[[#5.4 容量の目安\|5.4]])。使われなくなった画像は自動では消えず、プラグインからは完全削除もできない。使用量は Cloudflare のダッシュボードで監視する |
 | バックアップ | D1 Time Travel(直近7日)だけ |
@@ -750,6 +759,7 @@ export default defineConfig({
 | マイグレーションのコマンド | `emdash migrate --from-config` は、Node が `node_modules` の中の `.ts` を読めないので失敗する。既定の `emdash migrate`(build のマニフェストを使う)は使える。EmDash は `--from-config` をローカルの調査用としている([[git-dependency-ts-source]]) |
 | seed の画像 | seed で作った `b64_images` は `imageRefs` に記録が無く、それを参照する投稿は保存 hook で拒否される([[#8. サーバー側の検証\|8 章]]③) |
 | 保存の拒否の文言 | サーバーは管理画面の言語を知らないので、保存 hook の拒否のメッセージは日本語と英語を並べる([[#8. サーバー側の検証\|8 章]]) |
+| ほかのプラグインの保存 hook | 保存 hook(beforeSave)は priority 200 で動き、それより前に動くプラグインが変えた値を確かめる。priority が 200 より大きいプラグインの beforeSave が値を変えると、その値は確かめられない(対策はしていない)。根拠: 実測+公式ドキュメント(実行の順。[[emdash-plugin-definition-registration]])、推測のみ(そういうプラグインがほぼ無いこと) |
 | Cloudflare の開発サーバー | Cloudflare アダプターの `astro dev` では、最初のリクエストでプラグインが依存の最適化に加わり、1 回だけ再読み込みが起きる。サイトの `vite.ssr.optimizeDeps.include` にプラグインを入れると起きない([[git-dependency-ts-source#Cloudflare アダプターの astro dev の再最適化\|T07]]) |
 
 ## 19. 対象外・将来の検討事項
