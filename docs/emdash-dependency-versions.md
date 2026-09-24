@@ -115,6 +115,23 @@ updated: 2026-09-24
 - ブラウザの版は `@playwright/test`(`playwright-core`)の版で決まる。1.63.0 では Chromium 153.0.8010.12(`chromium-1243`)と Firefox 155.0(`firefox-1543`)。根拠: **実測のみ**(`playwright install --dry-run`)
 - ブラウザは T01 で 1 回だけ `~/Library/Caches/ms-playwright` に入れ、後続のタスクはそれを使う。`^` のままロックファイルが更新されると、入れたブラウザと合わなくなるので、完全一致にした。
 
+## EmDash を上げるときに先に確かめること
+
+このプラグインのテストの一部は、EmDash 0.39.1 の内部の形や管理画面の辞書に頼っている。EmDash を上げたら、まず次のテストと前提を確かめる。
+
+| 頼っているもの | 確かめる場所 | 元のタスク |
+|---|---|---|
+| `HookPipeline` の private の `getContext` を差し替えて、hook を本物の pipeline で動かしている | `tests/server/plugin.test.ts`、`tests/server/owners.test.ts`、`tests/server/orphans.test.ts` | [[T20-owner-tracking\|T20]]、[[T21-orphan-routes\|T21]]、[[T29-plugin-definition\|T29]]([[emdash-plugin-definition-registration]]) |
+| 管理画面の辞書のメッセージ ID(一覧の列の見出し「Image」の `hG89Ed`、画像管理ページのラベル「Images」の `an5hVd`)。辞書から消えると、画面に ID がそのまま出る | `tests/admin/ThumbnailColumn.test.tsx`、`tests/admin/ImagesPage.test.tsx` | [[T24-list-column\|T24]]、[[T25-images-page\|T25]] |
+| 一覧の列の `collections` が同期関数で、コレクション・ロール・プラグインの状態が変わったときだけ呼ばれること。管理画面の `fetchManifest` が Lingui の有効化の前に失敗すること(このプラグインが自前でマニフェストを取得する理由) | `tests/admin/ThumbnailColumn.test.tsx`、[[emdash-admin-content-list-columns]] | [[T24-list-column\|T24]] |
+| `ctx.content.create` の中の保存 hook の拒否が、`code: "SAVE_REJECTED"` の通常の `Error` で届くこと | `tests/server/upload.test.ts` | [[T18-upload-route\|T18]] |
+| プラグインストレージの `getMany` が ID を分けずに 1 つのクエリに入れること(ID を D1 のバインド変数の上限に収まるよう分けて渡している理由) | `tests/server/image-refs.test.ts`、`tests/server/admin-data.test.ts` | [[T16-2-image-refs-batches\|T16-2]]、[[T17-admin-data-routes\|T17]] |
+| テストが直接読む推移的な依存(`@tanstack/react-query`・`@lingui/core`・`@emdash-cms/blocks/server`)が、ルートの `node_modules` に巻き上げられていること | `tests/admin/ImagesPage.test.tsx`、[[test-lint-setup#vitest(4.1.11)]] | [[T25-1-handoff-images-page\|T25-1]] |
+| config で登録した native プラグインで、起動時に lifecycle hook が呼ばれないこと(`b64_images` の確認の方式の前提) | [[emdash-native-plugin-lifecycle-hooks]] | [[T29-plugin-definition\|T29]] |
+| 編集ロックが、フィールドを包む `<fieldset disabled={readOnly}>` で widget に伝わること(plugin widget に `readOnly` は渡らない。`ContentEditor.tsx:1336`) | 実際の管理画面(単体テストは包みの fieldset を自分で作るので、EmDash の変更では失敗しない)、[[emdash-plugin-field-widget]] | [[T27-image-widget\|T27]] |
+| 管理画面の入口の型 `PluginAdminModule["fields"]` が props 無しの `Record<string, React.ComponentType>` であること(`fields` に型の注釈を付けない理由)。EmDash が型を直すと、使われない `@ts-expect-error` で型チェックが失敗する | `tests/admin/ImageField.test.tsx` | [[T27-image-widget\|T27]] |
+| 編集画面が、手動の保存の応答でフォームの値を置き換えること(処理中の保存で画像が外れる理由。仕様書 18 章の「処理中の保存」)。EmDash が自動保存と同じく置き換えないようにしたら、その行と対策を見直す | 実際の管理画面(`references/emdash/packages/admin/src/components/ContentEditor.tsx:509-533`)、[[gallery-widget-reorder-focus#4. 処理中に「Save」を押したとき(EmDash の挙動)]] | [[T28-gallery-widget\|T28]] |
+
 ## 利用者の npm 設定(`~/.npmrc`)
 
 ```ini

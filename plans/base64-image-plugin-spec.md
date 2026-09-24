@@ -151,6 +151,10 @@ package: emdash-plugin-base64-image
 - sandboxed プラグインの field widget で使えるのは、Block Kit 要素(`text_input` / `number_input` / `toggle` / `select` / `media_picker`)だけ。ファイル選択、canvas での圧縮、プレビューができない。
 - 根拠: `skills/creating-plugins/references/admin-ui.md`、`packages/admin/src/components/ContentEditor.tsx:1806`(公式ドキュメントのみ)
 
+**プラグインの定義**([[T29-plugin-definition|T29]])
+- `definePlugin` は `src/server/plugin.ts` の `createBase64ImagePlugin()` にまとめる。`src/index.ts` は `createPlugin()` と descriptor の `base64ImagePlugin()` だけを持つ。
+- `content:beforeSave` は 1 つのプラグインに 1 つだけなので、`b64_images`([[#8. サーバー側の検証|8 章]]②)とほかのコレクション(③)を 1 つの handler で振り分ける。priority は 200(EmDash の既定の 100 より後。ほかのプラグインの beforeSave が値を変えたあとの、実際に保存される値を確かめる)、`errorPolicy` は既定の `abort`(`continue` にすると拒否の例外が捨てられ、保存が通る)。根拠: 実測+公式ドキュメント([[emdash-plugin-definition-registration]])
+
 **画像本体を投稿に直接持たせない理由(Q4)**
 - 管理画面の一覧は、1ページ100件を全データ込み(`SELECT *`)で取得する(`packages/admin/src/router.tsx:440`、`packages/core/src/database/repositories/content.ts:760`)。
   - カバー1枚+10枚ギャラリーの投稿が100件あると、応答は 146.9MB になり、Workers のメモリ上限 128MB を超える。
@@ -372,7 +376,8 @@ flowchart LR
 - ロケール: 画像エントリはサイトの既定ロケールで作り(5.1)、参照の `locale` はそのロケールにする。`target.locale`(参照元のエントリのロケール)は、`imageRefs` の参照元にだけ記録する。i18n を設定したサイトでは設定されたロケールのどれか(表記は設定にそろえる)、設定していないサイトでは 35 文字までを受け付け、ほかは 400 `INVALID_TARGET`。ロケールの設定は `emdash` の `getI18nConfig()` で読む(`ctx.site.locale` は別の値)。根拠: 実測+公式ドキュメント
   - widget は、`target.entryId` を送るときは、そのエントリのロケールも送る。省くと参照元は既定ロケールで記録され、既定ロケール以外のエントリでは、保存時の参照元の記録(9 章)がロケールだけ違う参照元をもう 1 件足す。根拠: 実測のみ([[emdash-plugin-upload-route#参照元の記録(T20)との関係]])
 - 公開まで行う理由: Contributor には公開権限がない(`content:publish_own` は Author 以上。`packages/auth/src/rbac.ts:28`)。標準 API で作成すると下書きのまま残り、サイトに表示されない。
-- 必要な capability(プラグイン全体): `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read`
+- 必要な capability(プラグイン全体): `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read` / `content:restore`([[T29-plugin-definition|T29]])
+  - `content:restore` は、画像管理の一覧とゴミ箱への移動が `getTrashedVersioned` に使う(`content:read` は含まない。[[T21-orphan-routes#T29 への引き継ぎ|T21]])。宣言が足りないと、ルートは 500 になり、hook は警告だけを出して登録されない(beforeSave には `content:write`、afterSave・afterPublish・afterDelete には `content:read` が要る)。根拠: 実測+公式ドキュメント([[emdash-plugin-definition-registration]])
   - アップロードで使うのは `schema:read`(保存先のフィールド定義)・`content:write`(作成)・`content:publish`(公開)。`content:read` は `definePlugin` が自動で足す。`content:revisions:read` は [[#9. 参照元の記録と未使用画像の検出|9 章]]の判定で使う([[T18-upload-route#T29 がルートを登録する方法|T18]])。
 
 ## 8. サーバー側の検証
@@ -465,8 +470,9 @@ flowchart LR
   - 画像の追加: ドロップゾーンは枠の全体が 1 つのボタンで、Tab で移り、Enter / Space でファイルの選択を開く。ボタンにフォーカスがある状態で Ctrl+V(Mac は ⌘V)を押すと、クリップボードの画像を貼り付けられる。ドロップはキーボードではできないので、選択と貼り付けで代える。
   - 貼り付けのイベントが届く要素はブラウザで違う(Chromium 153 はフォーカスのあるボタン、Firefox 155 は body)。`document` で受け、イベントの対象かフォーカスのある要素がドロップゾーンの中のときだけ扱う。根拠: 実測のみ([[admin-image-input-browser-behavior]])
   - 進捗の読み上げは、段階(読み込み・圧縮・サムネイルの作成・アップロード)と何枚目かが変わったときだけにする。画質を探すたびには読み上げない。
+  - 処理中は、進捗の行の下に「処理が終わってから保存してください。」(英語は「Save after processing finishes.」)と出す。処理中に保存すると画像が外れるため(18 章の「処理中の保存」)。案内は `aria-live` の領域に入れず(段階が変わるたびに読まない)、キャンセルボタンの説明(`aria-describedby`)にする。ドロップゾーンのボタンから処理を始めると、widget はフォーカスをキャンセルボタンへ移すので、そのときに読まれる。根拠: 実測のみ(Chromium 153 の支援技術のツリーで、キャンセルボタンの説明になった。スクリーンリーダーでは確かめていない。[[T28-2-save-hint-alt-width#結果|T28-2]])
 - widget は、アップロードの保存先(`target`)を、管理画面の URL(`/_emdash/admin/content/<collection>/<エントリ ID か new>` と `?locale=`)と props の `id`(`field-<slug>`)から求める。plugin widget には、コレクション・エントリ ID・ロケールが渡らない。`entryId` と `locale` は組にして、URL から両方が分かるときだけ送る。`?locale=` の無い画面(ダッシュボードなどから開いた編集画面)では参照元を送らず、保存のときに記録する。根拠: 公式ドキュメントのみ([[emdash-admin-content-editor-url]]、[[T23-upload-hook#結果|T23]])
-- plugin widget には `readOnly` が渡されない(`packages/admin/src/components/ContentEditor.tsx:1833`)。そのため、編集ロック中でも widget は操作できてしまう。これは EmDash 側の制約。
+- plugin widget には `readOnly` が渡されない(`packages/admin/src/components/ContentEditor.tsx:1833-1842`)。ただし、フィールドの並びは `<fieldset disabled={readOnly}>` の中にあり(`:1336`)、編集ロック中は widget の中のボタンと入力欄もブラウザが無効にする。`div` で受けるドロップだけは届くので、widget は自分の fieldset が `:disabled` のときにファイルを受け付けない。根拠: 実測+公式ドキュメント([[emdash-plugin-field-widget]]、[[T27-image-widget#決めたこと|T27]])
 
 ### 11.2 単一画像 widget(`base64-image:image`)
 
@@ -476,6 +482,7 @@ flowchart LR
                 │  [ファイルを選択]                 │
                 └──────────────────────────────┘
 処理中          圧縮中… 1280px / 画質 0.74   [キャンセル]
+                処理が終わってから保存してください。
 設定済みのとき   <img width height>(プレビュー)
                 1280×853 · 保存サイズ 98.2KB · 画質 0.77
                 代替テキスト [______________]   [差し替え] [削除]
@@ -488,8 +495,13 @@ flowchart LR
   - 追加したばかりの画像は、手元にある data URL をそのまま表示する。
   - 保存済みの画像は、編集画面を開いたときに、プラグインのルート(`preview`)からまとめて取得する。1 回の要求は 10 件(`PREVIEW_MAX_IDS`)までで、超える分は分けて並行に送る(20 枚のギャラリーは 2 回)。1 件は最大 500,000 バイトで、20 件をまとめると応答は最大 10MB、JS の処理は約 7〜10.5ms になり、Workers Free の CPU 時間(10ms)に届くため。10 件なら最大 5MB・約 3.5〜5.6ms で、クエリは 21。根拠: 実測のみ(Node + SQLite。Workers では未実測。[[T17-admin-data-routes#結果|T17]])
 - 代替テキストは任意入力。空欄のときは「装飾画像として扱われます」と注意を表示する。
+  - 差し替えた画像の代替テキストは空にする(前の画像の説明を新しい画像に残さない。EmDash 標準の画像フィールドも、選び直すと新しいメディアの代替テキストになる。`packages/admin/src/components/ImageFieldRenderer.tsx:224-227`)([[T27-image-widget#結果|T27]])。
 - 参照先の画像が見つからないときは、「画像が見つかりません」と表示し、削除ボタンを出す。
   - `preview` は、サイトに表示されない画像(ゴミ箱に入った・削除された・公開されていない・値が不正)の `image` を `null` で返す。ゴミ箱と削除は区別しない(区別には capability `content:restore` が要り、表示も変えないため。[[T17-admin-data-routes#結果|T17]])。
+- 値が参照の形でないとき(seed や手での書き換え。`null` / `undefined` は画像なし)は、「画像の値が正しくありません」と説明を表示し、削除ボタンだけを出す。このままでは保存 hook(8 章③)が拒否するため。
+- 保存済みの画像が `imageRefs` に記録されているか(保存できるか)は、開いたときには確かめない。記録の無い画像は seed で作ったものなどに限られ(13.1)、保存のときに hook ③ が理由と直し方を返すため([[T27-image-widget#結果|T27]])。
+- フォーカス: 押したボタンが表示の切り替えで消えたら、今の表示の主な要素へ移す(処理を始めたらキャンセル、追加したら代替テキスト、キャンセル・失敗のあとは差し替え、画像を外したらドロップゾーン)。
+- 編集ロック中は、EmDash がフィールドを `<fieldset disabled>` で包むので、ボタンと入力欄は無効になる。枠(`div`)へのドロップは届くので、widget が受け付けない。根拠: 実測+公式ドキュメント([[emdash-plugin-field-widget]])
 
 ### 11.3 ギャラリー widget(`base64-image:gallery`)
 
@@ -497,7 +509,15 @@ flowchart LR
   - 受け付けたファイルは、先にまとめて形式を確かめる。HEIC などの受け付けない形式は、ほかのファイルの処理を待たずに失敗として表示する。`maxItems` を超える分は処理せず、ファイルごとに失敗として表示する。
   - 1 枚が終わるたびに値に加える。1 枚が失敗しても残りを処理し、失敗したファイルは値に加えずにエラーを出す。進捗は何枚目か(2 / 3 枚目)を出す([[T23-upload-hook#結果|T23]])。
 - サムネイルを並べて表示する。ドラッグ、または ↑↓ ボタンで並べ替えられる。1枚ずつ削除や代替テキストの入力ができる。
-- 「あと N 枚追加できます」と表示し、`maxItems` を超える追加は拒否する。
+  - ↑↓ は Enter / Space で押せる。端の ↑↓ は `disabled` にせず `aria-disabled` にする(フォーカスのあるボタンを `disabled` にすると、フォーカスが外れる)。並べ替え・削除は読み上げで伝える。削除したら次の画像(最後なら前の画像、無くなればドロップゾーン)へフォーカスを移す。
+  - ドラッグは、行のつまみと縮小画像をつかむ。独自の種類のデータを運び、この widget の中で始まったドラッグだけを受け付ける(ファイルやほかのギャラリーの行は受け付けない)。
+  - 1 枚ずつ差し替えられる。差し替えた画像の代替テキストは空にする(11.2 と同じ)。
+- 「あと N 枚追加できます」と表示し、`maxItems` を超える追加は拒否する。上限に達したら、ドロップゾーンを押せなくして理由を出す。上限を超えている値(`maxItems` を小さくしたときなど)は、何枚削除すれば保存できるかを出す。
+- 値が正しくないとき(`null` / `undefined` は画像なし)。どれも値を勝手に直さず、利用者に直させる。保存 hook(8 章③)が拒否するため([[T28-gallery-widget#結果|T28]])。
+  - 配列でない値: 「ギャラリーの形ではありません」と、値を空にするボタンを出す。値が参照 1 つなら、ギャラリーの 1 枚目にするボタンも出す。直すまで画像を追加できない。
+  - 参照の形でない要素: その位置に「データが正しくありません」と出し、削除と並べ替えだけをできるようにする。ほかの画像はそのまま使える。
+  - 同じ画像が 2 回以上ある: 2 回目以降に、何枚目と重なっているかを出す。
+- 編集ロック中は、ボタンと入力欄は無効になる(11.1)。つまみ(`draggable` の `div`)は無効にならないので、ファイルのドロップと同じく、並べ替えのドラッグも widget が受け付けない。根拠: 実測のみ([[gallery-widget-reorder-focus]])
 
 ### 11.4 コンテンツ一覧のサムネイル列(Q10)
 
@@ -601,7 +621,9 @@ const images = await resolveBase64Images(refs);
 }
 ```
 
-- プラグインは起動時に `b64_images` があるかを確認し、なければエラーを出す。プラグインからはコレクションを作れない(`ctx.schema` は読み取り専用)。
+- プラグインは `b64_images` があるかを確かめ、無ければ作り方を書いたエラーのログを出す(保存と有効化は止めない)。プラグインからはコレクションを作れない(`ctx.schema` は読み取り専用)。
+  - 確かめるのは、`plugin:activate`(管理者がプラグインを有効に戻したとき)と、プラグインのインスタンス(プロセス。Workers では isolate)ごとの最初の `b64_images` 以外の保存(`content:beforeSave`)。EmDash 0.39.1 には、`astro.config.mjs` で登録した native プラグインの起動時に呼ばれる hook が無い(`plugin:install` は呼ばれず、`plugin:activate` も起動時には呼ばれない)。クエリは最初の 1 回だけ増える(あれば 2、無ければ 1)。根拠: 実測+公式ドキュメント([[T29-plugin-definition#決めたこと|T29]]、[[emdash-native-plugin-lifecycle-hooks]])
+  - 無いまま画像を上げると、アップロードのルートが 500 `IMAGE_COLLECTION_MISSING` を返す([[#7. アップロード(書き込み経路)|7 章]])。
 - `b64_images` は上の構成で足りる。タイトル用のフィールドは要らない(作成・公開・取得・一覧ができ、管理画面の一覧とダッシュボードには ID が表示される)。根拠: 実測+公式ドキュメント([[T02-playground#結果|T02]])
   - `routable: false` は必須。プラグインが作るエントリには slug が無く、routable のままでは公開できない(`Cannot publish routable content without a slug`。`packages/core/src/database/repositories/content.ts:2305`)。
   - `hidden: true` で外れるのは、サイドバーとダッシュボードのクイックアクションだけ。ダッシュボードの件数と最近の更新には出る(画像本体は読まない)。
@@ -673,11 +695,13 @@ export default defineConfig({
 /                        ← パッケージのルート(git 依存でインストールされる対象)
 ├─ package.json          files: ["src"]、exports: "." / "./admin" / "./astro"
 ├─ src/
-│  ├─ index.ts           definePlugin(ルート・hook・ストレージ・capability)
-│  ├─ admin.tsx          widget(単一画像 / ギャラリー)・画像管理ページ・一覧の列
+│  ├─ index.ts           createPlugin()・descriptor(base64ImagePlugin())
+│  ├─ admin.tsx          管理画面の入口(widget・画像管理ページ・一覧の列を export する)
 │  ├─ astro.ts           resolveBase64Images・型・type guard(サイト側で使う)
-│  ├─ server/            アップロード用ルート・検証・参照元の記録
-│  ├─ client/            圧縮処理(canvas)・サムネイル生成
+│  ├─ admin/             widget・画像管理ページ・一覧の列・共通の部品(parts/)・アップロードのフック(hooks/)
+│  ├─ server/            plugin.ts(definePlugin)・ルート(routes/)・保存 hook と参照元の記録(hooks/)・検証
+│  ├─ client/            入力画像の判定とデコード・圧縮(canvas)・サムネイル・文言・API クライアント
+│  ├─ site/              サイト側の画像の解決(resolveBase64Images の本体)
 │  └─ shared/            WebP ヘッダーの解析・参照のスキーマ・定数
 ├─ tests/                vitest(単体テスト)
 ├─ playground/           動作確認用の EmDash サイト(配布物には含めない)
@@ -729,9 +753,11 @@ export default defineConfig({
 | 入力形式 | HEIC / HEIF は非対応 |
 | アニメーション | GIF・アニメーション WebP・APNG は、最初のフレームの静止画になる。アニメーションが消える注意書きは GIF だけに出す([[#6.5 入力形式と上限(Q8)\|6.5]]) |
 | Firefox でのデコード | Firefox 155 は、デコードの間(6,400 万画素の JPEG で 78〜92ms)画面を止め、その間の中断はデコードが終わってから届く。途中で切れた JPEG・PNG は、欠けた部分を白・透明にしてデコードする(検出しない)。libheif で作ったグリッドの AVIF はデコードできない(`INPUT_DECODE_FAILED`)([[T12-input-decode#結果\|T12]]) |
-| 編集ロック | 編集ロック中でも widget を操作できる(EmDash 側の制約) |
+| 編集ロック | plugin widget には `readOnly` が渡らない(EmDash 側の制約)。編集ロックは、EmDash がフィールドを包む `<fieldset disabled>` に頼っている(ボタンと入力欄はブラウザが無効にし、枠へのドロップは widget が受け付けない。[[#11.1 共通方針\|11.1]])。EmDash の版が変わったら、実際の管理画面で確かめ直す。根拠: 実測+公式ドキュメント([[emdash-plugin-field-widget]]) |
+| 処理中の保存 | 画像の処理中に「Save」を押すと、保存の要求を送ってから応答が届くまでに widget が値に加えた画像が、フォームから外れる。EmDash が手動の保存の応答でフォームの値を置き換えるため(自動保存では置き換えない)。外れた画像のエントリは残り、使われない画像になる。新規作成の最初の保存では、widget が作り直されて残りの処理が止まるとみられる(推測のみ)。根拠: 実測+公式ドキュメント(ギャラリーで 4 枚 → 1〜2 枚。[[gallery-widget-reorder-focus#4. 処理中に「Save」を押したとき(EmDash の挙動)]])。処理中は、両方の widget が進捗の行の下に「処理が終わってから保存してください。」と出す(11.1)。案内だけで、保存は止めない([[T28-2-save-hint-alt-width#結果\|T28-2]]) |
+| 必須のギャラリー | 必須(`required`)のギャラリーでも、画像を全部消した `[]` のまま保存できる。EmDash の必須の確認は、値なし・`null`・空文字だけを拒否するため(単一画像の `null` は拒否される)。根拠: 公式ドキュメントのみ(`packages/core/src/api/handlers/validation.ts:196-221`。[[T28-gallery-widget#未解決・サブタスクの候補\|T28]]) |
 | 画像管理ページの表示 | サイドバーのプラグインのページの項目は、ロールで絞られない(閲覧者にも出る)。閲覧者が開くと、一覧は 403 になり、ページは「寄稿者以上」と示す。根拠: 実測+公式ドキュメント([[emdash-admin-plugin-pages]]) |
-| コマンドパレット | 管理画面のコマンドパレットで「Images」などと入力すると、非表示のコレクション `b64_images` も候補に出る。選ぶと、使わないとした標準の一覧(1 ページ 100 件の base64 を読む。[[#10. 画像のライフサイクル\|10 章]])が開くとみられる。根拠: 実測(候補に出ること)、推測のみ(開いたときの動き)([[T25-images-page#影響・サブタスクの候補\|T25]]) |
+| コマンドパレット | 管理画面のコマンドパレットで「Images」などと入力すると、非表示のコレクション `b64_images` も候補に出る。選ぶと、使わないとした標準の一覧(`/_emdash/admin/content/b64_images`。1 ページ 100 件の base64 を読む。[[#10. 画像のライフサイクル\|10 章]])に移る。根拠: 実測(候補に出ることと、移る先。[[T25-images-page#影響・サブタスクの候補\|T25]]、[[T29-plugin-definition#他のタスクへの影響・サブタスクの候補\|T29]])、推測のみ(一覧の重さは測っていない) |
 | 一覧の列の見出し | 列の見出しは、管理画面の辞書にある「Image」のメッセージ ID を使って、管理画面の言語で表示する。EmDash の版が変わって辞書から「Image」が消えると、見出しに ID(`hG89Ed`)がそのまま出る。インストールした `@emdash-cms/admin` の辞書に ID があることは、単体テストで確かめている([[T24-list-column#結果\|T24]]) |
 | 容量 | D1 の 500MB で約 2,500 枚(公開時にできるリビジョンを含む。[[#5.4 容量の目安\|5.4]])。使われなくなった画像は自動では消えず、プラグインからは完全削除もできない。使用量は Cloudflare のダッシュボードで監視する |
 | バックアップ | D1 Time Travel(直近7日)だけ |
@@ -745,6 +771,7 @@ export default defineConfig({
 | マイグレーションのコマンド | `emdash migrate --from-config` は、Node が `node_modules` の中の `.ts` を読めないので失敗する。既定の `emdash migrate`(build のマニフェストを使う)は使える。EmDash は `--from-config` をローカルの調査用としている([[git-dependency-ts-source]]) |
 | seed の画像 | seed で作った `b64_images` は `imageRefs` に記録が無く、それを参照する投稿は保存 hook で拒否される([[#8. サーバー側の検証\|8 章]]③) |
 | 保存の拒否の文言 | サーバーは管理画面の言語を知らないので、保存 hook の拒否のメッセージは日本語と英語を並べる([[#8. サーバー側の検証\|8 章]]) |
+| ほかのプラグインの保存 hook | 保存 hook(beforeSave)は priority 200 で動き、それより前に動くプラグインが変えた値を確かめる。priority が 200 より大きいプラグインの beforeSave が値を変えると、その値は確かめられない(対策はしていない)。根拠: 実測+公式ドキュメント(実行の順。[[emdash-plugin-definition-registration]])、推測のみ(そういうプラグインがほぼ無いこと) |
 | Cloudflare の開発サーバー | Cloudflare アダプターの `astro dev` では、最初のリクエストでプラグインが依存の最適化に加わり、1 回だけ再読み込みが起きる。サイトの `vite.ssr.optimizeDeps.include` にプラグインを入れると起きない([[git-dependency-ts-source#Cloudflare アダプターの astro dev の再最適化\|T07]]) |
 
 ## 19. 対象外・将来の検討事項
@@ -759,6 +786,8 @@ export default defineConfig({
 - 既存の `b64_images`(seed や移行で作ったもの)を `imageRefs` に登録する機能。サムネイルはブラウザでしか作れないので、管理画面から行う必要がある([[T16-reference-hook#未解決・サブタスクの候補|T16]])。アップロードの途中(作成と `imageRefs` の保存の間)で処理が止まったときや、`imageRefs` の保存に失敗したときに残るエントリも、この機能で拾える([[T18-upload-route#未解決|T18]])
 - 画像管理ページに、ゴミ箱から戻す操作(編集者以上。標準 API の `POST /_emdash/api/content/b64_images/{id}/restore`)を置く。今は、標準 API で戻し(標準の画面は 1 ページ 100 件の base64 を読むので使わない)、戻した画像(下書き)を画像管理ページの「公開」で公開し直す([[T25-images-page#影響・サブタスクの候補|T25]])
 - 記録だけが残った画像(画像管理の一覧の `missing`。完全削除の hook の失敗などで、`b64_images` のエントリが無いのに `imageRefs` の記録がある)の記録を、画像管理ページから消す操作([[T21-orphan-routes#未解決・サブタスクの候補|T21]])
+- 必須(`required`)の画像フィールドで画像が無いときの表示。EmDash 標準の画像フィールドは「This field is required」を出すが、widget は出さない(必須の確認は EmDash の保存の検証が行う)。揃えるなら、辞書に文言を足して空の表示の下に出す([[T27-image-widget#未解決・サブタスクの候補|T27]])
+- サイトのビジュアル編集から `?field=<slug>` で開いたときに、単一画像の widget にフォーカスを移す。管理画面は `#field-<slug>` を `focus()` するが、単一画像の widget は `id` を根の fieldset に付けているのでフォーカスできず、body のままになる(スクロールはする)。fieldset に `tabIndex={-1}` を付ける案がある(推測のみ。[[emdash-plugin-field-widget]])。ギャラリーは `id` をドロップゾーンのボタンに付けていて、フォーカスが移る([[T28-gallery-widget#決めたこと|T28]])
 
 ## 20. 決定ログ
 
