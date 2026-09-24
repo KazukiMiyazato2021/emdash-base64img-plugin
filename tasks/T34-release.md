@@ -36,7 +36,7 @@ git 依存で配布する最初のバージョンを作る。
 ## 作業内容
 
 - [ ] バージョンを 0.1.0 にして、タグ `v0.1.0` を作る(GitHub への push は利用者の確認を得てから)
-- [ ] 別の空のサイトから `github:<owner>/emdash-base64img-plugin#v0.1.0` でインストールし、起動を確認する
+- [ ] 別の空のサイトから `github:<owner>/emdash-base64img-plugin#v0.1.0` でインストールし、起動を確認する(npm 12 では、そのサイトの `.npmrc` に `allow-git=root` が要る。[[npm12-git-dependency-policy]])
 - [ ] 仕様書の status を更新する
 
 ## 完了条件
