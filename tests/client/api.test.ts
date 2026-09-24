@@ -505,7 +505,33 @@ const CALLS: CallCase[] = [
 		url: `${PLUGIN_API}/images/list`,
 		method: "POST",
 		body: { cursor: "next-page" },
-		data: { items: [] },
+		// 項目の値は、共有のスキーマで確かめたうえで、そのまま返る(公開の状態と参照元の全体の件数を含む。T21-2)
+		data: {
+			items: [
+				{
+					id: IMAGE_ID,
+					thumb: WEBP_DATA_URL,
+					width: 1280,
+					height: 853,
+					bytes: 74_668,
+					createdAt: "2026-09-24T12:00:00.000Z",
+					entryStatus: "active",
+					entryPublication: "draft",
+					usage: "in_use",
+					owners: [
+						{
+							collection: "posts",
+							entryId: "01J8Z3K4M5N6P7Q8R9S0POST01",
+							locale: "ja",
+							field: "cover",
+							status: "in_use",
+						},
+					],
+					ownersTotal: 23,
+				},
+			],
+			nextCursor: "c2",
+		},
 	},
 	{
 		name: "trashImage",

@@ -5,6 +5,8 @@ aliases:
   - images/list と images/trash
   - 未使用画像の判定
   - 一覧のクエリ数の予算
+  - 画像エントリの公開の状態
+  - 公開し直す操作の材料
 tags:
   - docs
   - emdash
@@ -28,6 +30,8 @@ updated: 2026-09-24
 > - `getTrashedVersioned`(capability `content:restore`)を使う。記録だけが残った画像(`missing`)を、ゴミ箱と区別できる。根拠: 実測+公式ドキュメント
 > - ゴミ箱(`images/trash`)はプラグインの `ctx.content.delete` で移す。**このとき `content:afterDelete` は呼ばれない**。標準 API のゴミ箱・完全削除・復元では hook が呼ばれる。完全削除で `imageRefs` の記録が消えること、T18 の後始末で残る「公開していない・ゴミ箱の・参照元なし」の画像を管理者が完全削除できることを確かめた。根拠: 実測+公式ドキュメント
 > - ゴミ箱の状態は `imageRefs` に記録しない。0.39.1 には `content:afterRestore` があり、復元で呼ばれることも確かめたが、書く場所が 3 つに増え、一覧は結局エントリを読むため。根拠: 実測+公式ドキュメント(事実)、推測のみ(費用の見込み)
+> - [[T21-2-list-publish-status|T21-2]] で、一覧の項目に **画像エントリの公開の状態(`entryPublication`)** と **参照元の全体の件数(`ownersTotal`)** を足した。公開の状態は EmDash の `status`(`published` / `draft` / `scheduled`)で、ゴミ箱・無い画像は null。どちらも追加のクエリは無い(ページごとのクエリ数は T21 と同じだった)。根拠: 実測+公式ドキュメント
+> - 下書きの画像を公開し直すには、標準 API(`POST …/publish`。プラグインが作った画像は作成者が空なので **Editor 以上**、45〜47 クエリ)か、プラグインのルートの `ctx.content.publish`(権限はルートの `permission` だけ、44 クエリ)。どちらも保存 hook は呼ばれず、公開版の無い画像では本体を丸ごと写したリビジョンが 1 件増える。どちらにするか(置くか)は [[T25-images-page|T25]] が決める。根拠: 実測+公式ドキュメント
 > - 関連: [[T21-orphan-routes]]、[[base64-image-plugin-spec#9. 参照元の記録と未使用画像の検出|仕様書 9 章]]、[[base64-image-plugin-spec#10. 画像のライフサイクル|仕様書 10 章]]、[[base64-image-plugin-spec#11.5 画像管理ページ|仕様書 11.5]]、[[emdash-plugin-content-query-counts]]、[[emdash-plugin-content-api-constraints]]、[[image-owner-tracking-hooks]]、[[emdash-after-save-payload]]、[[emdash-plugin-route-permissions]]、[[emdash-admin-api-requests]]、[[cloudflare-workers-free-d1-limits]]
 
 > [!info] 確かめた方法と環境
@@ -82,13 +86,16 @@ definePlugin({
 | 並び | `imageRefs` の `createdAt` の新しい順。同じ時刻は画像 ID の大きい順 |
 | 1 ページの枚数 | 0〜10 枚で変わる(クエリ数の見積もりで決まる)。10 枚を前提にしない |
 | `items: []` と `nextCursor` | 参照元の多い画像を調べている途中。**画面は続けて次のページを読む**(一覧の終わりではない)。載せられない記録だけのページの後にも起きる |
-| 項目 | `id` / `thumb` / `width` / `height` / `bytes` / `createdAt` / `entryStatus` / `usage` / `owners` |
+| 項目 | `id` / `thumb` / `width` / `height` / `bytes` / `createdAt` / `entryStatus` / `entryPublication` / `usage` / `owners` / `ownersTotal` |
 | `entryStatus` | `active`(ゴミ箱に入っていない)/ `trashed`(ゴミ箱)/ `missing`(`b64_images` にエントリが無く、記録だけがある) |
+| `entryPublication` | `active` のとき `published`(サイトに出る)/ `draft`(出ない)/ `scheduled`(予約。まだ出ない)。`trashed` / `missing` は null([[#公開の状態と参照元の全体の件数(T21-2)]]) |
 | `usage` | `in_use` / `owner_deleted` / `detached` / `no_owner`。参照元ごとの状態のうち、この順で最初に見つかったもの |
-| `owners` | 記録の順に先頭から 20 件まで(4 つのキーが同じものは 1 件)。`usage` はすべての参照元から決める。全体の件数は応答に無い |
+| `owners` | 記録の順に先頭から 20 件まで(4 つのキーが同じものは 1 件)。`usage` はすべての参照元から決める |
+| `ownersTotal` | 参照元の全体の件数(`owners` と同じ数え方)。`ownersTotal - owners.length` が「ほか N 件」 |
 | エラー | 400 `INVALID_CURSOR`(最初から読み直す)、400 `VALIDATION_ERROR`、401、403(Subscriber)、413(body が 3,085 バイトを超える)、500(データベースの失敗。途中までの結果は返さない) |
 
 - ボタンの出し方(仕様書 10 章、[[T06-decision-trash-permission|T06]]): ゴミ箱への移動は `entryStatus: "active"` の画像に出し、`usage: "in_use"` なら確認で使用中であることを示す。完全削除(管理者)は `entryStatus: "trashed"` の画像にだけ出す。`missing` には操作が無い(記録を消すルートは無い。[[#残る課題]])。
+- `entryPublication` が `draft` の画像は、サイトに出ない(参照している投稿でも描画されない)。「未公開」の表示と、公開し直す操作を置くかは T25 が決める([[#公開し直す操作の材料(T21-2)]])。`scheduled` は予約の日時に EmDash の定期処理が公開する。
 - ゴミ箱に移したあとは、応答(`{ id, trashed: true }`)でその項目を `trashed` に変えればよい。完全削除のあとは、項目を画面から消す。記録は `after()` で実行される hook が消すので、直後に先頭から読み直すと、まれに `missing` として出うる(spike では、直後の読み出しで記録はもう無かった)。根拠: 実測のみ(直後に消えていたこと)、推測のみ(まれに残りうること)
 - カーソルは位置(`createdAt` と ID)を持つので、読んでいる間に画像が完全削除されても、次のページはずれない。読んでいる間に足された画像は、先頭から読み直すまで出ない。根拠: 実測のみ(単体テスト)
 
@@ -132,6 +139,48 @@ spike で、状態ごとに画像を作って一覧を読んだ結果。どれ�
 - 記録だけが残るのは、完全削除の hook が失敗したとき(ストレージの失敗、タイムアウト)、プラグインを外していた間に完全削除したとき、データベースを直接操作したとき。どれも起きにくいが、起きたときに押せないボタンを出し続けることになるので、`getTrashedVersioned` を使う。根拠: 推測のみ(起きやすさ)
 - `getTrashedVersioned` と `restore` は、`content:restore` を宣言したときだけ `ctx.content` に付く(`plugins/context.ts:1687-1704`)。`content:restore` は `content:read` を含まない(`plugins/types.ts:84-95`)。根拠: 公式ドキュメントのみ
 - spike でのクエリ数: `get`(`b64_images`)は見つかれば 2、ゴミ箱・無い 1。`getTrashedVersioned`(`b64_images`)はゴミ箱 4、ゴミ箱に入っていない 4、無い 2。`posts` のゴミ箱に入っていないエントリ(下書きなし)は 6。根拠: 実測のみ([[emdash-plugin-content-query-counts]] の値と合う)
+
+## 公開の状態と参照元の全体の件数(T21-2)
+
+### `entryPublication`
+
+画像エントリが `active` のとき、`get` の `status` をそのまま使う(追加のクエリなし。プラグインの `get` は `status` を返す。`plugins/content-access.ts:25-51`)。
+
+| EmDash の `status`(0.39.1) | いつなるか | サイトに出るか | `entryPublication` |
+|---|---|---|---|
+| `published` | 公開したとき(T18 のアップロード、標準 API の公開、予約の日時の定期処理) | 出る | `published` |
+| `draft` | 公開の前に止まった(T18)、ゴミ箱から戻した、非公開にした、予約を取り消した | 出ない | `draft` |
+| `scheduled` | 公開していない画像を予約した(公開済みの画像を予約しても `published` のまま) | 出ない。日時が来ると定期処理が公開する | `scheduled` |
+| ほかの値 | 0.39.1 では作られない | 出ない | `draft` |
+| (ゴミ箱に入っている) | `status` はそのまま残る(spike では `published`) | 出ない。戻すと必ず `draft` になる | null(`entryStatus: "trashed"`) |
+| (エントリが無い) | — | — | null(`entryStatus: "missing"`) |
+
+- `status` の値は `draft` / `published` / `scheduled` の 3 つ(`api/schemas/content.ts:340` の説明、`database/repositories/content.ts` の書き換え: 公開 `:2329-2336`、非公開 `:2580-2586`、復元 `:1524-1530`、予約 `:1987`、予約の取り消し `:2037`)。根拠: 公式ドキュメントのみ
+- サイトの取得(`getEmDashCollection`)は、既定で `status = 'published'` だけを読む(`loader.ts:1233`、`database/dialect-helpers.ts:150-157`)。ゴミ箱のものは読まない(`loader.ts:1341`)。根拠: 公式ドキュメントのみ
+- 予約の公開は、Node では EmDash の定期処理、Cloudflare では Worker の `scheduled()` が行う(`scheduled-publish.ts:97-135`、`emdash-runtime.ts:2055-2073`)。根拠: 公式ドキュメントのみ
+- 名前と値を EmDash の `status` にそろえた理由: 画面がそのまま表示の文言に対応させられ、予約も区別できる。ゴミ箱・無い画像を null にした理由: サイトには出ず、戻すと必ず下書きになるので、ゴミ箱に入る前の値に意味が無い。知らない値を `draft` にした理由: サイトに出ないことだけは確か(応答のスキーマは 3 つの値しか受け付けないので、知らない値をそのまま返すと画面が `UNEXPECTED_RESPONSE` にする)。根拠: 推測のみ(設計判断)
+- 参照元の多い画像では、画像エントリを最初のリクエストで読み、状態と公開の状態をカーソルの途中の状態に入れて持ち越す(読み直さない)。根拠: 実測のみ(単体テスト)
+
+spike での値(`publish.mjs`)。根拠: **実測のみ**
+
+| 画像 | `entryStatus` | `entryPublication` | データベースの `status` |
+|---|---|---|---|
+| S01(公開済み) | active | published | published |
+| S11(T18: 公開の前で止まった) | active | draft | draft |
+| S14(ゴミ箱から戻した) | active | draft | draft |
+| 下書きを Admin が標準 API で予約した画像 | active | scheduled | scheduled |
+| S08(ゴミ箱) | trashed | null | published |
+| S09(記録だけ) | missing | null | (行が無い) |
+| H1〜H3(参照元 40 件。途中の状態を持ち越す) | active | published | published |
+| S11・S14 を公開し直したあと | active | published | published |
+
+- 一覧を最後まで読んだときのページごとのクエリ数は、参照元の多い画像のページ(49 / 50、94 / 98、49 / 50 / 29)を含めて T21 と同じで、どのページも見積もり以下だった。根拠: 実測のみ
+
+### `ownersTotal`
+
+- `owners` と同じ規則で数える: `imageOwnerSchema` に合う要素のうち、4 つのキー(`collection` / `entryId` / `locale` / `field`)が同じものは 1 件。`owners` は先頭から 20 件なので、`ownersTotal - owners.length` が載っていない件数。根拠: 実測のみ(単体テスト)
+- 数えないもの: `collection` / `entryId` / `field` が読めない要素と、`locale` だけが壊れた要素(どちらも一覧に載せられない)。`usage` は、`locale` だけが壊れた要素も調べて決めるので、そうした要素しか無い画像では `ownersTotal: 0` でも `usage` が `in_use` になりうる(T20 の記録では起きない)。根拠: 実測のみ(単体テスト)
+- spike: H1〜H3 は `owners` 20 件・`ownersTotal` 40、S13・S17 は 2 / 2、参照元の無い画像は 0 / 0。根拠: 実測のみ
 
 ## クエリ数の予算
 
@@ -183,7 +232,7 @@ spike で、状態ごとに画像を作って一覧を読んだ結果。どれ�
 - 範囲の条件は、境界が文字列なので `json_extract` の値を文字列として比べる(`plugins/storage-query.ts:232-247`)。SQLite では数値は文字列より小さく、NULL はどの範囲にも入らない。そのため、`createdAt` が数字で始まる文字列の記録だけを読む(無い・数値・英字で始まる記録は、載せられず位置にも使えない)。根拠: 公式ドキュメントのみ(SQL)、実測のみ(単体テスト)
 - 並びは、null の順位 → 値 → ID の順で、どれも同じ向き(`database/repositories/plugin-storage.ts:425-437`)。新しい順なら、同じ時刻は ID の大きい順。根拠: 公式ドキュメントのみ
 - **EmDash のストレージのカーソル(`cursor`)は使わない。** `orderBy` を付けたときのカーソルは、カーソルの記録の値を ID からその場で読み直す(`plugin-storage.ts:381-422`)。その記録が消えていると値が NULL になり、降順では先頭から読み直す(重複して出る)。画面で最後の画像を完全削除すると起きる。根拠: 公式ドキュメントのみ
-- カーソルは `{ v: 1, a: [createdAt, id], h?: 途中の状態 }` の JSON(ASCII 以外は `\uXXXX`)を base64url にした文字列。2,048 文字まで(要求のスキーマと同じ)。読めない・版が違う・形が違うカーソルは 400 `INVALID_CURSOR`(クエリをしない)。根拠: 実測のみ
+- カーソルは `{ v: 2, a: [createdAt, id], h?: 途中の状態 }` の JSON(ASCII 以外は `\uXXXX`)を base64url にした文字列。2,048 文字まで(要求のスキーマと同じ)。読めない・版が違う・形が違うカーソルは 400 `INVALID_CURSOR`(クエリをしない)。途中の状態の最後の 1 文字は、画像エントリの状態と公開の状態(`p` 公開済み / `d` 下書き / `s` 予約 / `t` ゴミ箱 / `m` 無い)。T21-2 でこれを足したので版を 2 にした(版 1 のカーソルは `INVALID_CURSOR`)。根拠: 実測のみ
 - カーソルは画面から送られるので、利用者が作り変えられる。変えても、その利用者が読める範囲(一覧)の中で位置や途中の状態がずれるだけで、ほかの利用者には影響しない。途中の状態は、画像の記録の `owners` の数が変わっていれば捨てて最初から調べ直す。根拠: 推測のみ
 
 ## ゴミ箱への移動と完全削除
@@ -232,6 +281,27 @@ POST、`X-EmDash-Request: 1` あり、セッション認証。根拠: **実測+�
 - 事実: 0.39.1 には `content:afterRestore` があり(`plugins/hooks.ts:85`、`:335`。登録には `content:read`)、標準 API の復元で呼ばれた。プラグインの `ctx.content.delete` では afterDelete が呼ばれなかった。根拠: 実測+公式ドキュメント
 - 判断: 得られるのは一覧の列の印だけで、変えるタスクが 5 つに増え、ずれたときの扱いも要る。ゴミ箱の画像を参照する投稿は、サイトでは画像が出ない(サイト側の取得がゴミ箱のものを除く)ので、列の印が無くても実害は小さい。記録しないことにした。根拠: 推測のみ(費用と効果の見込み)
 
+## 公開し直す操作の材料(T21-2)
+
+下書きの画像(戻した画像、公開の前に止まった画像)を公開し直す方法は 2 つある。標準の編集画面からは公開できない(保存 hook が拒否する。[[T19-image-entry-hook#結果|T19]])。どちらを使うか、画面に置くかは [[T25-images-page|T25]] が決める。spike での結果(`publish.mjs`)と、ソースで確かめたこと。
+
+| | 標準 API `POST /_emdash/api/content/b64_images/{id}/publish` | プラグインのルートで `ctx.content.getVersioned` → `ctx.content.publish` |
+|---|---|---|
+| 呼べる人 | `content:publish_own` / `content:publish_any` で判定。プラグインが作った画像は作成者(`authorId`)が空なので **`content:publish_any`(Editor 以上)** が要る | ルートの `permission` で決まる。`ctx.content` は利用者の権限を確かめない |
+| 実測 | 未ログイン 401 `NOT_AUTHENTICATED`、Subscriber・Contributor・Author 403 `FORBIDDEN`、Editor・Admin 200 | `permission: "content:create"` のルートで、Subscriber 403、Contributor 200 |
+| capability | 要らない | `content:publish`(T18 で宣言済み) |
+| 編集ロック | 確かめる(ほかの人が標準の編集画面で開いていると失敗しうる) | 確かめない |
+| 保存 hook(`content:beforeSave`) | 呼ばれない | 呼ばれない |
+| `content:beforePublish`(ほかのプラグインのポリシー) | 呼ばれる(`origin: { source: "api" }`、`actor` あり) | 呼ばれる(`origin: { source: "plugin", pluginId: "base64-image" }`、`actor` なし) |
+| `content:afterPublish` | すべてのプラグイン(このプラグインの参照元の記録は `b64_images` を読み飛ばす) | このプラグイン以外 |
+| クエリ(db.count、SQLite) | 45(公開したことの無い下書き)、47(戻した画像)、38(公開済みをもう一度) | 44(固定費 1、`getVersioned` 3、`publish` 39、ほか 1) |
+| リビジョン | 公開版の無い画像では、本体を丸ごと写したリビジョンを 1 件作る。戻した画像は前の公開のリビジョンも残り、2 件になった | 同じ(公開したことの無い下書きで 0 → 1 件) |
+
+- 根拠: 実測+公式ドキュメント(標準 API は `astro/routes/api/content/[collection]/[id]/publish.ts`、権限は `packages/auth/src/rbac.ts` の `content:publish_own`(Author)・`content:publish_any`(Editor)と `api/authorize.ts:59-72`、公開の処理は `emdash-runtime.ts:4160-4235`、プラグインの公開は `emdash-runtime.ts:3793-3913`、リビジョンを作る条件は `database/repositories/content.ts:2313-2321`)
+- 公開の日時は、前の値があれば保つ(戻した画像は最初の公開の日時のまま)。無ければ公開した日時。どちらの方法でも同じ処理を通る。根拠: 実測+公式ドキュメント
+- プラグインのルートでも、`permission: "content:publish_any"` にすれば標準 API と同じ Editor 以上になる(ルートの `permission` には EmDash の権限の名前を使える)。根拠: 公式ドキュメントのみ([[emdash-plugin-route-permissions]])
+- 公開のたびに写すリビジョンは、画像 1 枚につき本体と同じ大きさ(固定上限 500,000 バイト、既定の予算で 100,000 バイト)。ゴミ箱に移す → 戻す → 公開し直す、を繰り返すと 1 回ごとに増え、プラグインからは消せない(仕様書 5.4 の容量の見積もりに入っていない分)。根拠: 実測(件数)+公式ドキュメント(作る条件)、推測のみ(大きさ。spike の画像は 174 バイト)
+
 ## 処理時間
 
 - 上のページごとの応答時間は、開発サーバー(Vite の SSR)で 1〜16ms(最初のリクエストは 10〜16ms)。根拠: 実測のみ
@@ -241,11 +311,11 @@ POST、`X-EmDash-Request: 1` あり、セッション認証。根拠: **実測+�
 
 - `tests/server/orphans.test.ts`(88 件)。偽の EmDash(`FakeWorld`)は、`get` などのクエリ数を spike の実測に合わせ、`imageRefs.query` は SQLite の `json_extract` の比較と並び(NULL が先、同じ値は ID の大きい順)をまねる。各状態、ページ送り(同じ時刻の記録が 100 件を超える場合を含む)、予算、参照元の多い画像、カーソル、足りない宣言、ゴミ箱、完全削除の hook(EmDash の `createHookPipeline` で実行)を確かめる。根拠: 実測のみ
 - `src` に 49 種類の誤りを 1 つずつ入れ、どれでもテストが失敗することを確かめた(予算・見積もりの値、下書きを見ない・常に読む、例外の扱い、`usage` の順、同じ時刻の除き方、範囲の上限、位置の取り方、途中の状態の捨て方、カーソルの長さ、ルートの permission・body の上限・404 の条件、hook の条件・優先度・`errorPolicy` など)。最初の実行で残った 3 つ(コレクションの一覧の見積もり、範囲の上限、カーソルの長さ)は、テストを足して失敗するようにした。根拠: 実測のみ
+- T21-2: `tests/server/orphans.test.ts` を 102 件にし、`tests/shared/schema.test.ts` に 6 件(うち 4 件は公開の状態の値ごと)を足し、`tests/client/api.test.ts` の一覧の例に項目を入れた。一覧のテストの補助(`list`)は、どの応答でも「公開の状態は `active` のときだけ」「`ownersTotal` は `owners` の件数以上」を確かめる。15 種類の誤り(知らない `status` の扱い、`scheduled` の扱い、ゴミ箱・無い画像の値、カーソルの版と文字、途中の画像の公開の状態を読み直す、全体の件数の数え方、スキーマの必須と型など)が、どれもテストで失敗することを確かめた。根拠: 実測のみ
 
 ## 残る課題
 
-- 一覧の項目は、画像エントリが公開済みか下書きか(復元した画像、T18 で公開の前に止まった画像)を持たない。`get` の `status` で追加のクエリなしに分かるが、応答のスキーマ(T03)に項目が要る。画面で「公開し直す」を出すなら要る。
-- 参照元の全体の件数(20 件を超えた分)が応答に無い。画面で「ほか N 件」を出すなら、T03 に項目が要る。
+- (T21-2 で対応)画像エントリの公開の状態(`entryPublication`)と参照元の全体の件数(`ownersTotal`)を一覧の項目に足した。公開し直す操作を置くかは T25 が決める。
 - `missing`(記録だけが残った画像)を片付けるルートが無い。
 - D1 での実際のクエリ数・並行に投げたときの応答時間・消えたコレクションの例外の形は、[[T32-cloudflare-check|T32]] で確かめる。
 
@@ -326,8 +396,9 @@ hooks: {
 },
 ```
 
-3. REST で操作する。`GET /_emdash/api/setup/dev-bypass?redirect=/_emdash/admin` の cookie と `X-EmDash-Request: 1` を付け、投稿は `POST /_emdash/api/content/posts`(`{ data, slug }`)・`PUT …/{id}`(`{ data }`)・`POST …/{id}/publish`・`DELETE …/{id}`・`DELETE …/{id}/permanent`・`POST …/{id}/restore`、スキーマは `DELETE /_emdash/api/schema/collections/posts/fields/hero`・`DELETE /_emdash/api/schema/collections/events?force=true`。ロールは `node:sqlite` で `UPDATE users SET role = ? WHERE email = 'dev@emdash.local'`(EmDash はリクエストのたびに読み直す)。
-4. 一覧は `nextCursor` が無くなるまで `images/list` を呼び、同じカーソルで `spike/measure-list` も呼んで、応答が同じこと・`db.count` が見積もり以下であることを確かめる。
+3. T21-2 では、観察用のプラグインに `content:beforeSave`(`b64_images` だけ)・`content:beforePublish`(`origin` と `actor` の role)・`content:afterPublish` の記録を足し(capability `content:write` と `hooks.content-policy:register`)、base64-image のプラグインに `permission: "content:create"` の `spike/publish`(`getVersioned` → `publish` とクエリ数)を足した。
+4. REST で操作する。`GET /_emdash/api/setup/dev-bypass?redirect=/_emdash/admin` の cookie と `X-EmDash-Request: 1` を付け、投稿は `POST /_emdash/api/content/posts`(`{ data, slug }`)・`PUT …/{id}`(`{ data }`)・`POST …/{id}/publish`・`DELETE …/{id}`・`DELETE …/{id}/permanent`・`POST …/{id}/restore`、スキーマは `DELETE /_emdash/api/schema/collections/posts/fields/hero`・`DELETE /_emdash/api/schema/collections/events?force=true`。ロールは `node:sqlite` で `UPDATE users SET role = ? WHERE email = 'dev@emdash.local'`(EmDash はリクエストのたびに読み直す)。
+5. 一覧は `nextCursor` が無くなるまで `images/list` を呼び、同じカーソルで `spike/measure-list` も呼んで、応答が同じこと・`db.count` が見積もり以下であることを確かめる。
 
 > [!warning] seed のコレクションを消すと、開発用ログインが 500 になる
 > dev-bypass は呼ぶたびに seed を適用し直す。seed にあるコレクションを `force=true` で消したあとは、`SchemaError: Collection "events" already exists`(`COLLECTION_EXISTS`)で 500 になった(メディアの使用状況が、消したコレクションの slug を「削除中」として残すため。`schema/registry.ts:557-558`)。seed からそのコレクションを外して起動し直すか、先にログインした cookie を使い回す。根拠: 実測+公式ドキュメント

@@ -100,8 +100,10 @@ function listItem(overrides: Record<string, unknown> = {}) {
 		bytes: 74_668,
 		createdAt: "2026-09-23T12:00:00.000Z",
 		entryStatus: "active",
+		entryPublication: "published",
 		usage: "in_use",
 		owners: [{ ...owner(), status: "in_use" }],
+		ownersTotal: 1,
 		...overrides,
 	};
 }
@@ -404,6 +406,29 @@ describe("画像管理の一覧(仕様書 9 章・11.5)", () => {
 		expect(
 			issuePaths(imageListItemSchema, listItem({ owners: [{ ...owner(), status: "no_owner" }] })),
 		).toEqual(["owners.0.status"]);
+	});
+
+	it.each(["published", "draft", "scheduled", null])(
+		"画像エントリの公開の状態 %s を受け付ける(T21-2)",
+		(entryPublication) => {
+			expect(issuePaths(imageListItemSchema, listItem({ entryPublication }))).toEqual([]);
+		},
+	);
+
+	it("公開の状態は省略できず、EmDash の status に無い値は拒否する(T21-2)", () => {
+		expect(issuePaths(imageListItemSchema, listItem({ entryPublication: undefined }))).toEqual([
+			"entryPublication",
+		]);
+		expect(issuePaths(imageListItemSchema, listItem({ entryPublication: "archived" }))).toEqual([
+			"entryPublication",
+		]);
+	});
+
+	it("参照元の全体の件数は省略できない 0 以上の整数(T21-2)", () => {
+		expect(issuePaths(imageListItemSchema, listItem({ ownersTotal: 0, owners: [] }))).toEqual([]);
+		for (const ownersTotal of [undefined, -1, 1.5, "1"]) {
+			expect(issuePaths(imageListItemSchema, listItem({ ownersTotal }))).toEqual(["ownersTotal"]);
+		}
 	});
 
 	it("カーソルは省略でき、空文字は拒否する", () => {

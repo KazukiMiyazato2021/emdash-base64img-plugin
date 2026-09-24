@@ -5,6 +5,9 @@
  * 判定:
  * - 画像エントリの状態(`entryStatus`): `ctx.content.get("b64_images", id)` があれば `active`。null のときだけ
  *   `getTrashedVersioned` を呼び(ゴミ箱に入っていないエントリに呼ぶと 9 クエリと重い)、あれば `trashed`、無ければ `missing`。
+ * - 画像エントリの公開の状態(`entryPublication`): `active` のとき、`get` の `status` から決める(追加のクエリなし)。
+ *   EmDash 0.39.1 の `status` は `draft` / `published` / `scheduled`。サイトに出るのは `published` だけなので、知らない値は
+ *   `draft` にする。`trashed` / `missing` は null(ゴミ箱の画像はサイトに出ず、戻すと必ず下書きになる。T21-2)。
  * - 参照元ごとの状態(`owners[].status`): 参照元のエントリを `ctx.content.get` で読む。null なら `owner_deleted`
  *   (ゴミ箱・完全削除のどちらも)。あれば、列の値(`data`)と、`draftRevisionId` があればその下書き(`getRevision`)の
  *   どちらかで、参照元の `field` に画像が残っていれば `in_use`、どちらにも無ければ `detached`。
@@ -25,6 +28,7 @@
  * - 応答に載せられない記録(ID・サムネイル・寸法・バイト数・作成日時のどれかが不正、`owners` が配列でない)は、
  *   一覧から外してログに出す。
  * - 一覧に載せる参照元は、記録の順に先頭から `IMAGES_LIST_MAX_OWNERS` 件まで。`usage` はすべての参照元から決める。
+ *   全体の件数(`ownersTotal`)は、一覧に載せる規則(`imageOwnerSchema` に合い、4 つのキーが同じものは 1 件)で数える。
  *
  * ページ送りとクエリ数:
  * - `imageRefs` を `createdAt` の新しい順(同じ時刻は ID の大きい順。EmDash の `query` の順)に読み、1 ページは
@@ -49,6 +53,7 @@ import {
 	slugSchema,
 } from "../shared/schema";
 import type {
+	ImageEntryPublication,
 	ImageEntryStatus,
 	ImageListItem,
 	ImageListOwner,
@@ -110,12 +115,14 @@ const MAX_LOGGED_IDS = 10;
 // 使う部品の型(EmDash の型のうち、この処理が使う部分)
 // ---------------------------------------------------------------------------
 
-/** 参照元のエントリ(EmDash の `ContentItem` の一部) */
+/** 参照元・画像のエントリ(EmDash の `ContentItem` の一部) */
 export interface OwnerEntryLike {
 	/** content テーブルの列の値(公開済みなら公開版、一度も公開していなければ作成したときの値) */
 	readonly data: Readonly<Record<string, unknown>>;
 	/** 下書きのリビジョン。無ければ null */
 	readonly draftRevisionId?: string | null | undefined;
+	/** エントリの状態(0.39.1 は `draft` / `published` / `scheduled`)。画像エントリの公開の状態に使う */
+	readonly status?: string | undefined;
 }
 
 /** 下書きのリビジョン(EmDash の `ContentRevisionInfo` の一部) */
@@ -202,8 +209,14 @@ export interface HeavyImageProgress {
 	readonly listed: string;
 	/** 一覧に載せない参照元の状態のうち、いちばん優先されるもの(まだ無ければ空) */
 	readonly rest: OwnerStatusCode | "";
-	/** 画像エントリの状態(最初のリクエストで調べる) */
+	/** 画像エントリの状態と公開の状態(最初のリクエストで調べる) */
+	readonly entry: ImageEntryState;
+}
+
+/** 画像エントリの状態と公開の状態。公開の状態は `active` のときだけ値がある */
+export interface ImageEntryState {
 	readonly entryStatus: ImageEntryStatus;
+	readonly entryPublication: ImageEntryPublication | null;
 }
 
 /** 一覧のカーソル。`after` が無ければ先頭から */
@@ -224,20 +237,32 @@ const STATUS_BY_CODE: Readonly<Record<OwnerStatusCode, OwnerStatus>> = {
 	x: "detached",
 };
 
-const ENTRY_STATUS_CODES = {
-	active: "a",
-	trashed: "t",
-	missing: "m",
-} as const satisfies Record<ImageEntryStatus, string>;
+/** 画像エントリの状態の 1 文字の表し方(公開済み `p` / 下書き `d` / 予約 `s` / ゴミ箱 `t` / 無い `m`) */
+type EntryStateCode = "p" | "d" | "s" | "t" | "m";
 
-const ENTRY_STATUS_BY_CODE: Readonly<Record<"a" | "t" | "m", ImageEntryStatus>> = {
-	a: "active",
-	t: "trashed",
-	m: "missing",
+const ENTRY_STATE_BY_CODE: Readonly<Record<EntryStateCode, ImageEntryState>> = {
+	p: { entryStatus: "active", entryPublication: "published" },
+	d: { entryStatus: "active", entryPublication: "draft" },
+	s: { entryStatus: "active", entryPublication: "scheduled" },
+	t: { entryStatus: "trashed", entryPublication: null },
+	m: { entryStatus: "missing", entryPublication: null },
 };
 
-/** カーソルの版。形を変えたら上げる(古いカーソルは `INVALID_CURSOR` になり、画面は最初から読み直す) */
-const CURSOR_VERSION = 1;
+function entryStateCode(entry: ImageEntryState): EntryStateCode {
+	if (entry.entryStatus === "trashed") return "t";
+	if (entry.entryStatus === "missing") return "m";
+	if (entry.entryPublication === "published") return "p";
+	return entry.entryPublication === "scheduled" ? "s" : "d";
+}
+
+/** `missing` の状態(読めなかった画像の既定値) */
+const MISSING_ENTRY: ImageEntryState = ENTRY_STATE_BY_CODE.m;
+
+/**
+ * カーソルの版。形を変えたら上げる(古いカーソルは `INVALID_CURSOR` になり、画面は最初から読み直す)。
+ * 2: 途中の状態に、画像エントリの公開の状態を入れた(T21-2)
+ */
+const CURSOR_VERSION = 2;
 
 /** 位置の `createdAt`。一覧は数字で始まる文字列の `createdAt` の記録だけを読む(`CREATED_AT_FLOOR`) */
 const positionCreatedAtSchema = z.string().regex(/^[0-9]/);
@@ -246,7 +271,7 @@ const wireCursorSchema = z.strictObject({
 	v: z.literal(CURSOR_VERSION),
 	/** 位置: [createdAt, id] */
 	a: z.tuple([positionCreatedAtSchema, z.string().min(1)]).optional(),
-	/** 途中の画像: [id, owners の要素の数, 調べ終えたエントリの数, 一覧に載せる参照元の状態, 残りの状態, 画像エントリの状態] */
+	/** 途中の画像: [id, owners の要素の数, 調べ終えたエントリの数, 一覧に載せる参照元の状態, 残りの状態, 画像エントリの状態と公開の状態] */
 	h: z
 		.tuple([
 			entryIdSchema,
@@ -257,7 +282,7 @@ const wireCursorSchema = z.strictObject({
 				.max(IMAGES_LIST_MAX_OWNERS)
 				.regex(/^[udx.]*$/),
 			z.enum(["", "u", "d", "x"]),
-			z.enum(["a", "t", "m"]),
+			z.enum(["p", "d", "s", "t", "m"]),
 		])
 		.optional(),
 });
@@ -274,7 +299,7 @@ export function encodeImagesListCursor(cursor: ImagesListCursor): string {
 			heavy.checkedEntries,
 			heavy.listed,
 			heavy.rest,
-			ENTRY_STATUS_CODES[heavy.entryStatus],
+			entryStateCode(heavy.entry),
 		];
 	}
 	// ASCII 以外を \uXXXX にして、btoa(Latin-1 だけを受け付ける)に渡せるようにする
@@ -317,7 +342,7 @@ export function decodeImagesListCursor(value: string | undefined): DecodeCursorR
 			checkedEntries: h[2],
 			listed: h[3],
 			rest: h[4],
-			entryStatus: ENTRY_STATUS_BY_CODE[h[5]],
+			entry: ENTRY_STATE_BY_CODE[h[5]],
 		};
 	}
 	return { ok: true, cursor };
@@ -382,6 +407,8 @@ interface ImageRow {
 	readonly entries: readonly OwnerEntryRef[];
 	/** 一覧に載せる要素の、`elements` の中の位置(先頭から `IMAGES_LIST_MAX_OWNERS` 件まで) */
 	readonly listed: readonly number[];
+	/** 参照元の全体の件数(一覧に載せる規則で数える。`listed` の件数以上) */
+	readonly ownersTotal: number;
 	/** 調べられなかった(壊れた)要素の数 */
 	readonly brokenOwners: number;
 }
@@ -431,12 +458,15 @@ function readRecordRow(id: string, data: unknown): RecordRow {
 		}
 		let listable: ImageOwner | null = null;
 		const owner = imageOwnerSchema.safeParse(element);
-		if (owner.success === true && listed.length < IMAGES_LIST_MAX_OWNERS) {
+		if (owner.success === true) {
+			// 全体の件数は、上限を超えた分も数える
 			const identity = ownerIdentity(owner.data);
 			if (!seenOwners.has(identity)) {
 				seenOwners.add(identity);
-				listable = owner.data;
-				listed.push(elements.length);
+				if (listed.length < IMAGES_LIST_MAX_OWNERS) {
+					listable = owner.data;
+					listed.push(elements.length);
+				}
 			}
 		}
 		elements.push({ entryKey, field, listable });
@@ -451,6 +481,7 @@ function readRecordRow(id: string, data: unknown): RecordRow {
 			elements,
 			entries,
 			listed,
+			ownersTotal: seenOwners.size,
 			brokenOwners,
 		},
 	};
@@ -534,7 +565,7 @@ export async function listImagesPage(
 	const items = planned.map((image) =>
 		buildItem(
 			image,
-			judged.entryStatus.get(image.id) ?? "missing",
+			judged.entries.get(image.id) ?? MISSING_ENTRY,
 			(index) => judged.statusOf(image, index),
 			indexesOf(image.elements),
 			"",
@@ -719,8 +750,7 @@ async function judgeHeavy(
 		checkedEntries: checkedBefore + batch.length,
 		listed: listedCodes.join(""),
 		rest,
-		entryStatus:
-			progress === null ? (judged.entryStatus.get(image.id) ?? "missing") : progress.entryStatus,
+		entry: progress === null ? (judged.entries.get(image.id) ?? MISSING_ENTRY) : progress.entry,
 	};
 
 	const allListedKnown = !next.listed.includes(".");
@@ -739,7 +769,7 @@ async function judgeHeavy(
 	reportBrokenOwners(deps.log, image.brokenOwners > 0 ? [image.id] : []);
 	const item = buildItem(
 		image,
-		next.entryStatus,
+		next.entry,
 		(index) => {
 			const code = next.listed[image.listed.indexOf(index)];
 			return code === "u" || code === "d" || code === "x" ? STATUS_BY_CODE[code] : "detached";
@@ -784,7 +814,8 @@ type EntryResult =
 	  };
 
 interface Judged {
-	readonly entryStatus: ReadonlyMap<string, ImageEntryStatus>;
+	/** 画像エントリの状態と公開の状態(画像 ID ごと) */
+	readonly entries: ReadonlyMap<string, ImageEntryState>;
 	statusOf(image: ImageRow, elementIndex: number): OwnerStatus;
 }
 
@@ -819,10 +850,8 @@ async function judge(
 		return collections;
 	};
 
-	const [statuses, results] = await Promise.all([
-		Promise.all(
-			statusIds.map(async (id) => [id, await readEntryStatus(deps.content, id)] as const),
-		),
+	const [states, results] = await Promise.all([
+		Promise.all(statusIds.map(async (id) => [id, await readEntryState(deps.content, id)] as const)),
 		Promise.all(
 			entries.map(
 				async (entry) =>
@@ -840,7 +869,7 @@ async function judge(
 	]);
 	const entryResults = new Map<string, EntryResult>(results);
 	return {
-		entryStatus: new Map(statuses),
+		entries: new Map(states),
 		statusOf(image, elementIndex) {
 			const element = image.elements[elementIndex];
 			const result = element === undefined ? undefined : entryResults.get(element.entryKey);
@@ -852,11 +881,26 @@ async function judge(
 	};
 }
 
-/** 画像エントリの状態。`getTrashedVersioned` は `get` が null のときだけ呼ぶ */
-async function readEntryStatus(content: JudgeContentAccess, id: string): Promise<ImageEntryStatus> {
-	if ((await content.get(IMAGE_COLLECTION, id)) !== null) return "active";
+/**
+ * 画像エントリの状態と公開の状態。`getTrashedVersioned` は `get` が null のときだけ呼ぶ。
+ * 公開の状態は `get` の `status` から決める(追加のクエリなし)。
+ */
+async function readEntryState(content: JudgeContentAccess, id: string): Promise<ImageEntryState> {
+	const item = await content.get(IMAGE_COLLECTION, id);
+	if (item !== null) {
+		return { entryStatus: "active", entryPublication: publicationOf(item.status) };
+	}
 	const trashed = await content.getTrashedVersioned(IMAGE_COLLECTION, id);
-	return trashed === null || trashed === undefined ? "missing" : "trashed";
+	return trashed === null || trashed === undefined ? MISSING_ENTRY : ENTRY_STATE_BY_CODE.t;
+}
+
+/**
+ * EmDash の `status` を公開の状態にする。0.39.1 の値は `draft` / `published` / `scheduled`
+ * (`core/src/api/schemas/content.ts`)。サイトに出るのは `published` だけ(`core/src/loader.ts` の既定の取得)なので、
+ * 知らない値は `draft`(サイトに出ない)にする。
+ */
+function publicationOf(status: unknown): ImageEntryPublication {
+	return status === "published" || status === "scheduled" ? status : "draft";
 }
 
 /** 参照元のエントリを読む。下書きは、列の値で見つからない組があるときだけ読む */
@@ -918,7 +962,7 @@ function fieldValue(data: Readonly<Record<string, unknown>>, field: string): unk
  */
 function buildItem(
 	image: ImageRow,
-	entryStatus: ImageEntryStatus,
+	entry: ImageEntryState,
 	statusOf: (elementIndex: number) => OwnerStatus,
 	aggregateIndexes: readonly number[],
 	rest: OwnerStatusCode | "",
@@ -939,9 +983,11 @@ function buildItem(
 		height: image.base.height,
 		bytes: image.base.bytes,
 		createdAt: image.base.createdAt,
-		entryStatus,
+		entryStatus: entry.entryStatus,
+		entryPublication: entry.entryPublication,
 		usage: usageOf(image, statuses),
 		owners,
+		ownersTotal: image.ownersTotal,
 	};
 }
 
