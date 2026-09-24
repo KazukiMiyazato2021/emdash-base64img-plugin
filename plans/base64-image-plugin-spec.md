@@ -463,13 +463,14 @@ flowchart LR
 
 ## 12. サイト側の描画
 
-- プラグインは `resolveBase64Images(refs)` を提供する。ページで使う参照をまとめて渡すと、画像 ID をキーにした `MediaValue` 互換の値(`src` は data URL、`alt` は参照のもの)を返す。
+- プラグインは `resolveBase64Images(refs)` を提供する。ページで使う参照をまとめて渡すと、`get(ref)` を持つ値を返す。`get(ref)` は、参照が指す画像の `MediaValue` 互換の値(`src` は data URL、`alt` はその参照のもの)を返す。
+  - ID ではなく参照を渡して引く。同じ画像を alt の違う複数の参照が指せるため(alt は参照ごとに持つ。[[#5.2 参照(投稿側フィールドの値)|5.2]])。画像は参照の `locale` と `id` で引き、ほかのロケールの結果は使わない。根拠: 推測のみ([[T15-site-resolve#結果|T15]] で決めた)
   - 中では `getEmDashCollection("b64_images", { where: { id: [...] }, locale })` を使う。IN 句は `packages/core/src/loader.ts:772`。
   - ID は 50 件ずつに分けて取得する(D1 のバインド変数は1クエリ100個まで)。1 回の呼び出しのバインド変数は「ID の数 + 7」(locale を指定したとき)なので、1 回に入る ID は 93 件まで。50 件なら余裕があり、EmDash 自身の IN 句の分割単位(`packages/core/src/utils/chunks.ts:17` の `SQL_BATCH_SIZE`)とも揃う。根拠: 実測+公式ドキュメント(D1 の上限は node:sqlite で模擬した。[[T09-spike-query-count#結果|T09]])
   - バイラインとタクソノミーは、本体のクエリに畳み込まれる(`packages/core/src/loader.ts:124`)。そのため、50 件までの 1 回の呼び出しは 1 クエリ。サイトにバイラインが 1 件でもあると、バイラインの補完のクエリが加わる。このプラグインで作った画像(authorId なし)では、リクエストあたり +1、バイラインのカスタムフィールドもあれば呼び出しごとにさらに +1 で、1 ページ(1 ロケール・50 件まで)は 1〜3 クエリ。標準の REST API や管理画面で作った画像(authorId あり)では、最悪で呼び出しごとに 4 クエリとリクエストあたり +2 になる。根拠: 実測+公式ドキュメント([[T09-spike-query-count#結果|T09]]、[[emdash-query-count-b64-images]])
 - 描画は `emdash/ui` の `Image` を使う。data URL は responsive 変換の対象外なので、`<img src="data:…" width height loading="lazy" decoding="async">` がそのまま出力される(`packages/core/src/components/EmDashImage.astro`、`packages/core/src/media/responsive.ts:127`)。
 - LCP の対象になる画像には `priority` を付ける。
-- 画像が見つからないときは何も描画せず、警告ログを出す。
+- 画像が見つからないとき(ゴミ箱に入った・削除された)、値が不正なとき(seed や手での書き換え)、取得に失敗したときは、`get` が `undefined` を返し、警告ログを出す。例外は投げない(画像のためにページの描画を止めない)。
 - 一覧ページ(カード表示)でもメイン画像を使う(Q12 は (a) を選択)。表示中のエントリの参照をまとめて1回で解決する。10件並べると HTML は最大約 1MB になる。
 
 ```astro
@@ -484,7 +485,7 @@ const images = await resolveBase64Images(refs);
 ---
 {entries.map((entry, i) => {
 	const ref = entry.data.cover;
-	const image = isBase64ImageRef(ref) ? images.get(ref.id) : undefined;
+	const image = isBase64ImageRef(ref) ? images.get(ref) : undefined;
 	return image && <Image image={image} priority={i === 0} />;
 })}
 ```
@@ -689,6 +690,7 @@ export default defineConfig({
 | Q13 | 配布 | npm には公開しない。git 依存で配布する | 利用者の選択 |
 | Q14 | 構成とテスト | [[#15. リポジトリ構成・ツール・テスト]] のとおり | — |
 | — | 対象の EmDash の版(2026-09-24) | 0.39.1(peer は `^0.39.0`)。公開から 3 日未満だったので、`~/.npmrc` の `min-release-age` の例外として入れた | npm の 0.38.0 には必要な capability が無い(実測)。0.39.x にはある(公式ドキュメントのみ)。利用者の選択([[T01-2-emdash-0-39\|T01-2]]) |
+| — | サイト側の API の形(2026-09-24) | `resolveBase64Images(refs)` の結果から、参照を渡して `get(ref)` で引く(ID では引かない) | alt は参照ごとに持つので、ID だけでは alt が決まらない([[T15-site-resolve\|T15]]) |
 
 ---
 
