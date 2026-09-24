@@ -47,6 +47,10 @@ created: 2026-09-23
 - [ ] 「差し替え」「削除」などの文字は、自分の辞書(`defineMessages`)に持つ。部品は持たない。「差し替え」は `FileSelectButton`、削除は Kumo の `Button`(`secondary-destructive`)
 - [ ] 空のときの `ImageDropZone` は `multiple` なし。複数のファイルがドロップ・貼り付けされたら、部品が「画像は 1 枚ずつ追加してください。」と出して `onFiles` を呼ばない(仕様書 11.2)。形式は部品では確かめないので、`onFiles` のファイルを T23 のフックに渡す
 - [ ] 見た目のクラスは、管理画面の CSS にあるものだけを使う(管理画面の CSS はビルド済みで、プラグインのファイルを読まない)。無いクラスと枠の色は style で書く。テストでは `tests/admin/admin-css.ts` の `findMissingClasses(container, sourceTokens("<自分のソース>"))` で、使うクラスが CSS にあることを確かめる([[T22-1-admin-css-test-helper|T22-1]]、[[emdash-admin-plugin-ui-styling]])
+- [ ] アップロードの応答の `ref`(`{ v, id, locale, width, height, alt: "" }`)は、そのままフィールドの値にする。`ref.locale` は画像エントリのロケール(サイトの既定)で、編集中のエントリのロケールではないので書き換えない。代替テキストは、入力欄の値を `alt` に入れる([[T18-upload-route#T23 が使う応答|T18]])
+- [ ] アップロードのエラーは、T14 の `useErrorMessage` でコードごとの文言を出す。`UPLOAD_FAILED`(500)は、作った画像エントリをルートがゴミ箱に移したあとのエラー、`IMAGE_ENTRY_INVALID`(400)は保存 hook が作成を拒否したもの。どちらもフィールドの値は変えない
+- [ ] 処理と状態は `src/admin/hooks/` のフックを使う([[T23-upload-hook#T27・T28 が使うもの|T23 の表]]、[[T23-upload-hook#使い方の例|使い方の例]])。保存先は `useUploadTarget(id)`(props の `id` を渡す)の結果をそのまま `target` に渡す。フックは表示を持たないので、段階(`state.status`)を T22 の `UploadProgress` の `stage` にそのまま渡す。単一画像は `useImageUpload({ target, options })`。`upload(file)` は reject せず、結果が `done` のときだけ `onChange` する(`error` は `state` に残り、`cancelled` は何もしない)
+- [ ] 保存済みの画像は `usePreviewImages(ids)` で取得する(10 件ずつ並行。状態は `loading` / `loaded` / `missing` / `error`。`missing` は「画像が見つかりません」、`error` は `retry()`)。追加したばかりの画像は `prime(ref.id, entry)` で手元の data URL を表示し、取得しない
 
 ## 完了条件
 

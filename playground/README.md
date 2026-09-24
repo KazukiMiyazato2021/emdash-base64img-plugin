@@ -16,7 +16,9 @@ updated: 2026-09-24
 > [!summary] 概要
 > - プラグイン「base64-image」を動かして確かめるための EmDash サイト。Astro + `@astrojs/node` + SQLite で、`storage` は指定しない。
 > - プラグインは `file:..` でリポジトリのルートを参照する。配布物には含めない。
-> - 関連: [[T02-playground]]、[[base64-image-plugin-spec#13.1 seed|仕様書 13.1]]、[[emdash-playground-site-config]]、[[emdash-seed-and-b64-images]]、[[astro-dev-background-for-agents]]、[[vite-watch-scope-playground]]
+> - サイト側のページは、投稿の一覧(`/posts/`)と詳細(`/posts/<slug か ID>/`)。画像は `resolveBase64Images` でまとめて解決する([[#ページ]])。
+> - 表示用の画像は、アップロードのルートで作る(seed には画像と投稿を入れていない)。サンプルの投稿を作るスクリプトがある([[#表示用のデータの作り方]])。
+> - 関連: [[T02-playground]]、[[T26-playground-pages]]、[[base64-image-plugin-spec#13.1 seed|仕様書 13.1]]、[[emdash-playground-site-config]]、[[emdash-seed-and-b64-images]]、[[astro-dev-background-for-agents]]、[[vite-watch-scope-playground]]、[[playground-site-pages]]
 
 コマンドは、すべてリポジトリのルートで実行する。
 
@@ -57,6 +59,7 @@ http://localhost:4402/_emdash/api/setup/dev-bypass?redirect=/_emdash/admin
 - 開発サーバーのときだけ使える(`npm run preview` では 403)。
 - 初めてのときは、マイグレーション・seed の適用・管理者の作成もまとめて行う。「Welcome to EmDash, Dev!」のダイアログが出たら「Get Started」で閉じる。
 - ログインのセッションは `playground/node_modules/.astro/sessions` に保存される。データベースを消したあとは、もう一度この URL を開く。
+- この URL は、開くたびに seed を適用し直す。seed にあるコレクションを管理画面で消すと、`COLLECTION_EXISTS` で 500 になる(EmDash 0.39.1 の動き)。seed からそのコレクションを外して起動し直すか、先にログインした cookie を使い回す([[image-management-routes]])。
 
 ## seed
 
@@ -66,6 +69,64 @@ http://localhost:4402/_emdash/api/setup/dev-bypass?redirect=/_emdash/admin
 - 適用されるのは、データベースが空のときの最初のリクエストと、開発用ログインのとき。**すでにあるコレクションは変更されない。**
 - seed を変えたら、サーバーを止め、データベースを消してから起動し直す(動いているサーバーは seed の変更を読み直さない)。
 - プラグインの widget ができるまでは、`cover` と `gallery` は JSON の入力欄で表示される。参照を JSON で直接入力できる([[emdash-seed-and-b64-images#widget が見つからないフィールドの表示]])。
+- **seed には `b64_images` の画像も、それを参照する投稿も入れない。** seed で作った画像は `imageRefs` に記録が無く、プラグインの保存 hook が登録されると、それを参照する投稿は管理画面で保存できなくなる(タイトルだけを変えても拒否される)。画像管理ページにも出ず、一覧のサムネイルも出ない([[T16-reference-hook#seed の画像の扱い|T16]])。画像は、次のアップロードのルートで作る。
+
+## ページ
+
+| URL | 内容 |
+|---|---|
+| `/` | トップ(ページと管理画面へのリンク) |
+| `/posts/` | 公開した投稿の一覧(カード、10 件ずつ、新しく公開した順)。`?cursor=` で次のページ |
+| `/posts/<slug か ID>/` | 投稿の詳細(カバーとギャラリー、画像ごとに代替テキスト)。見つからなければ 404 |
+
+- 画像は、ページで使う参照を集め、`resolveBase64Images` を 1 回だけ呼んで解決する(一覧はカバー、詳細はカバーとギャラリー)。描画は `emdash/ui` の `Image` で、`<img src="data:image/webp;base64,…" width height>` が出る([[base64-image-plugin-spec#12. サイト側の描画|仕様書 12 章]])。
+- LCP の対象の画像に `priority` を付ける(`loading="eager"` と `fetchpriority="high"`。ほかは `loading="lazy"`)。一覧は描画できる最初のカバー、詳細はカバー(カバーの無い投稿では、描画できる最初のギャラリーの画像)。
+- 画像が見つからない(ゴミ箱に入った・削除された)ときは、参照の寸法で場所を取った「画像が見つかりません」の枠を出す。サーバーのログに `[base64-image] … not found …` の警告が出る。
+- E2E で探せるよう、次の属性を付けている。
+
+| 要素 | 属性 |
+|---|---|
+| 一覧のカード(`li`) | `data-testid="post-card"`、`data-post-id`(エントリ ID) |
+| 詳細の本文(`article`) | `data-testid="post"`、`data-post-id` |
+| 画像(`img`) | `data-field`(`cover` / `gallery`)、`data-image-id`(画像 ID) |
+| 見つからない画像の枠 | `data-testid="image-missing"`、`data-field`、`data-image-id` |
+| 投稿が無いとき(一覧) | `data-testid="no-posts"` |
+
+- 共通の部品は `playground/src/pages/_components/`(`_` から始まるので、ルートにならない)にある。
+
+## 表示用のデータの作り方
+
+アップロードのルート(`POST /_emdash/api/plugins/base64-image/upload`)で画像を作る。ルートは画像エントリを公開し、`imageRefs` に記録するので、その画像を参照する投稿は管理画面でも保存できる。
+
+> [!warning] アップロードのルートは、プラグインの定義(`src/index.ts`、[[T29-plugin-definition|T29]])が登録する
+> 登録されるまでは 404 になり、下のスクリプトも管理画面の widget も使えない。T26 では、ルートと hook を一時的に登録した使い捨てのサイトで、スクリプトとページを確かめた([[playground-site-pages#再現手順]])。
+
+### スクリプト(サンプルの投稿をまとめて作る)
+
+```sh
+npm run dev -w playground -- --port 4402                                  # 先に起動する
+node playground/scripts/create-sample-posts.ts --base http://localhost:4402  # 3 件(ギャラリー 3 枚ずつ)
+node playground/scripts/create-sample-posts.ts --base http://localhost:4402 --posts 11 --gallery 10 --trash-cover
+```
+
+| オプション | 既定 | 内容 |
+|---|---|---|
+| `--base` | `http://localhost:4321` | 開発サーバーの URL |
+| `--posts` | 3 | 作る投稿の数。11 件以上で、一覧に次のページができる |
+| `--gallery` | 3 | 1 件のギャラリーの枚数(`gallery` の `maxItems` は 10)。横長(800×600)と縦長(600×800)を交互に作り、最後の 1 枚は代替テキストを空にする |
+| `--trash-cover` | なし | 最後の投稿のカバー画像をゴミ箱に移す(サイトで「画像が見つかりません」の枠を確かめる) |
+
+- 開発用ログインで Cookie を得て、画像を Playwright の Chromium の canvas で描き(WebP、カバーは 1280×853)、アップロードのルートに 1 枚ずつ送る。そのあと標準の REST API で投稿を作って公開する。
+- 開発用ログインを使うので、開発サーバー(`astro dev`)でだけ動く。タイトルと slug には実行した時刻が入るので、何度実行しても重ならない。
+- `npm run typecheck` の対象外(Node が型の注釈を取り除いて実行する)。
+
+### 管理画面から作る
+
+widget([[T27-image-widget|T27]]・[[T28-gallery-widget|T28]]、組み立ては [[T30-admin-entry|T30]])ができたあとは、投稿の編集画面の Cover / Gallery から画像を選ぶと、同じルートでアップロードされる。投稿を公開すると、サイトのページに出る。
+
+### E2E の入力画像
+
+管理画面のファイル選択に渡す画像(形式ごとの画像・大きすぎる画像・壊れた画像)は `e2e/fixtures/make-images.ts` で作る。一覧と、実ブラウザで確かめた結果は [[e2e/fixtures/README|e2e/fixtures/README.md]]。
 
 ## データベースの消し方
 

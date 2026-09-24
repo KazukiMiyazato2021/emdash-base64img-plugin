@@ -1,0 +1,2 @@
+# make-images.ts が作る E2E 用の画像(40MB を超えるファイルを含む。数秒で作り直せる)
+images/

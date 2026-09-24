@@ -243,6 +243,9 @@ playground の複製(`astro dev`、SQLite)で、応答の `Server-Timing` の `d
 | [[T20-owner-tracking\|T20]] | 最初の参照元は T20 と同じ形で、重複しなかった([[#参照元の記録(T20)との関係]]) |
 | [[T32-cloudflare-check\|T32]] | D1 でのクエリ数(SQLite の `begin` / `commit` 4 本は出ない見込み)、アップロード全体の CPU 時間、workerd での `getI18nConfig()` |
 
+> [!note] 反映済み(リーダー)
+> 実行中の [[T23-upload-hook|T23]] と [[T21-orphan-routes|T21]] には、メッセージで伝えた。[[T25-images-page|T25]]・[[T27-image-widget|T27]]・[[T28-gallery-widget|T28]]・[[T29-plugin-definition|T29]]・[[T32-cloudflare-check|T32]] のノートと仕様書 19 章には、[[T18-1-handoff-upload-route|T18-1]] で書いた。T14 の `INVALID_TARGET` の文言は、[[T18-2-invalid-target-message|T18-2]] で、エントリの言語がサイトに無いときにも合うように直した。
+
 ### 未解決
 
 1. `imageRefs` の保存で失敗したとき、または作成と `imageRefs` の間で処理が止まったときに残るエントリは、画像管理ページから扱えない。起きるのは、データベースの失敗か処理の中断のときだけ。拾うなら、仕様書 19 章の「既存の `b64_images` を `imageRefs` に登録する機能」が要る(サブタスクの候補)。
