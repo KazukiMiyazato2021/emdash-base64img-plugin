@@ -79,7 +79,7 @@ const CSRF_HEADER = "X-EmDash-Request";
 
 /** 各関数の options */
 export interface RequestOptions {
-	readonly signal?: AbortSignal;
+	readonly signal?: AbortSignal | undefined;
 }
 
 /** 標準の完全削除 API の応答の `data`(`references/emdash/packages/core/src/api/handlers/content.ts:1505-1508`) */
@@ -248,7 +248,7 @@ async function callInChunks<Item>(
 /** 送る前に入力を確かめる。合わなければ送らずに `VALIDATION_ERROR` */
 function validateRequest<S extends z.ZodType>(schema: S, input: unknown): z.output<S> {
 	const parsed = schema.safeParse(input);
-	if (!parsed.success) {
+	if (parsed.success === false) {
 		throw new Base64ImageError("VALIDATION_ERROR", "Request does not match the input schema", {
 			cause: parsed.error,
 		});
@@ -270,15 +270,13 @@ async function requestJson<S extends z.ZodType>(
 	let response: Response;
 	let text: string;
 	try {
+		// body と signal は、あるときだけ入れる(`RequestInit` の省略できるプロパティに `undefined` を入れない。
+		// 利用者の設定で exactOptionalPropertyTypes が有効でも型が通るように。T04-1)。
+		const init: RequestInit = { method, headers, credentials: "same-origin", redirect: "manual" };
+		if (body !== undefined) init.body = JSON.stringify(body);
+		if (signal !== undefined) init.signal = signal;
 		// `fetch` は呼ぶときに読む(テストで `globalThis.fetch` を差し替えられるように)。
-		response = await globalThis.fetch(url, {
-			method,
-			headers,
-			body: body === undefined ? undefined : JSON.stringify(body),
-			credentials: "same-origin",
-			redirect: "manual",
-			signal,
-		});
+		response = await globalThis.fetch(url, init);
 		text = await response.text();
 	} catch (error) {
 		signal?.throwIfAborted();
@@ -297,15 +295,19 @@ async function requestJson<S extends z.ZodType>(
 	if (!response.ok) throw errorFromResponse(url, status, json);
 
 	// 包み(`{ success: true, data }`)と `data` の形を順に確かめる。
+	// `=== false` で比べる(利用者の設定で strictNullChecks が無効でも絞り込まれるように。T04-1)。
 	const envelope = successEnvelopeSchema.safeParse(json);
-	const parsed = envelope.success ? dataSchema.safeParse(envelope.data.data) : envelope;
-	if (!parsed.success) {
-		throw new Base64ImageError("UNEXPECTED_RESPONSE", `Unexpected response from ${url}`, {
-			details: { status },
-			cause: parsed.error,
-		});
-	}
+	if (envelope.success === false) throw unexpectedResponse(url, status, envelope.error);
+	const parsed = dataSchema.safeParse(envelope.data.data);
+	if (parsed.success === false) throw unexpectedResponse(url, status, parsed.error);
 	return parsed.data;
+}
+
+function unexpectedResponse(url: string, status: number, cause: z.ZodError): Base64ImageError {
+	return new Base64ImageError("UNEXPECTED_RESPONSE", `Unexpected response from ${url}`, {
+		details: { status },
+		cause,
+	});
 }
 
 function parseJson(text: string): unknown {

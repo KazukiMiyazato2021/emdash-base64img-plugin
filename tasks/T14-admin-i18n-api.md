@@ -136,6 +136,14 @@ await deleteImagePermanently(id); // T25。管理者のみ。ゴミ箱に入っ�
 
 - 11.1: 言語を変えると再読み込みせずに `<html lang>` が変わり、部品が `useLocale()` で追随することを 1 行加えた(決定 2)。
 
+### マージ前の修正(リーダー)
+
+チームメイトの分岐元(`7d6825b`)のあとで、`phase/2` に [[T04-1-consumer-typecheck|T04-1]](利用者のサイトの設定の代わりの型チェック)が入った。`phase/2` を取り込むと、`src/client/api.ts` が 3 件のエラーになったので、リーダーが直した。根拠: **実測のみ**
+
+- 緩い設定(`strict: false`): 包みと `data` の検証の結果を 1 つの変数にまとめていたため、`!parsed.success` で絞り込まれなかった → 包みと `data` を順に `=== false` で判別する形にした
+- 厳しい設定(`exactOptionalPropertyTypes`): `RequestOptions` の `signal` に `undefined` を渡せなかった → `signal?: AbortSignal | undefined` にした。`fetch` の `RequestInit` に `body: undefined` / `signal: undefined` を入れていた → 値があるときだけ入れる形にした(送る内容は同じ)
+- 直したあと、3 つの設定の型チェックと、`tests/client/api.test.ts` の 157 件が通った。
+
 ### 後続タスク・未解決
 
 1. `fetchPreviews` は 1 回 10 件なので、20 枚のギャラリーは 2 回に分かれる(並行)。仕様書 11.2 の「まとめて1回で取得する」とずれる。件数は [[T17-admin-data-routes|T17]] がクエリ数を実測して決める([[T03-shared-contracts#未解決・サブタスクの候補|T03 の未解決 3]])。仕様書 11.2 は、T17 の結果とあわせて直すのがよい。
