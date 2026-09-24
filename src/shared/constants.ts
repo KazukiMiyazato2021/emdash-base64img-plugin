@@ -155,7 +155,9 @@ export const ROUTE_PERMISSIONS = {
 
 /**
  * 1 回のプレビュー取得で送る画像 ID の上限。超える分は分けて送る。
- * `ctx.content.get` は 1 件につき 2 クエリなので、D1 の 1 リクエスト 50 クエリに余裕を残す。
+ * 1 件は最大 500,000 バイトの data URL なので、10 件で応答は最大約 5MB、JS の処理は Node で約 3.5〜5.6ms。
+ * 20 件にすると約 7〜10.5ms で、Workers Free の CPU 時間(10ms)に届く。クエリは「1 + 2 × 件数」で、
+ * 上限(1 呼び出し 1,000)より十分小さい(T17。docs/emdash-plugin-preview-thumbnail-routes.md)。
  */
 export const PREVIEW_MAX_IDS = 10;
 
