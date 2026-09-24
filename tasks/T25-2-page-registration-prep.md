@@ -173,3 +173,6 @@ export const pages = { [IMAGES_PAGE.path]: ImagesPage };
 - **`docs/00-index.md`**: [[emdash-admin-plugin-pages]] に「ページから一覧の列の覚え書きを消す」の節を足した。索引の説明に足すかは、リーダーが決める。
 - `tests/admin/ImagesPage.test.tsx` は、`@emdash-cms/blocks/server`(`emdash` と `@emdash-cms/admin` の依存。このプラグインの package.json には無い)を直接読み込むようにした。T25 の `@tanstack/react-query`・`@lingui/core` と同じく、npm の巻き上げが変わって読めなくなったら、devDependencies に入れる(package.json の変更)。
 - 完全削除の直後に一覧を開くと、hook が終わる前に古いサムネイルを覚えることがありうる(推測のみ。[[#実際の管理画面で確かめたこと]])。起きても 1 分で取り直す。
+
+> [!note] 反映済み(リーダー、マージのとき)
+> 仕様書 11.5 の完全削除に、一覧の列の覚え書きを消してマニフェストを読み直すことを書いた。索引に登録し、知見ノートの索引の説明にも足した。T29・T30 のノートへの `IMAGES_PAGE` の反映は、T25 の引き継ぎのサブタスク T25-1 で行う。`forgetThumbnails(ids)` の提案(完全削除 1 回ごとのマニフェストの要求を減らす)は、要求が 1 回増えるだけなので、今は行わない。
