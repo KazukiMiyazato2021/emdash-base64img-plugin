@@ -1,0 +1,95 @@
+---
+/**
+ * 投稿の一覧(カード表示。仕様書 12 章)。
+ *
+ * - 1 ページに 10 件。新しく公開した順に並べ、`?cursor=` で次のページへ進む。
+ * - カードにはカバー画像(メイン画像)を使う(Q12 の (a))。表示するエントリのカバーの参照を集め、
+ *   `resolveBase64Images` を 1 回だけ呼んでまとめて解決する。
+ * - 最初のカードの画像を LCP の対象として `priority` にする(画像が見つからなければ、描画できる次の画像)。
+ */
+
+import { getEmDashCollection } from "emdash";
+import { isBase64ImageRef, resolveBase64Images } from "emdash-plugin-base64-image/astro";
+
+import Layout from "../_components/Layout.astro";
+import PostImage from "../_components/PostImage.astro";
+
+const PAGE_SIZE = 10;
+
+const cursor = Astro.url.searchParams.get("cursor") ?? undefined;
+const { entries, nextCursor, error } = await getEmDashCollection("posts", {
+	limit: PAGE_SIZE,
+	cursor,
+	orderBy: { published_at: "desc" },
+});
+
+// json フィールドの値はサイトの型では unknown なので、参照の形のものだけを集める
+const coverRefs = entries.map((entry) => entry.data.cover).filter(isBase64ImageRef);
+const images = await resolveBase64Images(coverRefs);
+// LCP の対象: 描画できる最初のカバー(1 件目の画像が見つからないときは、次のカードの画像)
+const lcpRef = coverRefs.find((ref) => images.get(ref) !== undefined);
+---
+
+<Layout title="投稿の一覧">
+	<h1>投稿の一覧</h1>
+	{error && <p role="alert">投稿を読み込めませんでした。</p>}
+	{entries.length === 0 && !error && <p data-testid="no-posts">公開された投稿はありません。</p>}
+	<ul class="cards">
+		{
+			entries.map((entry) => {
+				const cover = entry.data.cover;
+				return (
+					<li class="card" data-testid="post-card" data-post-id={entry.data.id}>
+						<a href={`/posts/${encodeURIComponent(entry.id)}/`}>
+							{isBase64ImageRef(cover) ? (
+								<PostImage imageRef={cover} images={images} field="cover" priority={cover === lcpRef} />
+							) : (
+								<div class="no-cover">カバー画像なし</div>
+							)}
+							<span class="card-title">{entry.data.title}</span>
+						</a>
+					</li>
+				);
+			})
+		}
+	</ul>
+	{
+		nextCursor && (
+			<p>
+				<a href={`/posts/?cursor=${encodeURIComponent(nextCursor)}`} rel="next">
+					次のページ
+				</a>
+			</p>
+		)
+	}
+</Layout>
+
+<style>
+	.cards {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+		gap: 1.5rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.card a {
+		display: block;
+		color: inherit;
+		text-decoration: none;
+	}
+	.card-title {
+		display: block;
+		margin-top: 0.5rem;
+		font-weight: 600;
+	}
+	.no-cover {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		aspect-ratio: 3 / 2;
+		background: #f6f8fa;
+		color: #57606a;
+		font-size: 0.875rem;
+	}
+</style>

@@ -1,0 +1,9 @@
+# EmDash が playground の中に作るもの。
+# data.db・dist/・.astro/・node_modules/ は、ルートの .gitignore で除外している。
+
+# astro dev の起動時に、データベースのスキーマから生成される型定義
+emdash-env.d.ts
+
+# astro build が書き出すマイグレーションのマニフェスト(migrations.json)と、
+# storage を省略したときに使われる local storage の保存先(uploads/)
+.emdash/
