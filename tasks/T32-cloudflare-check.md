@@ -45,7 +45,7 @@ Node + SQLite だけでなく、workerd + D1 でも動くことを確かめる�
 - [x] workerd でも、プラグインのルートの body の上限(`maxBytes`)とエラー(413 `INVALID_PLUGIN_REQUEST`・400 `VALIDATION_ERROR`)が Node と同じになるかを確かめる([[T08-spike-route-body#仕様書とほかのタスクへの影響|T08]]、[[T08-1-spec-route-body|T08-1]])
 - [x] D1 で、参照元の記録の hook のクエリ数(0 / 3 / 新しい参照元 1 枚につき +2)と、並行公開・同時作成で参照元が消えないことを確かめる([[T20-owner-tracking|T20]]、[[emdash-plugin-storage-conditional-writes]])
 - [x] workerd でも、保存 hook の拒否が 422 `SAVE_REJECTED` と `message` になることを確かめる([[T16-reference-hook|T16]]・[[T19-image-entry-hook|T19]])
-- [ ] 任意: 利用者のアカウントの Workers Free にデプロイし、CPU 時間とクエリ数を測る(手動。利用者の了承を得てから行う)。**未実施(利用者の了承待ち)。** 手順の案は [[#デプロイして測る(任意・利用者の了承待ち)]]。CPU 時間は、アップロード 1 回の全体(body の parse・検証・作成・公開)で測る(Node での検証だけの時間は 0.28ms。[[emdash-plugin-route-body-limit]])
+- [ ] 任意: 利用者のアカウントの Workers Free にデプロイし、CPU 時間とクエリ数を測る(手動。利用者の了承を得てから行う)。**未実施(2026-09-25 の利用者の判断で、今は行わない)。** 手順の案は [[#デプロイして測る(任意・利用者の了承待ち)]]。CPU 時間は、アップロード 1 回の全体(body の parse・検証・作成・公開)で測る(Node での検証だけの時間は 0.28ms。[[emdash-plugin-route-body-limit]])
   - ルートの検証全体(T11)は Node で中央値 0.40ms / 0.93ms(`fromBase64` / `atob`)。workerd には `Uint8Array.fromBase64` がある([[T07-spike-git-dependency#結果|T07]]、[[server-image-validation]])
   - `preview` 10 件 × 500,000 バイトの JS の処理は、Node で 3.5〜5.6ms([[emdash-plugin-preview-thumbnail-routes]])。Workers でも 10ms に収まるかを測る
 - [x] D1 で、アップロード 1 回のクエリ数を確かめる(SQLite では 75、i18n のサイトで 77。SQLite の `begin` / `commit` の 4 本は D1 では出ない見込み)。workerd でも `getI18nConfig()` がサイトの i18n の設定を返し、`target.locale` の確認が Node と同じになることを確かめる([[T18-upload-route#クエリ数|T18]]、[[emdash-plugin-upload-route]])
@@ -122,6 +122,9 @@ Node + SQLite だけでなく、workerd + D1 でも動くことを確かめる�
 | CPU 時間・起動時間 | 測っていない。ローカルの CPU プロファイルはローカルの D1 の処理が大半で使えず、root span の `cpu_time_ms` も 0 だった。起動時間は `wrangler deploy` の `startup_time_ms` で測る | 実測のみ |
 
 ### デプロイして測る(任意・利用者の了承待ち)
+
+> [!note] 利用者の判断(2026-09-25)
+> 今は測らない。wrangler dev のローカルの D1 の結果で進める。測るときは、下の手順の案を使う([[T34-1-publish-and-install-check|T34-1]])。
 
 T32 では行っていない(`wrangler login` をせず、Cloudflare のアカウントと API に接続しない、という指示のため)。利用者が了承したら、次の手順で測る案。
 
