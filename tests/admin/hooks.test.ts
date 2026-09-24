@@ -9,7 +9,7 @@
 // - StrictMode は `reactStrictMode: true` で掛ける(`wrapper` で包むと、初回のマウントで effect が 2 回動かない。
 //   docs/react-hook-testing-pitfalls.md)。
 
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import {
 	afterEach,
 	beforeEach,
@@ -81,6 +81,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	// 先に描画を片付ける(アンマウントの警告も数える)。下で投げると、ほかの afterEach(tests/setup/dom.ts の
+	// cleanup)が呼ばれず、描画が次のテストに残る(docs/react-effect-lint-and-vitest-hooks.md)
+	cleanup();
 	vi.useRealTimers();
 	vi.unstubAllGlobals();
 	window.history.replaceState(null, "", "/");
