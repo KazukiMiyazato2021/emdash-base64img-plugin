@@ -7,10 +7,15 @@
  * - 読み上げの領域は、処理していないときも残す。領域が先に DOM に無いと、読み上げない支援技術があるため。
  *   そのため、widget はこの部品を処理の有無にかかわらず描画しておく(`progress` が `null` のときは行を出さない)。
  * - キャンセルボタンを押したあと、行は消える。フォーカスの戻し先(ドロップゾーンのボタンなど)は widget が決める。
+ * - 処理中は、行の下に「処理が終わってから保存してください。」と出す。EmDash の編集画面は、手動の保存の応答で
+ *   フォームの値を保存した値に置き換えるので、保存の要求のあいだに処理を終えた画像が値から外れる
+ *   (docs/gallery-widget-reorder-focus.md の 4 章)。案内は読み上げの領域に入れず(段階が変わるたびに読まない)、
+ *   キャンセルボタンの説明(`aria-describedby`)にする。キーボードで処理を始めると(押したボタンが消える・無効になる)、
+ *   widget はキャンセルボタンへフォーカスを移すので、そのときに読まれる。マウスでのドロップでは読まれない(見える案内だけ)。
  */
 
 import { Button, Loader } from "@cloudflare/kumo";
-import type { Ref } from "react";
+import { useId, type Ref } from "react";
 
 import { defineMessages, useMessages } from "../../client/i18n";
 import type { CompressProgress } from "../../shared/pipeline";
@@ -60,6 +65,7 @@ const messages = defineMessages({
 		uploading: "アップロード中…",
 		position: (index: number, total: number) => `${index} / ${total} 枚目`,
 		cancel: "キャンセル",
+		saveHint: "処理が終わってから保存してください。",
 		announceDecoding: "画像を読み込んでいます。",
 		announceCompressing: "画像を圧縮しています。",
 		announceThumbnail: "サムネイルを作成しています。",
@@ -76,6 +82,7 @@ const messages = defineMessages({
 		uploading: "Uploading…",
 		position: (index, total) => `Image ${index} of ${total}`,
 		cancel: "Cancel",
+		saveHint: "Save after processing finishes.",
 		announceDecoding: "Reading the image.",
 		announceCompressing: "Compressing the image.",
 		announceThumbnail: "Creating a thumbnail.",
@@ -139,6 +146,7 @@ export function UploadProgress({
 	cancelButtonRef,
 }: UploadProgressProps) {
 	const t = useMessages(messages);
+	const hintId = useId();
 	const position = progress === null ? null : positionOf(progress);
 	return (
 		<div className="grid gap-2">
@@ -159,11 +167,23 @@ export function UploadProgress({
 					)}
 					<span className="tabular-nums">{visibleStageText(t, progress)}</span>
 					{onCancel === undefined ? null : (
-						<Button ref={cancelButtonRef} variant="secondary" size="sm" onClick={onCancel}>
+						<Button
+							ref={cancelButtonRef}
+							variant="secondary"
+							size="sm"
+							aria-describedby={hintId}
+							onClick={onCancel}
+						>
 							{t.cancel}
 						</Button>
 					)}
 				</div>
+			)}
+			{/* 処理中に保存しないよう案内する(読み上げの領域の外。キャンセルボタンの説明として読まれる) */}
+			{progress === null ? null : (
+				<p id={hintId} className="text-xs leading-4 text-kumo-subtle">
+					{t.saveHint}
+				</p>
 			)}
 		</div>
 	);

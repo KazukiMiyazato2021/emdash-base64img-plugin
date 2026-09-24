@@ -28,10 +28,10 @@ updated: 2026-09-24
 > - **React DOM 19 は、コミットの前にフォーカスのある要素を覚え、DOM を変えたあとで `focus()` し直す。** そのため、行を動かしても押した ↑↓ ボタンのフォーカスは残る。生の `insertBefore` では、両方のブラウザでフォーカスが body に戻る。根拠: 実測+公式ドキュメント
 > - フォーカスのあるボタンを `disabled` にすると、次の描画でフォーカスが外れる(両方のブラウザ)。端の ↑↓ は `aria-disabled` にして、押しても何もしない。根拠: 実測のみ
 > - 編集ロック中、つまみ(`draggable` の `div`)は `<fieldset disabled>` で無効にならない。`dragstart` を `preventDefault` して止める。根拠: 実測のみ(fieldset を disabled にして確かめた)
-> - **画像の処理中に「Save」を押すと、保存の応答でフォームの値が保存した値に戻り、保存の要求のあいだに足した画像が外れる。** 自動保存では起きない。根拠: 実測+公式ドキュメント
-> - Firefox 155 の幅 390px では、代替テキストの入力欄(T22 の `AltTextInput`)が行から 10px はみ出す。入力欄に `min-width: 0` を付けると収まった。根拠: 実測のみ
+> - **画像の処理中に「Save」を押すと、保存の応答でフォームの値が保存した値に戻り、保存の要求のあいだに足した画像が外れる。** 自動保存では起きない。根拠: 実測+公式ドキュメント。処理中は、進捗の行の下に「処理が終わってから保存してください。」と案内する([[T28-2-save-hint-alt-width|T28-2]]。案内だけで、保存は止めない)
+> - Firefox 155 の幅 390px では、代替テキストの入力欄(T22 の `AltTextInput`)が行から 10px はみ出した。T28-2 で Kumo の `Input` に `className="min-w-0"` を渡し(`className` は `<input>` に付く)、収まった。根拠: 実測+公式ドキュメント
 > - widget に共通のこと(props・編集ロック・作り直しの時期・フィールドの間隔・フォーカスの戻し方)は [[emdash-plugin-field-widget]] にある。
-> - 関連: [[T28-gallery-widget]]、[[T27-image-widget]]、[[T22-widget-parts]]、[[T23-upload-hook]]、[[emdash-admin-plugin-ui-styling]]、[[admin-image-input-browser-behavior]]、[[astro-dev-background-for-agents]]
+> - 関連: [[T28-gallery-widget]]、[[T28-2-save-hint-alt-width]]、[[T27-image-widget]]、[[T22-widget-parts]]、[[T23-upload-hook]]、[[emdash-admin-plugin-ui-styling]]、[[admin-image-input-browser-behavior]]、[[astro-dev-background-for-agents]]
 
 ## 1. 並べ替えのドラッグ(HTML の Drag and Drop)
 
@@ -121,12 +121,52 @@ const handleListDragOver = (event: DragEvent<HTMLDivElement>) => {
 - 応答が速ければ(ふつうは数十〜数百 ms)外れにくいが、大きい画像や遅い回線では 1 枚ほど外れうる。widget は、外から値が変わったと区別できない(復元などと同じ)ので、新しい値の後ろに次の画像を足す。
 - 新規作成の最初の保存では、widget が作り直されて処理が止まる([[emdash-plugin-field-widget#3. 新規作成を保存すると widget は作り直される]])。
 
+### 処理中の案内(T28-2)
+
+- 処理中は、T22 の `UploadProgress` が進捗の行の下に「処理が終わってから保存してください。」(英語は「Save after processing finishes.」)と出す。部品に足したので、単一画像とギャラリーの両方に出る。処理していないときは描画しない。案内だけで、保存は止めない。
+- 案内は `aria-live` の領域の外に置き、キャンセルボタンの `aria-describedby` にした。
+  - 領域に入れると、段階が変わるたびに(1 枚につき 4 回)案内も読み上げられる。
+  - ドロップゾーンのボタンから処理を始める(Enter でファイルを選ぶ・貼り付け)と、ボタンが消える・無効になるので、widget はフォーカスをキャンセルボタンへ移す([[emdash-plugin-field-widget]])。そのとき、ボタンの名前のあとに説明として読まれる。
+  - マウスでドロップしたとき(widget にフォーカスが無い)は、フォーカスを動かさないので読まれない。見える案内だけになる。
+- 見た目は 12px・行の高さ 16px・`text-kumo-subtle`。進捗の行との間は 8px(`UploadProgress` の `grid gap-2`)。
+
+| 確かめたこと(T28-2) | Chromium 153 | Firefox 155 |
+|---|---|---|
+| 単一画像(Cover)の処理中に、進捗の行の下に出る | 出た | 出た |
+| ギャラリーの処理中に出る(1 枚目を足したあと、2 枚目の処理中も) | 出た | 出た |
+| 処理していない widget には出ない / 処理が終わると消える | 出ない / 消えた | 出ない / 消えた |
+| 読み上げの領域の文に入らない(`output` の変化をすべて記録した) | 入らない | 入らない |
+| キャンセルボタンの `aria-describedby` が案内を指す | 指す | 指す |
+| 支援技術のツリーでのキャンセルボタンの説明 | 「Save after processing finishes.」 | 読む手段が無く、確かめていない |
+| キーボードで処理を始めたときのフォーカス | キャンセルボタン | キャンセルボタン |
+| フィールドの間隔(画像なし・単一画像の処理中・ギャラリーの処理中・画像あり) | どれも 24px、widget の下の余白は 0 | 同じ |
+| 処理中に「Save」を押したとき(上の確かめ方) | 4 枚 → 1 枚 | 4 枚 → 2 枚 |
+
+- 根拠: 実測のみ。Chromium の説明は CDP の `Accessibility.getPartialAXTree` で読んだ。スクリーンリーダーでは確かめていない。アップロードの要求を `page.route` で 3 秒遅らせて、処理中の表示を測った。spike の管理画面の入口には、単一画像の widget も登録した(`export const fields = { image: ImageField, gallery: GalleryField }`)。
+- 案内を出しても、押せば画像は外れる(最後の行。T28 と同じ数)。外れた画像を知らせて足し直す案は行っていない。
+
 ## 5. 狭い画面での代替テキストの入力欄(Firefox)
 
 - 行は「つまみ+縮小画像(96px)」と「見出し・代替テキスト・ボタン」の横並び。幅 390px の管理画面で、右の列は 196px になる。
 - Firefox 155 では、代替テキストの入力欄とラベル・説明が 215px になり、行から 10px はみ出した。Kumo の `Input` はラベル付きのとき `grid gap-2`(`auto` の列)で包まれ、その列の最小幅が入力欄の既定の幅(Firefox で約 215px)になるため。Chromium 153 でははみ出さなかった。根拠: 実測のみ
 - 右の列に `grid-cols-1`(`minmax(0, 1fr)`)を付けても直らなかった。ページに `input { min-width: 0 }` を入れると、Firefox でもはみ出さなくなった(Kumo の包みの列も縮んだ)。根拠: 実測のみ
-- 直すなら T22 の `AltTextInput` で、`Input` に `className="min-w-0"` を渡す(推測のみ。`className` が `input` に付くかは確かめていない)。ページ全体の横スクロールは出ない(0px)。
+- T28 の時点の案は、T22 の `AltTextInput` で `Input` に `className="min-w-0"` を渡すこと(下の T28-2 で行った)。ページ全体の横スクロールは出ない(0px)。
+
+### T28-2 で直した結果
+
+- T22 の `AltTextInput` で、Kumo の `Input` に `className="min-w-0"` を渡した。Kumo 2.6.0 の `Input` は、`className` を `<input>`(Base UI の Input)に付け、ラベル・説明を包む Field(`grid gap-2`)には付けない(`node_modules/@cloudflare/kumo/dist/chunks/input-f2ct7obgdzypjmp2.js:96-101`、包みは `field-f1hy08um3jf9jos6.js:18`)。根拠: 実測+公式ドキュメント(jsdom のテストと、両方のブラウザで `<input>` の計算値の `min-width` が `0px`)
+- `.min-w-0{min-width:0}` は管理画面の CSS にある(部品のテストの「管理画面の CSS」で確かめている)。
+
+| 幅 390px(T28-2) | Chromium 153 | Firefox 155 |
+|---|---|---|
+| ギャラリーの行の入力欄 | 196px。行の右端から 9px 内側 | 196px。同じ |
+| 単一画像の入力欄 | 342px(fieldset の幅いっぱい) | 342px |
+| widget からはみ出す要素・ページの横スクロール | 0・0px | 0・0px |
+| 対照: 入力欄を `min-width: auto` に戻す | はみ出さない(196px のまま) | 行の入力欄が 214.7px になり、9.7px はみ出す(要素 14 個) |
+| 幅 1280px | 行 458px・単一画像 604px(列の幅いっぱい) | 同じ |
+
+- 単一画像は 390px でも列が 342px あり、`min-w-0` が無くてもはみ出さない。同じ部品なので、付けたままにした(狭い列に置いたときに備える)。根拠: 実測のみ
+- 6. の確認のうち Firefox 155 で通らなかった「390px で widget が横にはみ出さない」は、T28-2 のあと通った(6. の全項目を両方のブラウザで実行し、すべて通った)。根拠: 実測のみ
 
 ## 6. 実際の管理画面での確認の結果
 
