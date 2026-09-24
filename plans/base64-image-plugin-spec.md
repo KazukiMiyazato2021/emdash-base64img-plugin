@@ -694,6 +694,7 @@ export default defineConfig({
 | ページの重さ | 画像は HTML にインラインで埋め込まれる。一覧ページ10件で最大約 1MB、カバー1枚+ギャラリー10枚のページで約 1.1MB。圧縮すれば転送量はほぼ WebP 本体の合計まで下がる見込み(推測のみ) |
 | 標準画面 | `b64_images` の標準の一覧画面・ゴミ箱画面は重い(1ページ100件 × 約 100KB)。標準の編集画面からは保存も公開もできない(保存 hook が `image` を送る更新を拒否する)。非公開にしたものは、標準の API の `POST …/publish` で公開し直す([[#10. 画像のライフサイクル\|10 章]]) |
 | スコープ外 | 本文中の画像と OGP 画像には対応しない |
+| 参照元の記録の同時書き込み | 同じ画像を参照するエントリを同時に保存・公開すると、参照元の記録の書き込みが重なる。版を確かめて書く(`compareAndSet`、最大 8 回)ので消えないが、8 回で書けなかった参照元は、そのエントリを次に保存・公開するまで記録されない。D1 での起きやすさは [[T32-cloudflare-check\|T32]] で確かめる([[#9. 参照元の記録と未使用画像の検出\|9 章]]) |
 | git 依存(npm 12) | 利用者のサイトの `.npmrc` に `allow-git=root` が要る([[npm12-git-dependency-policy]]) |
 | 利用者の型チェック | 利用者のサイトの `tsc` は、TS ソースのまま配布する `src` を利用者の設定で検査する。このリポジトリでは、緩い設定と厳しい設定の代わりの tsconfig で確かめている([[T04-1-consumer-typecheck\|T04-1]])。TypeScript 5.x の実物での確認は、T07 の時点のコードだけ |
 | マイグレーションのコマンド | `emdash migrate --from-config` は、Node が `node_modules` の中の `.ts` を読めないので失敗する。既定の `emdash migrate`(build のマニフェストを使う)は使える。EmDash は `--from-config` をローカルの調査用としている([[git-dependency-ts-source]]) |
@@ -835,6 +836,10 @@ export default defineConfig({
 | `packages/core/src/emdash-runtime.ts:2151` | プラグインの `ctx.content.create` は、保存 hook の拒否を通常の `Error`(`code: "SAVE_REJECTED"`)にする |
 | `packages/core/src/emdash-runtime.ts:3632` | `supports` に `revisions` の無いコレクションの更新は、公開中の値を書き換える |
 | `packages/core/src/astro/middleware/auth.ts:270` | MCP は Bearer のトークンでしか呼べない |
+| `packages/core/src/database/repositories/plugin-storage.ts:174` | プラグインストレージの条件付きの書き込み(`getVersioned` / `compareAndSet`) |
+| `packages/core/src/database/migrations/077_plugin_storage_revisions.ts` | プラグインストレージの版(`revision`)を、書き込みのたびに変える |
+| `packages/core/src/plugins/hooks.ts:630` | hook の `errorPolicy`(`"continue"` の hook の例外はログに出ない) |
+| `packages/core/src/database/instrumentation.ts:83` | 開発サーバーのクエリログ(応答のあとに実行された hook のクエリは出ない) |
 | `packages/core/src/emdash-runtime.ts:3516` / `:5560` | 下書きはリビジョンに保存される、afterSave は遅れて実行される |
 | `packages/auth/src/rbac.ts:19` | 権限(content:create / delete_own / publish_own) |
 

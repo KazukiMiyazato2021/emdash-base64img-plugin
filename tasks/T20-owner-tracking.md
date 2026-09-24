@@ -192,6 +192,10 @@ export function createPlugin() {
 - ほかの章への反映の候補(リーダーが判断する。変更していない):
   - 17 章または 18 章: D1(Workers)での同時の保存の競合の起きやすさと、hook のクエリ数は [[T32-cloudflare-check|T32]] で確かめる。
   - 付録 B: `packages/core/src/database/repositories/plugin-storage.ts:174`(条件付きの書き込み)、`packages/core/src/database/migrations/077_plugin_storage_revisions.ts`(版のトリガー)、`packages/core/src/plugins/hooks.ts:630`(`errorPolicy` と例外のログ)、`packages/core/src/database/instrumentation.ts:83`(クエリログの書き出し)。
+
+> [!note] 反映済み(リーダー、マージのとき)
+> 18 章(参照元の記録の同時書き込み)と付録 B を反映し、知見ノート 2 つを索引に登録した。
+
 - [[T29-plugin-definition|T29]]: 上の登録のしかた。
 - [[T21-orphan-routes|T21]]: 上の注意。`imageRefs` を書き換えるなら `compareAndSet`。
 - [[T18-upload-route|T18]]: 新しい画像 ID への `put` はそのままでよい。最初の参照元を記録するときの値を、T20 と同じ形(`{ collection, entryId, locale, field }`、`locale` はエントリのロケール)にすると、あとで T20 が同じ参照元を重複させない。
