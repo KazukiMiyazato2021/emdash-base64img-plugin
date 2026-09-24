@@ -513,11 +513,15 @@ flowchart LR
 
 ### 11.5 画像管理ページ
 
-- `admin.pages` で登録する(例: `/_emdash/admin/plugins/base64-image/images`)。
+- `admin.pages` で登録する。パスは `/images`(`/_emdash/admin/plugins/base64-image/images`)、ラベルは管理画面の辞書にある「Images」の ID `an5hVd`、アイコンは `image`。部品は `src/admin/ImagesPage.tsx` の `ImagesPage`(props なし)。
+  - サイドバーとコマンドパレットは、ラベルを管理画面の Lingui で訳す(`i18n._(label)`)。辞書のキーは Lingui の ID なので、文字列の「Images」は訳されず(日本語の画面でも「Images」)、本番のビルドでは「Uncompiled message detected!」の警告が出る。ID なら日本語は「画像」、英語は「Images」になり、警告も出ない。根拠: 実測+公式ドキュメント([[T25-images-page#結果|T25]]、[[emdash-admin-plugin-pages]])
 - 一覧に出すもの: サムネイル、寸法、保存サイズ、参照元へのリンク、状態バッジ([[#9. 参照元の記録と未使用画像の検出]])、作成日時、公開の状態(下書きの画像はサイトに出ない)、参照元の全体の件数(載せきれない分は「ほか N 件」)。
-  - 下書きの画像を公開し直す操作を置くかは [[T25-images-page|T25]] で決める。標準 API は Editor 以上で、材料は [[image-management-routes#公開し直す操作の材料(T21-2)]]([[T21-2-list-publish-status|T21-2]])。
-- 操作: ゴミ箱への移動、完全削除(管理者のみ)。
-- メニューのラベルは静的な文字列になる(マニフェストのラベルは翻訳されない)。
+  - 参照元は記録ごとに 1 行で並べ、フィールド・ロケール・状態を添える。リンク先は編集画面(`/_emdash/admin/content/<collection>/<エントリ ID>?locale=<ロケール>`)。削除された参照元はリンクにしない。
+- 操作(ボタンは利用者のロールと画像の状態で出し分ける。表示のためだけで、権限はサーバーが判定する):
+  - ゴミ箱への移動: ゴミ箱に入っていない画像。Contributor 以上。必ず確認し、使用中ならそのことを示す。
+  - 完全削除: ゴミ箱に入った画像。管理者のみ。必ず確認し、使用中なら参照している投稿が保存できなくなることを示す。
+  - 公開: 下書きの画像(ゴミ箱から戻した画像・アップロードの途中で止まった画像)。Editor 以上。標準 API の `POST /_emdash/api/content/b64_images/{id}/publish` を body なしで呼ぶ(`src/client/api.ts` の `publishImage`)。予約済みの画像には置かない(予約の日時に公開される)。根拠: 実測+公式ドキュメント([[T25-images-page#結果|T25]])
+  - エントリの無い画像(記録だけが残ったもの)には操作が無い。
 
 ## 12. サイト側の描画
 

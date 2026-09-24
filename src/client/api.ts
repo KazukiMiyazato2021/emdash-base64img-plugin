@@ -89,6 +89,18 @@ export const permanentDeleteResponseSchema = z.object({
 });
 export type PermanentDeleteResponse = z.infer<typeof permanentDeleteResponseSchema>;
 
+/**
+ * 標準の公開 API の応答の `data` のうち、確かめる部分(`references/emdash/packages/core/src/api/handlers/content.ts:1862-1865`)。
+ * `item` は画像の本体(最大 500,000 バイトの data URL)も含むが、使わないので落とす。
+ */
+export const publishResponseSchema = z.object({
+	item: z.object({
+		id: entryIdSchema,
+		status: z.literal("published"),
+	}),
+});
+export type PublishImageResponse = z.infer<typeof publishResponseSchema>;
+
 // ---------------------------------------------------------------------------
 // 公開する関数
 // ---------------------------------------------------------------------------
@@ -168,6 +180,28 @@ export async function deleteImagePermanently(
 	const validId = validateRequest(entryIdSchema, id);
 	const url = `${API_BASE}/content/${IMAGE_COLLECTION}/${encodeURIComponent(validId)}/permanent`;
 	return requestJson(url, "DELETE", undefined, permanentDeleteResponseSchema, options.signal);
+}
+
+/**
+ * 画像を公開する(下書きになった画像を公開し直す。仕様書 11.5)。EmDash の標準 API
+ * `POST /_emdash/api/content/b64_images/{id}/publish` を、ログイン中の利用者の権限で呼ぶ。
+ * プラグインが作った画像は作成者が空なので、`content:publish_any`(編集者以上)が要る(T21-2・T25)。
+ *
+ * - body は送らない。公開の日時は、前に公開していればその日時を保ち、無ければ公開した日時になる
+ *   (`references/emdash/packages/core/src/astro/routes/api/content/[collection]/[id]/publish.ts:4-10`)。
+ * - ゴミ箱に入った画像・無い画像は 404 `NOT_FOUND`。ほかの利用者が標準の編集画面で開いていると 409 `ENTRY_LOCKED`、
+ *   ほかのプラグインの `content:beforePublish` が止めると 422 `PUBLISH_REJECTED`。どちらも元のコードは
+ *   `details.responseCode` に入る(コードは HTTP ステータスから決まる)。
+ */
+export async function publishImage(
+	id: string,
+	options: RequestOptions = {},
+): Promise<PublishImageResponse> {
+	options.signal?.throwIfAborted();
+	// ID は URL のパスに入れるので、`/` や `.` を含まない形か確かめてから送る(`entryIdSchema`)。
+	const validId = validateRequest(entryIdSchema, id);
+	const url = `${API_BASE}/content/${IMAGE_COLLECTION}/${encodeURIComponent(validId)}/publish`;
+	return requestJson(url, "POST", undefined, publishResponseSchema, options.signal);
 }
 
 /**
