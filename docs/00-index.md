@@ -27,6 +27,8 @@ updated: 2026-09-24
 | [[claude-code-worktree-isolation\|worktree で隔離したチームの運用]] | `docs/claude-code-worktree-isolation.md` | isolation: worktree の worktree は `main` から作られる。分岐元の確認、片付け、共有される stash | [[T01-1-workflow-docs-index\|T01-1]] |
 | [[astro-dev-background-for-agents\|エージェントから実行した astro dev はバックグラウンドで起動する]] | `docs/astro-dev-background-for-agents.md` | Astro 7.3.3 は環境変数 `CLAUDECODE` を見て `astro dev` / `astro preview` を自動でバックグラウンドにする。止めるのは `npm run dev -w playground -- stop` | [[T02-playground\|T02]] |
 | [[vite-watch-scope-playground\|playground の開発サーバーが監視する範囲]] | `docs/vite-watch-scope-playground.md` | 監視は playground の中と、読み込まれたプラグインのソースだけ。ルート自身へのリンク・`spikes/`・`.claude/` はたどらない(除外の設定は不要) | [[T02-playground\|T02]] |
+| [[git-dependency-ts-source\|git 依存 + TS ソースのプラグインを利用者のサイトで読み込む]] | `docs/git-dependency-ts-source.md` | ビルドなしの TS ソースを git 依存で入れ、Node と Cloudflare の両アダプターで読み込めた。利用者の `tsc` は `src` を検査する(`astro check` はしない)。緩い設定・厳しい設定の代わりの tsconfig で確かめる。`emdash migrate --from-config` は失敗する | [[T07-spike-git-dependency\|T07]]、[[T04-1-consumer-typecheck\|T04-1]] |
+| [[npm12-git-dependency-policy\|npm 12 の git 依存・install スクリプトの既定と min-release-age]] | `docs/npm12-git-dependency-policy.md` | npm 12 は git 依存を既定で拒否する(サイトの `.npmrc` に `allow-git=root` が要る)。依存の install スクリプト(git 依存の `prepare` も)は既定で止まる。`min-release-age` で peer の解決が `ERESOLVE` になる | [[T07-spike-git-dependency\|T07]] |
 
 ## EmDash
 
@@ -56,6 +58,8 @@ updated: 2026-09-24
 |---|---|---|---|
 | [[webp-data-url-validation\|WebP の data URL の検証]] | `docs/webp-data-url-validation.md` | `atob` / `fromBase64` は空白を読み飛ばす。O(1) の検査で不正な base64 を拒否する方法。WebP ヘッダーの検査(libwebp との比較)。Chromium の canvas は `VP8X` + `ICCP` で 482 バイト増える。約 100KB で 0.009〜0.15ms。テスト用の WebP は `tests/fixtures/webp/README.md` | [[T04-webp-utils\|T04]] |
 | [[canvas-webp-encoding\|canvas の WebP エンコード(Chromium・Firefox と cwebp の比較)]] | `docs/canvas-webp-encoding.md` | 同じ画素ならエンコーダーの差は小さい。ずれの主因は縮小の方法(Firefox は `imageSmoothingQuality` が無い)。`createImageBitmap` の `resizeQuality: "high"` で縮小し、`minQuality` から探索する。時間・可逆になる画質・全データと再現のコード | [[T05-spike-canvas-webp\|T05]] |
+| [[compress-image-browser-check\|圧縮処理(compressImage・createThumbnail)を Chromium・Firefox で動かした結果]] | `docs/compress-image-browser-check.md` | 写真 5 枚の結果は T05 の表と長辺・画質・エンコード回数まで一致した。中断は 0.4ms 以内に reject。透過は保持される。乱数ノイズの画像は Chromium の GPU 描画だけ上限を超えた | [[T13-encode-search\|T13]] |
+| [[jsdom-browser-api-gaps\|jsdom でブラウザ側の画像処理をテストするときの注意]] | `docs/jsdom-browser-api-gaps.md` | jsdom 30.1.0 には `createImageBitmap`・`OffscreenCanvas` が無く、canvas の `getContext` は `null`。canvas の部分は差し替えられるように作り、偽物でテストする。`abort()` の `reason` は Node の `DOMException` | [[T13-encode-search\|T13]] |
 
 ## Cloudflare
 

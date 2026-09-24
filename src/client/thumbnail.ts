@@ -43,7 +43,8 @@ export const createThumbnail: CreateThumbnail = async (image, options = {}) => {
 		},
 		{ encoder: options.encoder ?? createCanvasWebpEncoder(), signal },
 	);
-	if (!outcome.ok) {
+	// `=== false` で比べる(利用者の設定で strictNullChecks が無効でも絞り込まれるように)。
+	if (outcome.ok === false) {
 		throw new Base64ImageError(
 			"THUMB_OVER_BUDGET",
 			`The thumbnail does not fit in ${THUMB_MAX_STORED_BYTES} bytes even at ${outcome.lastEdge}px`,

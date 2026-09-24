@@ -23,7 +23,7 @@ updated: 2026-09-24
 > - Vite は `.ts` / `.tsx` の入口を SSR で外部化しない。Cloudflare の worker の環境はそもそも `noExternal: true`。EmDash はプラグインを特別扱いしていない。
 > - npm 12 は git 依存を既定で拒否する。サイトの `.npmrc` に `allow-git=root` が要る → [[npm12-git-dependency-policy]]
 > - Cloudflare アダプターの `astro dev` では、最初のリクエストでプラグインが依存の最適化に加わり、1 回だけ再読み込みが起きる。サイトの `vite.ssr.optimizeDeps.include` に入れると起きない。
-> - 利用者の `astro check` は、プラグインの `src` の型エラーを報告しない。`tsc` は報告する。TypeScript 5.x、`lib` を絞った設定、`strict: false` では `src/shared/data-url.ts` がエラーになる(TypeScript 6.0.3 / 7.0.2 の既定と strictest では 0 件)。
+> - 利用者の `astro check` は、プラグインの `src` の型エラーを報告しない。`tsc` は報告する。TypeScript 5.x、`lib` を絞った設定、`strict: false` では `src/shared/data-url.ts` がエラーになる(TypeScript 6.0.3 / 7.0.2 の既定と strictest では 0 件)。対策は [[T04-1-consumer-typecheck|T04-1]] で入れ、`npm run typecheck` で緩い設定・厳しい設定の両方を毎回検査している。
 > - `emdash migrate --from-config` は、Node が `node_modules` の中の `.ts` を読めないので失敗する。EmDash はこの経路をローカルの調査用としていて、デプロイでは build のマニフェストを使う。
 > - 関連: [[T07-spike-git-dependency]]、[[base64-image-plugin-spec#14. 配布とバージョン|仕様書 14 章]]、[[base64-image-plugin-spec#16. 実装前の検証(スパイク)|仕様書 16 章]]、[[emdash-native-plugin-entrypoints]]、[[emdash-playground-site-config]]、[[emdash-dependency-versions]]、[[npm12-git-dependency-policy]]
 
@@ -157,6 +157,18 @@ if (parsed.ok === false) return parsed;
 
 - zod: サイトでは、プラグインがサイト直下の 4.6.5、`emdash` が入れ子の 4.5.4 を使った(`astro` の依存 `^4.5.4` が 4.6.5 を選ぶため)。T03 のスキーマ(4.6.5)をルートの `input` に渡しても、型チェック(0 件)と実行(検証と 400)の両方で問題なかった。根拠: **実測のみ**
 - 利用者の `src/worker.ts`(EmDash のテンプレートと同じ `satisfies ExportedHandler`)は、strictest で TS1360 になった。利用者のコードの問題で、プラグインとは関係ない。根拠: **実測のみ**
+
+### プラグイン側の対策(T04-1)
+
+上の対策を [[T04-1-consumer-typecheck|T04-1]] で実際のソースに入れた。あわせて、利用者の設定の代わりになる tsconfig を 2 つ作り、`npm run typecheck`(`build` と `verify` から呼ばれる)で毎回検査するようにした。
+
+| ファイル | 変えた設定 |
+|---|---|
+| `tsconfig.consumer-loose.json` | `lib: ["es2022", "dom", "dom.iterable"]`、`strict: false`、`noUncheckedIndexedAccess: false` |
+| `tsconfig.consumer-strict.json` | `exactOptionalPropertyTypes`・`noPropertyAccessFromIndexSignature`・`noImplicitReturns`・`noUnusedLocals`・`noUnusedParameters`・`noUncheckedSideEffectImports`・`erasableSyntaxOnly` を有効 |
+
+- 対策を入れる前の `phase/2`(`5404fe4`)では、緩い設定で 12 件、厳しい設定で 1 件だった。T07 のあとに [[T13-encode-search|T13]] が足したコードで、`!outcome.ok` の絞り込み(6 件)と `exactOptionalPropertyTypes` の `signal`(1 件)が増えていた。直したあとは 3 つの設定のどれも 0 件。根拠: **実測のみ**(TypeScript 6.0.3)
+- 書き方の決まり: lib の型に頼る新しい API は使う形を自前で宣言してから呼ぶ。判別共用体は `=== false` で判別する。`undefined` を渡しうる省略できるプロパティは `?: T | undefined` にする。
 
 ## `emdash migrate --from-config`
 

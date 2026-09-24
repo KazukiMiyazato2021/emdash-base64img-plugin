@@ -1,0 +1,15 @@
+{
+	// 利用者のサイトの tsc が、このプラグインの src を「厳しい」設定(Astro の strictest に近いもの)で検査するときの代わり。
+	// 経緯: docs/git-dependency-ts-source.md(T07)、tasks/T04-1-consumer-typecheck.md
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"exactOptionalPropertyTypes": true,
+		"noPropertyAccessFromIndexSignature": true,
+		"noImplicitReturns": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noUncheckedSideEffectImports": true,
+		"erasableSyntaxOnly": true
+	},
+	"include": ["src"]
+}

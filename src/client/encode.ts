@@ -46,7 +46,8 @@ export const compressImage: CompressImage = async (image, options) => {
 		{ maxStoredBytes, maxEdge, minEdge, minQuality },
 		{ encoder: options.encoder ?? createCanvasWebpEncoder(), signal, onProgress },
 	);
-	if (!outcome.ok) {
+	// `=== false` で比べる(利用者の設定で strictNullChecks が無効でも絞り込まれるように)。
+	if (outcome.ok === false) {
 		throw new Base64ImageError(
 			"COMPRESSION_OVER_BUDGET",
 			`The image does not fit in ${maxStoredBytes} bytes even at ${outcome.lastEdge}px and quality ${minQuality}`,
