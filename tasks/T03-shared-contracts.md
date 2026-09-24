@@ -154,4 +154,5 @@ created: 2026-09-23
 1. seed で作った `b64_images` には `imageRefs` の記録ができない。seed はリポジトリを直接使うので、保存 hook を通らず、プラグインストレージも書かない(`references/emdash/packages/core/src/seed/apply.ts:670-684`。公式ドキュメントのみ)。[[T16-reference-hook|T16]] の存在確認(`imageRefs` にあること)で、seed の画像を参照する投稿の保存が拒否される。[[T26-playground-pages|T26]]・[[T31-e2e|T31]] で seed の画像を使うなら、アップロードのルートで作るか、`imageRefs` を補う処理が要る。
 2. [[T13-encode-search|T13]] のノートの「サムネイル生成(長辺 96px 程度、8,000 バイト以下)」は、data URL の長さの意味に揃えるとよい(このタスクで変更してよいファイルではない)。
 3. プレビュー取得は 1 回 10 件なので、20 枚のギャラリーは 2 回に分かれる(仕様書 11.2 の「まとめて1回で」は 10 枚までになる)。[[T17-admin-data-routes|T17]] がクエリ数を実測してから、上げるかを決める。
+   - → T17 で決着: 10 件のまま。理由は応答の大きさと CPU 時間で、仕様書 11.2 も直した([[T17-admin-data-routes#結果|T17]]、[[T17-1-preview-limit-reason|T17-1]])。
 4. 仕様書 8 章①の行は [[T04-webp-utils|T04]] も変更している可能性がある。マージのときに衝突しうる。
