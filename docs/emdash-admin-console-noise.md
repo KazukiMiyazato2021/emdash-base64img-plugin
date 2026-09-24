@@ -66,6 +66,13 @@ at console.warn (<anonymous>:8:26) | at vt._ (PluginRegistry.BncHfa0t.js:4:379) 
 - 画面の高さが 900px のとき、サイドバーの「プラグイン」のグループ(このプラグインの「画像」)は下にあり、Playwright がそこへスクロールすると出た。Notes の一覧(このプラグインの列が無い)でも同じ。「設定」の項目を `scrollIntoViewIfNeeded` しても、高さが 900px ならスクロールせずに見えているので出ず、高さを 480px にして「設定」までスクロールさせると出た。一覧の上でホイールを回したとき(内容が短く、ページがスクロールしたかは確かめていない)と、ページ全体のスクリーンショットでは出なかった。根拠: 実測のみ
 - 原因の要素は特定していない(EmDash のサイドバーのどれか。推測のみ)。
 
+## E2E(Playwright)で見つかった、EmDash と関係の無いもの
+
+[[T31-e2e|T31]] の E2E で console を見張ったときに出た。どちらも EmDash やこのプラグインの不具合ではない。見張りから除く方法は [[e2e-playwright-emdash-admin#5. console の見張り]]。根拠: **実測のみ**
+
+- Chromium は、4xx の応答(API の 403・422、404 の文書)ごとに、console に「Failed to load resource: the server responded with a status of …」の `error` を出す。その応答を確かめるテストだけで除く。
+- Firefox は、Playwright の `evaluate` がページの読み込みの途中でレイアウトを読むと、「Layout was forced before the page was fully loaded … debugger eval code」の `warning` を出す。Playwright が原因なので除く。
+
 ## 再現手順
 
 - playground を起動し、Playwright の `page.on("console")` で `warning` と `error` を集める。本番のビルドは、開発サーバーで保存した `storageState` を使う([[emdash-admin-entry-assembly#6. 再現手順]])。
