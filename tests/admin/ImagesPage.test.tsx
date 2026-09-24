@@ -1,11 +1,14 @@
-// 画像管理ページ(src/admin/ImagesPage.tsx。T25)のテスト。
+// 画像管理ページ(src/admin/ImagesPage.tsx。T25・T25-2)のテスト。
 // fetch を偽のサーバーに差し替え、本物の API クライアント(src/client/api.ts)を通して、送る要求と画面を確かめる。
 // `@emdash-cms/admin` は読み込むと重い(jsdom で数秒)ので、`useCurrentUser` だけのモックにする(本物は最後のテストで使う)。
+// 一覧のサムネイル列(src/admin/ThumbnailColumn.tsx。T24)は差し替えない。このページと同じモジュールの覚え書きを調べる。
 
 import type { PluginAdminModule } from "@emdash-cms/admin";
 import { useCurrentUser } from "@emdash-cms/admin";
+import { isSafePluginPagePath, normalizePluginPagePath } from "@emdash-cms/blocks/server";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { PluginAdminConfig } from "emdash";
 import { createHash } from "node:crypto";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
@@ -21,7 +24,14 @@ import {
 	ROLE_CONTRIBUTOR,
 	ROLE_EDITOR,
 } from "../../src/admin/ImagesPage";
+import {
+	clearThumbnailColumnCache,
+	preloadThumbnailColumn,
+	requestThumbnails,
+	showsThumbnailColumn,
+} from "../../src/admin/ThumbnailColumn";
 import { ERROR_MESSAGES } from "../../src/client/error-messages";
+import { IMAGES_PAGE } from "../../src/shared/constants";
 import { isBase64ImageError } from "../../src/shared/errors";
 import type { ImageListItem, ImageListOwner } from "../../src/shared/types";
 import { findMissingClasses, sourceTokens } from "./admin-css";
@@ -39,6 +49,21 @@ const contentUrl = (id: string, action: "permanent" | "publish") =>
 	`/_emdash/api/content/b64_images/${id}/${action}`;
 // スキーマは形だけを確かめるので、data URL の中身は本物の WebP でなくてよい
 const THUMB = "data:image/webp;base64,UklGRhYAAABXRUJQ";
+// 一覧のサムネイル列(T24)が使う要求
+const MANIFEST_URL = "/_emdash/api/manifest";
+const THUMBNAILS_URL = `${PLUGIN_API}/thumbnails`;
+/** 管理画面のマニフェスト(posts にはこのプラグインのフィールドがあり、pages には無い) */
+const COLUMN_MANIFEST = {
+	collections: {
+		posts: {
+			fields: {
+				title: { kind: "string" },
+				cover: { kind: "json", widget: "base64-image:image" },
+			},
+		},
+		pages: { fields: { title: { kind: "string" } } },
+	},
+};
 
 interface SentRequest {
 	readonly url: string;
@@ -237,6 +262,18 @@ beforeEach(() => {
 	routes.clear();
 	sent.length = 0;
 	createdSeq = 0;
+	// 一覧の列の要求(完全削除のあとで、このページがマニフェストを読み直す)
+	route("GET", MANIFEST_URL, () => success(COLUMN_MANIFEST));
+	route("POST", THUMBNAILS_URL, (request) =>
+		success({
+			items: (request.body as { ids: string[] }).ids.map((id) => ({
+				id,
+				thumbnail: { thumb: THUMB, width: 96, height: 64 },
+			})),
+		}),
+	);
+	// 一覧の列の覚え書きはモジュールの中にあるので、テストごとに消す
+	clearThumbnailColumnCache();
 	fetchMock.mockReset();
 	fetchMock.mockImplementation(async (input, init = {}) => {
 		const url = String(input);
@@ -295,11 +332,6 @@ describe("補助", () => {
 
 	it("ロールの値は EmDash と同じ(寄稿者 20・編集者 40・管理者 50)", () => {
 		expect([ROLE_CONTRIBUTOR, ROLE_EDITOR, ROLE_ADMIN]).toEqual([20, 40, 50]);
-	});
-
-	it("admin.pages に登録できる(props を受け取らない部品。型のテスト)", () => {
-		const pages: NonNullable<PluginAdminModule["pages"]> = { "/images": ImagesPage };
-		expect(pages["/images"]).toBe(ImagesPage);
 	});
 });
 
@@ -1297,28 +1329,166 @@ describe("公開(下書きの画像を公開し直す)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 見た目のクラス
+// 一覧のサムネイル列(T24)の覚え書き
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// サイドバーのラベル(T29・T30 の登録に使う)
-// ---------------------------------------------------------------------------
+describe("一覧のサムネイル列(T24)の覚え書き", () => {
+	/** 列の覚え書きを作っておく(コンテンツ一覧を開いたあとの状態)。マニフェストとサムネイルを 1 回ずつ取得する */
+	async function primeColumn(ids: readonly string[]): Promise<void> {
+		preloadThumbnailColumn();
+		requestThumbnails(ids);
+		await waitFor(() => expect(showsThumbnailColumn("pages")).toBe(false));
+		await waitFor(() => expect(requestsTo(THUMBNAILS_URL)).toHaveLength(1));
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		});
+		// 覚えている間(1 分)は取り直さない
+		requestThumbnails(ids);
+		expect(requestsTo(THUMBNAILS_URL)).toHaveLength(1);
+		expect(requestsTo(MANIFEST_URL)).toHaveLength(1);
+	}
 
-describe("サイドバーのラベル(T29 が admin.pages に登録する値)", () => {
-	// 画像管理ページのラベルは、管理画面の辞書にある「Images」の ID にする(tasks/T25-images-page.md の結果)。
-	// 管理画面はラベルを `i18n._(label)` で訳すので、文字列の「Images」は訳されない(本番のビルドでは警告も出る)。
-	const LABEL_ID = "an5hVd";
+	it("完全に削除したら、覚え書きを消し、マニフェストをすぐに読み直す(次に開く一覧で、サムネイルを取り直し、列を出すコレクションを正しく判定する)", async () => {
+		const user = userEvent.setup();
+		const image = item({ id: "img-1", entryStatus: "trashed", entryPublication: null });
+		listPages({ "": { items: [image] } });
+		route("DELETE", contentUrl("img-1", "permanent"), () =>
+			success({ deleted: true, id: "img-1" }),
+		);
+		await renderPage();
+		await primeColumn(["img-1", "img-2"]);
 
-	it("ID は Lingui が「Images」から作る ID(sha256 の base64 の先頭 6 文字)", () => {
-		expect(createHash("sha256").update("Images\u001F").digest("base64").slice(0, 6)).toBe(LABEL_ID);
+		await user.click(screen.getByRole("button", { name: `完全に削除: ${nameOf(image)}` }));
+		const dialog = await screen.findByRole("alertdialog");
+		await user.click(within(dialog).getByRole("button", { name: "完全に削除" }));
+		await waitFor(() => expect(hasRow("img-1")).toBe(false));
+
+		// マニフェストは、完全削除の応答のあとですぐに読み直す
+		await waitFor(() => expect(requestsTo(MANIFEST_URL)).toHaveLength(2));
+		const deleteAt = sent.findIndex((request) => request.method === "DELETE");
+		const manifestAt = sent.findLastIndex((request) => request.url === MANIFEST_URL);
+		expect(manifestAt).toBeGreaterThan(deleteAt);
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		});
+		// 次に開く一覧: このプラグインのフィールドの無いコレクションでは、最初の判定から列を出さない(読み込み中の true にならない)
+		expect(showsThumbnailColumn("pages")).toBe(false);
+		expect(showsThumbnailColumn("posts")).toBe(true);
+		// サムネイルは取り直す(完全に削除した画像は、警告アイコンになる)
+		requestThumbnails(["img-1", "img-2"]);
+		expect(requestsTo(THUMBNAILS_URL)).toHaveLength(2);
+		expect(requestsTo(THUMBNAILS_URL)[1]?.body).toEqual({ ids: ["img-1", "img-2"] });
 	});
 
-	it("管理画面が使えるすべての言語の辞書に訳がある(日本語は「画像」、英語は「Images」)", async () => {
+	it("ゴミ箱への移動と公開では、覚え書きを消さない(記録が変わらず、一覧の列の表示も変わらない)", async () => {
+		const user = userEvent.setup();
+		const draft = item({ id: "img-1", entryPublication: "draft" });
+		const published = item({ id: "img-2" });
+		listPages({ "": { items: [draft, published] } });
+		route("POST", contentUrl("img-1", "publish"), () =>
+			success({ item: { id: "img-1", status: "published" } }),
+		);
+		route("POST", TRASH_URL, () => success({ id: "img-2", trashed: true }));
+		await renderPage();
+		await primeColumn(["img-1", "img-2"]);
+
+		await user.click(screen.getByRole("button", { name: `公開: ${nameOf(draft)}` }));
+		await waitFor(() => expect(within(row("img-1")).getByText("公開済み")).toBeInTheDocument());
+		await user.click(screen.getByRole("button", { name: `ゴミ箱に移動: ${nameOf(published)}` }));
+		const dialog = await screen.findByRole("alertdialog");
+		await user.click(within(dialog).getByRole("button", { name: "ゴミ箱に移動" }));
+		await waitFor(() => expect(within(row("img-2")).getByText("ゴミ箱")).toBeInTheDocument());
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		});
+
+		expect(requestsTo(MANIFEST_URL)).toHaveLength(1);
+		requestThumbnails(["img-1", "img-2"]);
+		expect(requestsTo(THUMBNAILS_URL)).toHaveLength(1);
+	});
+
+	it("完全削除に失敗したら、覚え書きを消さない", async () => {
+		const user = userEvent.setup();
+		const image = item({ id: "img-1", entryStatus: "trashed", entryPublication: null });
+		listPages({ "": { items: [image] } });
+		route("DELETE", contentUrl("img-1", "permanent"), () => apiError("NOT_FOUND", 404));
+		await renderPage();
+		await primeColumn(["img-1"]);
+
+		await user.click(screen.getByRole("button", { name: `完全に削除: ${nameOf(image)}` }));
+		const dialog = await screen.findByRole("alertdialog");
+		await user.click(within(dialog).getByRole("button", { name: "完全に削除" }));
+		await within(dialog).findByText("完全に削除できませんでした");
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		});
+
+		expect(requestsTo(MANIFEST_URL)).toHaveLength(1);
+		requestThumbnails(["img-1"]);
+		expect(requestsTo(THUMBNAILS_URL)).toHaveLength(1);
+	});
+
+	it("一覧の列のモジュールは、このページから読み込んでも、実行時に @emdash-cms/admin を読み込まない(T24 の決まり)", async () => {
+		const loaded = "@emdash-cms/admin was loaded at runtime";
+		// 読み込み直し、@emdash-cms/admin を読み込もうとしたら失敗するようにする(型だけの import は実行時に消える)
+		vi.resetModules();
+		vi.doMock("@emdash-cms/admin", () => {
+			throw new Error(loaded);
+		});
+		try {
+			await expect(import("../../src/admin/ThumbnailColumn")).resolves.toHaveProperty(
+				"clearThumbnailColumnCache",
+			);
+			// 比べるため: このページは useCurrentUser を実行時に読み込むので、同じ条件では読み込めない(確かめ方が働いていること)
+			const failure = await import("../../src/admin/ImagesPage").then(
+				() => undefined,
+				(error: unknown) => error,
+			);
+			expect(failure).toBeInstanceOf(Error);
+			expect(String((failure as Error).cause ?? failure)).toContain(loaded);
+		} finally {
+			// ほかのテストが読み込むときのために、ファイルの先頭と同じモックに戻す
+			vi.doMock("@emdash-cms/admin", () => ({ useCurrentUser }));
+		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// ページの定数(T29・T30 の登録に使う)
+// ---------------------------------------------------------------------------
+
+describe("ページの定数(src/shared/constants.ts の IMAGES_PAGE。T29・T30 が登録に使う)", () => {
+	it("T29 の definePlugin の admin.pages に、そのまま入れられる(型のテスト)", () => {
+		const admin: PluginAdminConfig = {
+			entry: "emdash-plugin-base64-image/admin",
+			pages: [IMAGES_PAGE],
+		};
+		expect(admin.pages).toEqual([{ path: "/images", label: "an5hVd", icon: "image" }]);
+	});
+
+	it("T30 の pages のキーに使える(props を受け取らない部品。型のテスト)", () => {
+		const pages: NonNullable<PluginAdminModule["pages"]> = { [IMAGES_PAGE.path]: ImagesPage };
+		expect(pages[IMAGES_PAGE.path]).toBe(ImagesPage);
+	});
+
+	it("パスは管理画面が受け付ける形で、/ から始める(サイドバーのリンクと、部品を探すキーが同じになる)", () => {
+		expect(isSafePluginPagePath(IMAGES_PAGE.path)).toBe(true);
+		expect(normalizePluginPagePath(IMAGES_PAGE.path)).toBe(IMAGES_PAGE.path);
+	});
+
+	it("ラベルは、Lingui が「Images」から作る ID(sha256 の base64 の先頭 6 文字)", () => {
+		// 管理画面はラベルを `i18n._(label)` で訳すので、文字列の「Images」は訳されない(本番のビルドでは警告も出る)
+		expect(createHash("sha256").update("Images\u001F").digest("base64").slice(0, 6)).toBe(
+			IMAGES_PAGE.label,
+		);
+	});
+
+	it("ラベルの ID は、管理画面が使えるすべての言語の辞書にある(日本語は「画像」、英語は「Images」)", async () => {
 		const { SUPPORTED_LOCALES, loadMessages } = await import("@emdash-cms/admin/locales");
 		const translations = new Map<string, unknown>();
 		for (const { code } of SUPPORTED_LOCALES) {
 			// oxlint-disable-next-line no-await-in-loop -- 辞書を 1 つずつ読む(テストだけ)
-			translations.set(code, (await loadMessages(code))[LABEL_ID]);
+			translations.set(code, (await loadMessages(code))[IMAGES_PAGE.label]);
 		}
 
 		expect(translations.size).toBeGreaterThan(1);
@@ -1337,6 +1507,10 @@ describe("サイドバーのラベル(T29 が admin.pages に登録する値)", 
 		expect(translations.get("en")).toEqual(["Images"]);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// 見た目のクラス
+// ---------------------------------------------------------------------------
 
 describe("見た目のクラス", () => {
 	it("使うクラスは、すべて管理画面の CSS にある(状態・参照元・エラー・確認のダイアログを出した状態で)", async () => {

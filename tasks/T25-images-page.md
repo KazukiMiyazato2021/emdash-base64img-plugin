@@ -102,7 +102,7 @@ created: 2026-09-23
 | `"hG89Ed"`(「Image」の ID) | 画像 | Image | 0 回 |
 
 - ページのラベルも、一覧の列([[T24-list-column|T24]])と同じく `i18n._(label)` を通る(`admin/src/components/Sidebar.tsx:333-341`、`:497`、`AdminCommandPalette.tsx:259`)。T24 の推測(ページのラベルも同じ)は、実測で確かめられた。
-- `an5hVd` は、0.39.1 の 29 の辞書のすべてにある。テスト(「サイドバーのラベル」)で、管理画面が使えるすべての言語に訳があることを確かめている。
+- `an5hVd` は、0.39.1 の 29 の辞書のすべてにある。テスト(「サイドバーのラベル」。[[T25-2-page-registration-prep|T25-2]] からは「ページの定数」)で、管理画面が使えるすべての言語に訳があることを確かめている。
 - 単数の「Image」(`hG89Ed`)より、複数の画像を並べるページには「Images」が合う。EmDash のメディアの項目は「メディア」(Media)なので、日本語の「画像」とは重ならない。項目は「プラグイン」のグループに出る。
 - 文字列にした場合の見え方: 日本語の画面でも英語の「Images」のまま出て、本番のビルドでは描き直しのたびに console に警告が出る。
 
@@ -151,22 +151,24 @@ created: 2026-09-23
 
 ## T29・T30 への登録のしかた
 
-- T29(`src/index.ts` の `definePlugin`): `admin` に `pages: [{ path: "/images", label: "an5hVd", icon: "image" }]` を足す(`entry` はそのまま)。
+パス・ラベル・アイコンは、`src/shared/constants.ts` の `IMAGES_PAGE`(`{ path: "/images", label: "an5hVd", icon: "image" }`)にまとめた([[T25-2-page-registration-prep|T25-2]])。2 か所とも、この定数を使う(値を書き写さない。`path` と `pages` のキーが食い違うと、サイドバーに項目が出ない)。
+
+- T29(`src/index.ts` の `definePlugin`): `import { IMAGES_PAGE } from "./shared/constants";` を足し、`admin: { entry: ADMIN_ENTRY, pages: [IMAGES_PAGE] }` にする(`entry` はそのまま)。
   - `label` は、管理画面の辞書にある「Images」の ID。文字列("Images" など)にしない(訳されず、本番のビルドで警告が出る)。
   - `icon: "image"` は管理画面のアイコンの名前(Phosphor の Image)。
   - ページは閲覧者を含む全員のサイドバーに出る(ロールで絞られない)。権限の無い利用者には、ページが 403 の文言を出す。
-- T30(`src/admin.tsx`): `import { ImagesPage } from "./admin/ImagesPage";` と `export const pages = { "/images": ImagesPage };`。キーは T29 の `path` と同じ文字列(`/` から始める)。
+- T30(`src/admin.tsx`): `import { ImagesPage } from "./admin/ImagesPage";` と `import { IMAGES_PAGE } from "./shared/constants";` を足し、`export const pages = { [IMAGES_PAGE.path]: ImagesPage };` にする。
 - 開く URL は `/_emdash/admin/plugins/base64-image/images`。
 - `ImagesPage` は `@emdash-cms/admin` の `useCurrentUser` を使うので、管理画面の中でだけ描ける(管理画面の `QueryClientProvider` が要る)。
-- T29 の `src/index.ts` から `src/admin/ImagesPage.tsx` を読み込まない(サーバーの入口に React と Kumo が入る)。パス・ラベル・アイコンを 2 か所で揃えるなら、`src/shared/constants.ts` に置く(サブタスクの候補)。
-- 一覧の列の覚え書き(T24 の `clearThumbnailColumnCache()`)は、T25 では呼んでいない(リーダーの指示)。画像をゴミ箱に移した・完全に削除した・公開したあとに消すなら、両方のマージのあとでつなぐ。
+- T29 の `src/index.ts` から `src/admin/ImagesPage.tsx` を読み込まない(サーバーの入口に React と Kumo が入る)。`src/shared/constants.ts` は依存の無い定数だけなので、サーバーの入口から読み込んでよい。
+- 一覧の列の覚え書き(T24)は、[[T25-2-page-registration-prep|T25-2]] で、完全削除が成功したときにこのページが消すようにした(`clearThumbnailColumnCache()` のすぐあとに `preloadThumbnailColumn()`)。ページと列は同じ入口から読み込まれ、覚え書きを共有する。T30 は、T24 のとおり入口で `preloadThumbnailColumn()` を呼ぶほかに、つなぐための作業は無い。
 
 ## 影響・サブタスクの候補
 
 - **ゴミ箱から戻す操作**(Editor 以上。標準 API の `POST /_emdash/api/content/b64_images/{id}/restore`)は置いていない。`src/client/api.ts` に足してよい関数が 1 つ(`publishImage`)だけだったため。いまは、戻すには EmDash の `b64_images` の画面(1 ページ 100 件の base64 を読む。仕様書 10 章で使わないとしたもの)しか無い。ページの「ゴミ箱から戻せるのは編集者以上です。」の文は、戻す操作を置いたら見直す。
 - **T22 の `ErrorMessage` に、文言を渡せる props**(例: `message`)があれば、このページの自前のエラー表示(`AlertMessage`)を置き換えられる。
 - **記録だけが残った画像(`missing`)を消す手段**が無い(ルートが無い。[[T21-orphan-routes#未解決・サブタスクの候補|T21]])。ページでは「このページからは操作できません」と出している。
-- **ページのパス・ラベル・アイコンの定数**を `src/shared/constants.ts` に置くと、T29 と T30 で食い違わない。
+- **ページのパス・ラベル・アイコンの定数**を `src/shared/constants.ts` に置くと、T29 と T30 で食い違わない。→ [[T25-2-page-registration-prep|T25-2]] で `IMAGES_PAGE` を置いた。
 - `tests/admin/hooks.test.ts`(T23)の `afterEach` も、`console.error` で投げる前に `cleanup()` を呼んでいない。失敗したときに、次のテストまで失敗しうる。`docs/react-hook-testing-pitfalls.md` の例も同じ。
 - 管理画面のコマンドパレットで「Images」と入力すると、非表示のコレクション `b64_images`(「Base64 Images」)が出る。選ぶと、仕様書 10 章で使わないとした標準の一覧(1 ページ 100 件の base64 を読む)が開くとみられる(推測のみ。開いていない。仕様書 18 章の候補)。
 - `tests/admin/ImagesPage.test.tsx` の本物の `useCurrentUser` のテストは、`@tanstack/react-query` と `@lingui/core`(`@emdash-cms/admin` の依存。このプラグインの package.json には無い)を直接読む。npm の巻き上げが変わって読めなくなったら、devDependencies に入れる(package.json の変更)。

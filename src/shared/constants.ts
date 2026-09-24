@@ -163,3 +163,31 @@ export const PREVIEW_MAX_IDS = 10;
 
 /** 1 回のサムネイル取得で送る画像 ID の上限(コンテンツ一覧の 1 ページ = 100 行) */
 export const THUMBNAILS_MAX_IDS = 100;
+
+// ---------------------------------------------------------------------------
+// 管理画面のページ(`/_emdash/admin/plugins/base64-image<path>`)
+// ---------------------------------------------------------------------------
+
+/**
+ * 画像管理ページ(仕様書 11.5)。登録する 2 か所で同じ値を使う。
+ * - サーバー側(T29 の `src/index.ts`): `definePlugin({ admin: { entry, pages: [IMAGES_PAGE] } })`。
+ *   サイドバーとコマンドパレットの項目になる。
+ * - 管理画面の入口(T30 の `src/admin.tsx`): `export const pages = { [IMAGES_PAGE.path]: ImagesPage }`。
+ *   管理画面は、URL の残りに `/` を付けたもの(`/images`)をキーにして部品を探す。
+ *
+ * 開く URL は `/_emdash/admin/plugins/base64-image/images`。
+ * - `path`: `/` から始める(キーと、サイドバーのリンクが同じになる)。
+ * - `label`: 管理画面の辞書にある「Images」の Lingui の ID(日本語は「画像」、英語は「Images」)。管理画面は
+ *   `i18n._(label)` で訳すので、文字列("Images")は訳されず、本番のビルドでは描き直しのたびに警告が出る
+ *   (docs/emdash-admin-plugin-pages.md)。辞書にあることは tests/admin/ImagesPage.test.tsx で確かめる。
+ * - `icon`: 管理画面のアイコンの名前(Phosphor の Image)。
+ */
+export const IMAGES_PAGE = {
+	path: "/images",
+	label: "an5hVd",
+	icon: "image",
+} as const satisfies {
+	readonly path: `/${string}`;
+	readonly label: string;
+	readonly icon: string;
+};
