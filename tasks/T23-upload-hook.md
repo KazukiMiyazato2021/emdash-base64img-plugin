@@ -42,6 +42,10 @@ created: 2026-09-23
 - [ ] [[T12-input-decode|T12]]・[[T13-encode-search|T13]]・[[T14-admin-i18n-api|T14]] を組み合わせた `useImageUpload`(進捗・キャンセル・エラーを状態として返す)
 - [ ] 保存済み画像のプレビュー取得(`usePreviewImages`)
 - [ ] 複数ファイルを1枚ずつ順に処理する仕組み(ギャラリー用)
+- [ ] [[T12-input-decode|T12]] の `decodeImage(file, { signal })` の結果は、`finally` で必ず `close()` する。Firefox 155 はデコードの間に押された中断を、デコードが終わってから届ける(`decodeImage` が resolve する)ので、そのあとの中断の確認と `close()` を忘れない([[T12-input-decode#T23 が使う export|T12 の呼び方の例]])
+- [ ] ギャラリーで複数のファイルを受け取ったら、`inspectInputFile` で先にまとめて判定し、HEIC などを最初に知らせる(1 件 1ms 前後)
+- [ ] `decoded.notices` は `getNoticeMessage(code, locale)`([[T14-admin-i18n-api|T14]])で表示する。`decoded.filename` は、空なら送らず、`MAX_FILENAME_LENGTH`(255)文字で切る
+- [ ] テストでは、`createDecodeImage` に偽の `createImageBitmap` を渡し、実際のヘッダーのバイトで作った `File` を使う(T12 のノートに例がある)
 
 ## 完了条件
 
