@@ -151,6 +151,10 @@ package: emdash-plugin-base64-image
 - sandboxed プラグインの field widget で使えるのは、Block Kit 要素(`text_input` / `number_input` / `toggle` / `select` / `media_picker`)だけ。ファイル選択、canvas での圧縮、プレビューができない。
 - 根拠: `skills/creating-plugins/references/admin-ui.md`、`packages/admin/src/components/ContentEditor.tsx:1806`(公式ドキュメントのみ)
 
+**プラグインの定義**([[T29-plugin-definition|T29]])
+- `definePlugin` は `src/server/plugin.ts` の `createBase64ImagePlugin()` にまとめる。`src/index.ts` は `createPlugin()` と descriptor の `base64ImagePlugin()` だけを持つ。
+- `content:beforeSave` は 1 つのプラグインに 1 つだけなので、`b64_images`([[#8. サーバー側の検証|8 章]]②)とほかのコレクション(③)を 1 つの handler で振り分ける。priority は 200(EmDash の既定の 100 より後。ほかのプラグインの beforeSave が値を変えたあとの、実際に保存される値を確かめる)、`errorPolicy` は既定の `abort`(`continue` にすると拒否の例外が捨てられ、保存が通る)。根拠: 実測+公式ドキュメント([[emdash-plugin-definition-registration]])
+
 **画像本体を投稿に直接持たせない理由(Q4)**
 - 管理画面の一覧は、1ページ100件を全データ込み(`SELECT *`)で取得する(`packages/admin/src/router.tsx:440`、`packages/core/src/database/repositories/content.ts:760`)。
   - カバー1枚+10枚ギャラリーの投稿が100件あると、応答は 146.9MB になり、Workers のメモリ上限 128MB を超える。
@@ -372,7 +376,8 @@ flowchart LR
 - ロケール: 画像エントリはサイトの既定ロケールで作り(5.1)、参照の `locale` はそのロケールにする。`target.locale`(参照元のエントリのロケール)は、`imageRefs` の参照元にだけ記録する。i18n を設定したサイトでは設定されたロケールのどれか(表記は設定にそろえる)、設定していないサイトでは 35 文字までを受け付け、ほかは 400 `INVALID_TARGET`。ロケールの設定は `emdash` の `getI18nConfig()` で読む(`ctx.site.locale` は別の値)。根拠: 実測+公式ドキュメント
   - widget は、`target.entryId` を送るときは、そのエントリのロケールも送る。省くと参照元は既定ロケールで記録され、既定ロケール以外のエントリでは、保存時の参照元の記録(9 章)がロケールだけ違う参照元をもう 1 件足す。根拠: 実測のみ([[emdash-plugin-upload-route#参照元の記録(T20)との関係]])
 - 公開まで行う理由: Contributor には公開権限がない(`content:publish_own` は Author 以上。`packages/auth/src/rbac.ts:28`)。標準 API で作成すると下書きのまま残り、サイトに表示されない。
-- 必要な capability(プラグイン全体): `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read`
+- 必要な capability(プラグイン全体): `schema:read` / `content:read` / `content:write` / `content:publish` / `content:revisions:read` / `content:restore`([[T29-plugin-definition|T29]])
+  - `content:restore` は、画像管理の一覧とゴミ箱への移動が `getTrashedVersioned` に使う(`content:read` は含まない。[[T21-orphan-routes#T29 への引き継ぎ|T21]])。宣言が足りないと、ルートは 500 になり、hook は警告だけを出して登録されない(beforeSave には `content:write`、afterSave・afterPublish・afterDelete には `content:read` が要る)。根拠: 実測+公式ドキュメント([[emdash-plugin-definition-registration]])
   - アップロードで使うのは `schema:read`(保存先のフィールド定義)・`content:write`(作成)・`content:publish`(公開)。`content:read` は `definePlugin` が自動で足す。`content:revisions:read` は [[#9. 参照元の記録と未使用画像の検出|9 章]]の判定で使う([[T18-upload-route#T29 がルートを登録する方法|T18]])。
 
 ## 8. サーバー側の検証
@@ -601,7 +606,9 @@ const images = await resolveBase64Images(refs);
 }
 ```
 
-- プラグインは起動時に `b64_images` があるかを確認し、なければエラーを出す。プラグインからはコレクションを作れない(`ctx.schema` は読み取り専用)。
+- プラグインは `b64_images` があるかを確かめ、無ければ作り方を書いたエラーのログを出す(保存と有効化は止めない)。プラグインからはコレクションを作れない(`ctx.schema` は読み取り専用)。
+  - 確かめるのは、`plugin:activate`(管理者がプラグインを有効に戻したとき)と、プラグインのインスタンス(プロセス。Workers では isolate)ごとの最初の `b64_images` 以外の保存(`content:beforeSave`)。EmDash 0.39.1 には、`astro.config.mjs` で登録した native プラグインの起動時に呼ばれる hook が無い(`plugin:install` は呼ばれず、`plugin:activate` も起動時には呼ばれない)。クエリは最初の 1 回だけ増える(あれば 2、無ければ 1)。根拠: 実測+公式ドキュメント([[T29-plugin-definition#決めたこと|T29]]、[[emdash-native-plugin-lifecycle-hooks]])
+  - 無いまま画像を上げると、アップロードのルートが 500 `IMAGE_COLLECTION_MISSING` を返す([[#7. アップロード(書き込み経路)|7 章]])。
 - `b64_images` は上の構成で足りる。タイトル用のフィールドは要らない(作成・公開・取得・一覧ができ、管理画面の一覧とダッシュボードには ID が表示される)。根拠: 実測+公式ドキュメント([[T02-playground#結果|T02]])
   - `routable: false` は必須。プラグインが作るエントリには slug が無く、routable のままでは公開できない(`Cannot publish routable content without a slug`。`packages/core/src/database/repositories/content.ts:2305`)。
   - `hidden: true` で外れるのは、サイドバーとダッシュボードのクイックアクションだけ。ダッシュボードの件数と最近の更新には出る(画像本体は読まない)。
