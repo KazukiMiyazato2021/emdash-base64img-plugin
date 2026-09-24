@@ -49,6 +49,9 @@ created: 2026-09-23
   - 標準の新規作成の画面・REST・seed で作った画像は `imageRefs` に記録が無く、投稿から参照すると保存が拒否される。画像は widget からアップロードする([[T16-reference-hook#seed の画像の扱い|T16]])
 - [ ] サイト側の例: `getEmDashEntry` は、エントリが見つからないときも `error`(Astro の `LiveEntryNotFoundError`)を返す。`error` があるだけで 500 にすると、存在しない URL が 500 になる。playground の詳細ページ(`playground/src/pages/posts/[slug].astro`)の書き方を例にする([[playground-site-pages#getEmDashEntry は見つからないときも error を返す]])
 - [ ] サイト側の例: LCP の対象の画像に `priority` を付けるとき、対象の画像が見つからないとどの画像にも付かないことがある。描画できる最初の画像を選ぶ(仕様書 12 章、[[playground-site-pages#LCP の対象の選び方]])
+- [ ] 画像管理ページ(サイドバーの「プラグイン」の「画像」)の使い方: ゴミ箱への移動(寄稿者以上)、完全削除(管理者、ゴミ箱の画像だけ)、公開し直す(編集者以上、下書きの画像だけ)。ページの項目はロールで絞られず、閲覧者にも出る(開くと権限の文言)([[T25-images-page#結果|T25]])
+- [ ] ゴミ箱から戻す操作は画像管理ページに無い。戻すなら、標準 API の `POST /_emdash/api/content/b64_images/{id}/restore`(編集者以上)を使う。戻した画像は下書きになるので、画像管理ページの「公開」で公開し直す(仕様書 10 章・19 章)。EmDash の標準の画面でも戻せるとみられるが、1 ページ 100 件の base64 を読むので使わない(推測のみ。T33 で確かめて書く)
+- [ ] 管理画面のコマンドパレットで「Images」などと入力すると、非表示の `b64_images`(Base64 Images)も候補に出る。選ばない(標準の一覧が開き、重い)(仕様書 18 章)
 
 ## 完了条件
 
