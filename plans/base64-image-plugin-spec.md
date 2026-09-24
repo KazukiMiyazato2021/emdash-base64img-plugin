@@ -721,12 +721,13 @@ export default defineConfig({
 |---|---|
 | 単体テスト(vitest) | WebP ヘッダーの解析、サーバー側の検証、参照のスキーマ、画質の探索処理(エンコーダーを差し替え可能にして試す)、参照元の判定 |
 | widget のテスト(vitest + jsdom + Testing Library) | 操作と状態の遷移。jsdom には canvas がないので、エンコーダーはモックにする |
-| E2E(Playwright、Chromium・Firefox) | 実ブラウザの canvas で「圧縮 → アップロード → 保存 → サイトに表示(img の width / height を確認)→ 一覧のサムネイル → 画像管理ページ」を通しで確認する。Safari の検出は、toBlob が PNG を返すモックで確認する |
+| E2E(Playwright、Chromium・Firefox) | 実ブラウザの canvas で「圧縮 → アップロード → 保存 → サイトに表示(img の width / height を確認)→ 一覧のサムネイル → 画像管理ページ」を通しで確認する。ほかに、widget の操作(キーボード・ドロップ・貼り付け・並べ替え・上限)、一覧の列、画像管理ページ(ロールごとの操作・ページ送り)、異常系、処理中の保存、編集ロック、編集画面の開き方ごとの保存先、サイトのページ、サーバー側の検証(API に直接送る)を確認する。Safari の検出は、toBlob が PNG を返すモックで確認する |
 
 - `@emdash-cms/plugin-test` は使わない。sandboxed プラグイン向け(workerd とマニフェストが前提)のため(`packages/plugin-test/package.json`)。
 - playground: 普段の開発は Node + SQLite で素早く確認し、`wrangler dev` + D1 でも動くことを確かめる。
   - サイト側のページ(投稿の一覧 `/posts/`、詳細 `/posts/<slug>/`)と、アップロードのルートでサンプルの投稿を作るスクリプト(`playground/scripts/create-sample-posts.ts`)がある。seed には画像と投稿を入れない(seed の画像は `imageRefs` に記録が無く、それを参照する投稿は保存できないため)([[T26-playground-pages|T26]])。
   - E2E の入力画像(形式ごとの画像・大きすぎる画像・壊れた画像)は `e2e/fixtures/make-images.ts` で作り、git に入れない(40MB を超えるファイルを含むため)。macOS の `sips` と Playwright の Chromium を使う([[T26-playground-pages|T26]]、[[e2e-input-image-fixtures]])。
+- E2E は `npm run test:e2e` で実行する(`npm run verify` には入れない)。playground の開発サーバーを空のデータベースで起動して動かし、終わったら止める。スクリーンリーダーでの読み上げ、OS からの本物のドラッグ、ヘッドレスでない Firefox での貼り付け、翻訳の切り替え、Safari の実機は手で確認する([[T31-e2e|T31]]、[[e2e-playwright-emdash-admin]])。
 - Cloudflare の本番環境(Workers Free)でクエリ数と CPU 時間を測るのは任意。利用者のアカウントに手動でデプロイして行う。
 
 ## 16. 実装前の検証(スパイク)
