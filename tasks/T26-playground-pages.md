@@ -151,4 +151,4 @@ E2E と手動確認のために、サイト側のページとテストデータ�
 4. `sips` の無い環境(Linux の CI など)で E2E を動かすなら、JPEG・AVIF・BMP・TIFF・ICO・HEIC の作り方を替える必要がある(Chromium の canvas は JPEG と WebP を書ける。HEIC と AVIF は書けない)。
 
 > [!note] 反映済み(リーダー、マージのとき)
-> 知見ノート 2 つを索引に登録した。「他のタスクへの影響」と 3・4 は後続タスクのノートに、1 はサブタスクで扱う。2 は、E2E の実行の仕組みを作る [[T31-e2e|T31]] が `package.json` を変えるときに合わせて決める。
+> 知見ノート 2 つを索引に登録した。「他のタスクへの影響」と 3・4 は [[T26-2-handoff-playground-pages|T26-2]] で後続タスク(T29・T31・T32・T33)のノートに書き、1 は [[T26-1-typecheck-playground-scripts|T26-1]] で直した。2 は、E2E の実行の仕組みを作る [[T31-e2e|T31]] が `package.json` を変えるときに合わせて決める。
