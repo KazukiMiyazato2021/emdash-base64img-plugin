@@ -46,6 +46,7 @@ Node + SQLite だけでなく、workerd + D1 でも動くことを確かめる�
 - [ ] 任意: 利用者のアカウントの Workers Free にデプロイし、CPU 時間とクエリ数を測る(手動。利用者の了承を得てから行う)。CPU 時間は、アップロード 1 回の全体(body の parse・検証・作成・公開)で測る(Node での検証だけの時間は 0.28ms。[[emdash-plugin-route-body-limit]])
   - ルートの検証全体(T11)は Node で中央値 0.40ms / 0.93ms(`fromBase64` / `atob`)。workerd には `Uint8Array.fromBase64` がある([[T07-spike-git-dependency#結果|T07]]、[[server-image-validation]])
   - `preview` 10 件 × 500,000 バイトの JS の処理は、Node で 3.5〜5.6ms([[emdash-plugin-preview-thumbnail-routes]])。Workers でも 10ms に収まるかを測る
+- [ ] D1 で、アップロード 1 回のクエリ数を確かめる(SQLite では 75、i18n のサイトで 77。SQLite の `begin` / `commit` の 4 本は D1 では出ない見込み)。workerd でも `getI18nConfig()` がサイトの i18n の設定を返し、`target.locale` の確認が Node と同じになることを確かめる([[T18-upload-route#クエリ数|T18]]、[[emdash-plugin-upload-route]])
 
 ## 完了条件
 

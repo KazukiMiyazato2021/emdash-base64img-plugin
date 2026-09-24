@@ -58,6 +58,7 @@ created: 2026-09-23
 - [ ] T17 のルート(`src/server/routes/admin-data.ts`)は `routes: { [ROUTES.preview]: previewRoute, [ROUTES.thumbnails]: thumbnailsRoute }` で登録する。capability `content:read` と、ストレージ `imageRefs` の宣言が無いと 500 になる。`content:restore` は要らない([[T17-admin-data-routes#結果|T17]])
 - [ ] widget の `fieldTypes` は `["json"]` にする。T11 の検証は、このプラグインの widget を使う `json` フィールドだけを保存先として受け付ける([[T11-server-validation#結果|T11]])
 - [ ] `src/index.ts` 以下は、利用者のサイトの `tsc` でも検査される(`astro.config.mjs` から辿られる)。`npm run typecheck` の 3 つの設定を通す([[T04-1-consumer-typecheck|T04-1]]、[[T07-1-spec-distribution|T07-1]])
+- [ ] アップロードのルートは `uploadRoute`(`src/server/routes/upload.ts`)を `routes: { [ROUTES.upload]: uploadRoute }` で登録する。使う capability は `schema:read` / `content:write` / `content:publish`(`content:read` は補われる)、ストレージは `imageRefs`。ハンドラーは、EmDash の i18n の設定(`getI18nConfig()`)をリクエストのたびに読む([[T18-upload-route#T29 がルートを登録する方法|T18]])
 
 ## 完了条件
 

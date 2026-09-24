@@ -47,6 +47,8 @@ created: 2026-09-23
 - [ ] 1 枚ずつの部品は、画像ごとに区別できる名前を付ける: `FileSelectButton` の `aria-label`(「画像 2 を差し替え」)、`AltTextInput` の `itemLabel`(「画像 2」)、`ImageNotFound` の `size="small"` と `removeLabel`、`ImagePreview` の `size="small"`(96px の枠)。進捗は `UploadProgress` の `index`・`total`、追加し終えた枚数は `completed`
 - [ ] 「差し替え」「削除」「↑」「↓」「あと N 枚追加できます」などの文字は、自分の辞書(`defineMessages`)に持つ。部品は持たない
 - [ ] 見た目のクラスは、管理画面の CSS にあるものだけを使う(管理画面の CSS はビルド済みで、プラグインのファイルを読まない)。無いクラスと枠の色は style で書く。テストでは `tests/admin/admin-css.ts` の `findMissingClasses(container, sourceTokens("<自分のソース>"))` で、使うクラスが CSS にあることを確かめる([[T22-1-admin-css-test-helper|T22-1]]、[[emdash-admin-plugin-ui-styling]])
+- [ ] アップロードの応答の `ref`(`{ v, id, locale, width, height, alt: "" }`)は、そのままフィールドの値にする。`ref.locale` は画像エントリのロケール(サイトの既定)で、編集中のエントリのロケールではないので書き換えない。代替テキストは、入力欄の値を `alt` に入れる([[T18-upload-route#T23 が使う応答|T18]])
+- [ ] アップロードのエラーは、T14 の `useErrorMessage` でコードごとの文言を出す。`UPLOAD_FAILED`(500)は、作った画像エントリをルートがゴミ箱に移したあとのエラー、`IMAGE_ENTRY_INVALID`(400)は保存 hook が作成を拒否したもの。どちらもフィールドの値は変えない。複数の画像を順に送るとき、失敗した画像は値に足さず、その画像のエラーを出して次の画像に進むかを決める
 
 ## 完了条件
 
