@@ -432,9 +432,14 @@ flowchart LR
 ### 11.1 共通方針
 
 - コンポーネントは Kumo(`@cloudflare/kumo`)を使う(公式の field-kit と同じ)。
+  - 管理画面の CSS はビルド済みで、プラグインのファイルを読まない。Tailwind のクラスは、管理画面の CSS にあるものだけを使い、無いものは style で書く。枠の色のクラス(`border-kumo-brand` など)は、層の外の `*` の `border-color` に負けて当たらないので、style で付ける。根拠: 実測+公式ドキュメント([[emdash-admin-plugin-ui-styling]])
+  - 単一画像とギャラリーが共通で使う部品(ドロップゾーン・進捗・プレビュー・代替テキスト・エラー・「画像が見つかりません」)は `src/admin/parts/` に置く([[T22-widget-parts#結果|T22]])。
 - 文言は日本語と英語を用意し、`<html lang>` で切り替える。どちらでもなければ英語にする(`packages/admin/src/locales/LocaleDirectionProvider.tsx:21`)。
   - 管理画面の設定で言語を変えると、再読み込みせずに `<html lang>` が書き換わる。部品はこの変化を監視して文言を切り替える(`src/client/i18n.ts` の `useLocale()`)。根拠: 実測+公式ドキュメント([[emdash-admin-locale-lang]]、[[T14-admin-i18n-api#結果|T14]])
 - ファイル選択、並べ替え、削除は、すべてキーボードでも操作できるようにする。進捗は `aria-live` でスクリーンリーダーに伝える。
+  - 画像の追加: ドロップゾーンは枠の全体が 1 つのボタンで、Tab で移り、Enter / Space でファイルの選択を開く。ボタンにフォーカスがある状態で Ctrl+V(Mac は ⌘V)を押すと、クリップボードの画像を貼り付けられる。ドロップはキーボードではできないので、選択と貼り付けで代える。
+  - 貼り付けのイベントが届く要素はブラウザで違う(Chromium 153 はフォーカスのあるボタン、Firefox 155 は body)。`document` で受け、イベントの対象かフォーカスのある要素がドロップゾーンの中のときだけ扱う。根拠: 実測のみ([[admin-image-input-browser-behavior]])
+  - 進捗の読み上げは、段階(読み込み・圧縮・サムネイルの作成・アップロード)と何枚目かが変わったときだけにする。画質を探すたびには読み上げない。
 - plugin widget には `readOnly` が渡されない(`packages/admin/src/components/ContentEditor.tsx:1833`)。そのため、編集ロック中でも widget は操作できてしまう。これは EmDash 側の制約。
 
 ### 11.2 単一画像 widget(`base64-image:image`)
@@ -451,6 +456,7 @@ flowchart LR
 ```
 
 - アップロードのタイミング: 圧縮が終わった時点で、すぐにルートへ送る。失敗したらその場にエラーを表示し、フィールドの値は変えない。
+- 空のときに複数のファイルをドロップ・貼り付けされたら、受け付けずに「画像は 1 枚ずつ追加してください。」と表示する(EmDash 標準の画像フィールドのドロップ先と同じ。`packages/admin/src/components/media/ImageDropTarget.tsx:47`)。
 - プレビュー:
   - 追加したばかりの画像は、手元にある data URL をそのまま表示する。
   - 保存済みの画像は、編集画面を開いたときに、プラグインのルート(`preview`)からまとめて取得する。1 回の要求は 10 件(`PREVIEW_MAX_IDS`)までで、超える分は分けて並行に送る(20 枚のギャラリーは 2 回)。1 件は最大 500,000 バイトで、20 件をまとめると応答は最大 10MB、JS の処理は約 7〜10.5ms になり、Workers Free の CPU 時間(10ms)に届くため。10 件なら最大 5MB・約 3.5〜5.6ms で、クエリは 21。根拠: 実測のみ(Node + SQLite。Workers では未実測。[[T17-admin-data-routes#結果|T17]])
