@@ -215,6 +215,7 @@ flowchart LR
 - `MediaValue` 互換の形。読み出すときにエントリ ID を `id` に入れ、参照の `alt` を加えると `MediaValue` に代入できる。`alt` は使う場所ごとに変えられるよう参照側で持つので、画像エントリには持たせない(Q3 + Q9)。
 - `id` は値に持たせない。プラグインの `ctx.content.create` は ID を指定できず(`packages/core/src/emdash-runtime.ts:2135`)、新規作成時の `content:beforeSave` にも ID が渡らない(`:3339`)ため、作成が終わるまで ID が決まらない。根拠: 公式ドキュメントのみ([[T03-shared-contracts#結果|T03]])
 - `meta.quality` は、ブラウザが申告した圧縮時の画質。保存済みの画像を開いたときに widget で画質を表示するために持つ([[#11. 管理画面 UI|11.2]])。サーバーは確かめない。
+- `meta.bytes` は、保存 hook([[#8. サーバー側の検証|8 章]]の②)が、`src` をデコードした WebP 本体のバイト数と一致することを確かめる([[T11-server-validation#結果|T11]])。
 - 作成時のロケールは、サイトの既定ロケールにする(`ctx.content.create` の既定値。`packages/core/src/plugins/types.ts:476`)。
 - 画像エントリは、作成したあと変更しない。
 
@@ -306,6 +307,7 @@ flowchart LR
 
 - 本体と同時に、長辺 96px 程度の WebP を、data URL の長さで 8,000 バイト以下(WebP 本体で 5,982 バイト以下)で作る。アップロード時に一緒に送り、`imageRefs.thumb` に保存する。
   - 画質は本体の既定と同じ 0.60〜0.92 の範囲で、6.3 と同じ順に探し、収まる最高の画質にする。96px より小さい画像は拡大しない。96px の画質 0.60 でも収まらなければ 0.8 倍ずつ縮め、長辺が 48px を下回ったらエラー(`THUMB_OVER_BUDGET`)にする([[T13-encode-search#結果|T13]])。
+  - サーバーは、長辺が 96px 以下の静止画の WebP だけを受け付ける(超えると `THUMB_DATA_INVALID`)。一覧に最大 100 枚並ぶので、小さなデータで大きな寸法を持つ画像を入れさせないため([[T11-server-validation#結果|T11]])。
 - 用途: コンテンツ一覧の列と、画像管理ページ。
 
 ### 6.5 入力形式と上限(Q8)
